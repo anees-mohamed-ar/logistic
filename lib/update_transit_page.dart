@@ -3,10 +3,12 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'api_config.dart'; // Assuming ApiConfig file with baseUrl
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:logistic/widgets/searchable_dropdown.dart';
 
 class UpdateTransitPage extends StatefulWidget {
   const UpdateTransitPage({Key? key}) : super(key: key);
@@ -117,49 +119,141 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
     });
 
     try {
+      print('Fetching GC details for: $gcNumber');
+      
+      // First, try to get the GC details directly by GC number
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/gc/search/gcnum?gcNumber=$gcNumber'),
+        Uri.parse('${ApiConfig.baseUrl}/gc/search?GcNumber=$gcNumber'),
       );
+
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as List<dynamic>;
-        if (data.isNotEmpty) {
-          setState(() {
-            gcDetails = data[0] as Map<String, dynamic>;
-            isGcDetailsExpanded = true;
-
-            if (gcDetails!.containsKey('Day1')) {
-              final dateStr = gcDetails!['Day1'];
-              if (dateStr != null) {
-                final date = DateTime.tryParse(dateStr);
-                transitDates[0] = date;
-                for (int i = 1; i < 8; i++) {
-                  transitDates[i] = date != null
-                      ? date.add(Duration(days: i))
-                      : null;
-                }
-              }
+        print('GC search response: ${response.body}');
+        
+        final responseData = jsonDecode(response.body);
+        
+        if (responseData is List && responseData.isNotEmpty) {
+          // If we got a list, take the first item
+          final gcData = responseData[0];
+          
+          if (gcData is Map<String, dynamic>) {
+            setState(() {
+              gcDetails = gcData;
+              _processGcDetails();
+            });
+            return;
+          }
+        } 
+        
+        // If direct search didn't work, try getting by ID
+        if (responseData is List && responseData.isNotEmpty && responseData[0]['Id'] != null) {
+          final gcId = responseData[0]['Id'];
+          print('Fetching GC details by ID: $gcId');
+          
+          final detailResponse = await http.get(
+            Uri.parse('${ApiConfig.baseUrl}/gc/search/$gcId'),
+          );
+          
+          if (detailResponse.statusCode == 200) {
+            print('GC details response: ${detailResponse.body}');
+            final detailData = jsonDecode(detailResponse.body);
+            
+            if (detailData is List && detailData.isNotEmpty) {
+              setState(() {
+                gcDetails = detailData[0];
+                _processGcDetails();
+              });
+              return;
             }
-
-            for (int i = 0; i < 8; i++) {
-              final placeKey = 'Day${i + 1}Place';
-              if (gcDetails!.containsKey(placeKey)) {
-                placeControllers[i].text = gcDetails![placeKey] ?? '';
-                if (placeControllers[i].text.trim() ==
-                    gcDetails!['TruckTo']?.trim()) {
-                  lastEditableTransitIndex = i;
-                }
-              }
-            }
-
-            if (placeControllers[0].text.isEmpty &&
-                gcDetails!['TruckFrom'] != null) {
-              placeControllers[0].text = gcDetails!['TruckFrom'];
-            }
-          });
+          }
         }
+        
+        throw Exception('Invalid GC data format received');
+      } else {
+        throw Exception('Failed to fetch GC details: ${response.statusCode}');
       }
+    } catch (e) {
+      print('Error in fetchGcDetails: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to fetch GC details: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     } finally {
       setState(() => isLoadingGc = false);
+    }
+  }
+  
+  void _processGcDetails() {
+    if (gcDetails == null) return;
+    
+    isGcDetailsExpanded = true;
+    
+    try {
+      // Parse transit dates
+      for (int i = 1; i <= 8; i++) {
+        final dayKey = 'Day$i';
+        final placeKey = 'Day${i}Place';
+        
+        if (gcDetails!.containsKey(dayKey) && gcDetails![dayKey] != null) {
+          try {
+            transitDates[i-1] = DateTime.tryParse(gcDetails![dayKey].toString());
+          } catch (e) {
+            print('Error parsing date for $dayKey: ${gcDetails![dayKey]}');
+          }
+        }
+        
+        if (gcDetails!.containsKey(placeKey)) {
+          placeControllers[i-1].text = gcDetails![placeKey]?.toString() ?? '';
+          
+          // Check if this is the destination
+          if (placeControllers[i-1].text.trim().isNotEmpty &&
+              gcDetails!.containsKey('TruckTo') &&
+              placeControllers[i-1].text.trim().toLowerCase() == 
+              gcDetails!['TruckTo']?.toString().trim().toLowerCase()) {
+            lastEditableTransitIndex = i-1;
+          }
+        }
+      }
+
+      // Set first location to TruckFrom if empty
+      if (placeControllers[0].text.isEmpty && 
+          gcDetails!.containsKey('TruckFrom') &&
+          gcDetails!['TruckFrom'] != null) {
+        placeControllers[0].text = gcDetails!['TruckFrom'].toString();
+      }
+
+      // Parse other dates
+      if (gcDetails!.containsKey('UnloadedDate') && 
+          gcDetails!['UnloadedDate'] != null) {
+        unloadedDate = DateTime.tryParse(gcDetails!['UnloadedDate'].toString());
+      }
+      
+      if (gcDetails!.containsKey('NewReceiptDate') && 
+          gcDetails!['NewReceiptDate'] != null) {
+        receiptDate = DateTime.tryParse(gcDetails!['NewReceiptDate'].toString());
+      }
+      
+      // Parse remarks
+      reportRemarksController.text = gcDetails!['ReportRemarks']?.toString() ?? '';
+      unloadedRemarksController.text = gcDetails!['UnloadedRemark']?.toString() ?? '';
+      receiptRemarksController.text = gcDetails!['ReceiptRemarks']?.toString() ?? '';
+      
+      // Disable fields if dates are in the past
+      final now = DateTime.now();
+      isUnloadedDateEditable = unloadedDate == null || unloadedDate!.isAfter(now);
+      isReceiptDateEditable = receiptDate == null || receiptDate!.isAfter(now);
+      
+    } catch (e) {
+      print('Error processing GC details: $e');
+      Get.snackbar(
+        'Error',
+        'Error processing GC details: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     }
   }
 
@@ -258,9 +352,9 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
     final pdf = pw.Document();
 
     // Sample data (replace with actual input variables)
-    final String companyName = 'GLOBE TRANSPORT CORPORATION';
+    final String companyName = 'iMatrix Technologies Pvt Ltd';
     final String companyAddress =
-        'NO 40, 4th Floor, Lakshmi Complex K.R.Road, Fort, Bangalore- 560002';
+        'iMatrix Technologies Pvt Ltd #R-76 M M D A Colony, Arumbakkam, Chennai - 600 106';
     final String gcNumberText = '411308';
     final String fromText = 'Palakkad';
     final String toText = 'KGF';
@@ -1147,48 +1241,71 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
         'UnloadedDate': unloadedDate != null ? formatDate(unloadedDate) : null,
         'NewReceiptDate': receiptDate != null ? formatDate(receiptDate) : null,
         'UnloadedRemark': unloadedRemarksController.text.isNotEmpty
-            ? unloadedRemarksController.text
+              ? unloadedRemarksController.text
             : null,
-        'ReceiptTime': receiptTime != null ? formatTime(receiptTime) : null,
-        'UnloadedTime': unloadedTime != null ? formatTime(unloadedTime) : null,
-        'ReportTime': reportRemarksController.text.isNotEmpty
-            ? formatTime(TimeOfDay.now())
-            : null,
-        'Success': true,
       };
 
+      // Add Success field to payload
+      payload['Success'] = '1';
+      
+      // Log the request for debugging
+      print('Sending update request to backend:');
+      print('URL: ${ApiConfig.baseUrl}/gc/update/${gcDetails!['Id']}/${gcDetails!['GcNumber']}');
+      print('Body: $payload');
+
+      // Validate payload
+      if (gcDetails!['Id'] == null || gcDetails!['GcNumber'] == null) {
+        throw Exception('Invalid GC details: Missing ID or GC Number');
+      }
+
+      // Remove null values from payload
+      payload.removeWhere((key, value) => value == null);
+
+      final url = '${ApiConfig.baseUrl}/gc/update/${gcDetails!['Id']}/${gcDetails!['GcNumber']}';
+      print('Sending PUT request to: $url');
+      print('Payload: $payload');
+
       final response = await http.put(
-        Uri.parse(
-          '${ApiConfig.baseUrl}/gc/update/${gcDetails!['Id']}/$selectedGcNumber',
-        ),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: jsonEncode(payload),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('Request timed out after 30 seconds');
+        },
       );
 
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
       if (response.statusCode == 200) {
+        // Refresh the GC details after successful update
+        await fetchGcDetails(selectedGcNumber!);
+        
         Get.snackbar(
           'Success',
-          'Transit details saved successfully!',
+          'Transit details updated successfully',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.green,
           colorText: Colors.white,
+          duration: Duration(seconds: 3),
         );
       } else {
-        Get.snackbar(
-          'Error',
-          'Failed to save transit details: ${response.statusCode}',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
+        throw Exception('Failed to update transit details: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
+      print('Error updating transit details: $e');
       Get.snackbar(
         'Error',
-        'Error saving transit details: $e',
+        'Failed to update transit details: ${e.toString()}',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
+        duration: Duration(seconds: 5),
       );
     } finally {
       setState(() {
@@ -1247,12 +1364,15 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
+                  SearchableDropdown<String>(
+                    label: 'GC Number',
                     value: selectedGcNumber,
-                    hint: const Text('Select GC Number'),
                     items: gcNumbers
-                        .map(
-                          (gc) => DropdownMenuItem(value: gc, child: Text(gc)),
+                        .map<DropdownMenuItem<String>>(
+                          (gc) => DropdownMenuItem(
+                            value: gc,
+                            child: Text(gc),
+                          ),
                         )
                         .toList(),
                     onChanged: (val) {
@@ -1264,24 +1384,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                         fetchGcDetails(val);
                       }
                     },
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF1E2A44)),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF1E2A44)),
-                      ),
-                    ),
-                    dropdownColor: Colors.white,
-                    style: const TextStyle(color: Colors.black, fontSize: 16),
+                    isRequired: true,
                   ),
                   const SizedBox(height: 24),
                   if (isLoadingGc)

@@ -3,7 +3,10 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:logistic/gc_form_screen.dart';
+import 'package:logistic/controller/id_controller.dart';
+import 'package:logistic/controller/gc_form_controller.dart';
 import 'api_config.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class GCListPage extends StatefulWidget {
   const GCListPage({Key? key}) : super(key: key);
@@ -150,7 +153,15 @@ class _GCListPageState extends State<GCListPage> {
                   filterSearchResults('');
                 },
                 icon: const Icon(Icons.clear),
-                label: const Text('Clear search'),
+                label: const Text('Clear Search'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  minimumSize: const Size(0, 40),
+                  visualDensity: VisualDensity.compact,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
           ],
         ),
@@ -178,13 +189,6 @@ class _GCListPageState extends State<GCListPage> {
                         gc['GcNumber'] ?? '',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 20),
-                      onPressed: () => _navigateToEditGc(gc),
-                      tooltip: 'Edit GC',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
                     ),
                   ],
                 ),
@@ -226,7 +230,24 @@ class _GCListPageState extends State<GCListPage> {
                         _infoRow('Delivery Address', gc['DeliveryAddress']),
                         _infoRow('Freight Charge', gc['FreightCharge']),
                         _infoRow('Payment Method', gc['PaymentDetails']),
-                        // Add more fields as needed
+                        const SizedBox(height: 16),
+                        // Edit button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _editGC(gc),
+                            icon: const Icon(Icons.edit, size: 18),
+                            label: const Text('Edit GC'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4A90E2),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ),
                       ].where((w) => w != null).cast<Widget>().toList(),
                     ),
                   ),
@@ -239,38 +260,193 @@ class _GCListPageState extends State<GCListPage> {
     );
   }
 
-  void _navigateToEditGc(Map<String, dynamic> gcData) {
-    // Convert the GC data to match the form's expected format
-    final formData = {
-      'gcNumber': gcData['GcNumber'],
-      'gcDate': gcData['GcDate'],
-      'branch': gcData['Branch'],
-      'truckNumber': gcData['TruckNumber'],
-      'poNumber': gcData['PoNumber'],
-      'tripId': gcData['TripId'],
-      'brokerName': gcData['BrokerName'],
-      'driverName': gcData['DriverName'],
-      'driverPhone': gcData['DriverPhoneNumber'],
-      'consignorName': gcData['ConsignorName'],
-      'consignorGst': gcData['ConsignorGst'],
-      'consignorAddress': gcData['ConsignorAddress'],
-      'consigneeName': gcData['ConsigneeName'],
-      'consigneeGst': gcData['ConsigneeGst'],
-      'consigneeAddress': gcData['ConsigneeAddress'],
-      'numberOfPackages': gcData['NumberofPkg'],
-      'packageMethod': gcData['MethodofPkg'],
-      'actualWeight': gcData['ActualWeightKgs'],
-      'rate': gcData['Rate'],
-      'distance': gcData['km'],
-      'hireAmount': gcData['HireAmount'],
-      'advanceAmount': gcData['AdvanceAmount'],
-      'deliveryAddress': gcData['DeliveryAddress'],
-      'freightCharge': gcData['FreightCharge'],
-      'paymentMethod': gcData['PaymentDetails'],
-      // Add other fields as needed
-    };
 
-    Get.to(() => const GCFormScreen(), arguments: {'gcData': formData, 'isEditMode': true});
+  void _editGC(Map<String, dynamic> gc) {
+    // Get company ID from IdController
+    final idController = Get.find<IdController>();
+    final companyId = idController.companyId.value;
+    
+    if (companyId.isEmpty) {
+      Fluttertoast.showToast(
+        msg: 'Company ID not found. Please login again.',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    // Check if we already have a controller (e.g., when coming back from another screen)
+    final gcController = Get.put(GCFormController(), permanent: false);
+    
+    // Reset the form before populating with new data
+    gcController.clearForm();
+    
+    // Set edit mode before populating the form
+    gcController.isEditMode.value = true;
+    gcController.editingGcNumber.value = gc['GcNumber']?.toString() ?? '';
+    gcController.editingCompanyId.value = companyId;
+
+    // Populate form with existing GC data
+    _populateFormWithGCData(gcController, gc, companyId);
+
+    // Navigate to GC form screen
+    Get.to(
+      () => const GCFormScreen(),
+      preventDuplicates: false,
+    )?.then((_) {
+      // Don't dispose the controller here as it might still be in use
+      // The controller will be properly managed by GetX's dependency injection
+    });
+  }
+
+  void _populateFormWithGCData(GCFormController controller, Map<String, dynamic> gc, String companyId) {
+    // Store the GC number and company ID for update operation
+    controller.gcNumberCtrl.text = gc['GcNumber']?.toString() ?? '';
+    
+    // Set edit mode flag (we'll add this to the controller)
+    controller.isEditMode.value = true;
+    controller.editingGcNumber.value = gc['GcNumber']?.toString() ?? '';
+    controller.editingCompanyId.value = companyId;
+
+    // Populate all available fields from the GC data
+    controller.selectedBranch.value = gc['Branch']?.toString() ?? 'Select Branch';
+    
+    // Handle dates
+    if (gc['GcDate'] != null) {
+      try {
+        final gcDate = DateTime.parse(gc['GcDate'].toString());
+        controller.gcDate.value = gcDate;
+        controller.gcDateCtrl.text = controller.formatDate(gcDate);
+      } catch (e) {
+        // Handle date parsing error
+      }
+    }
+    
+    if (gc['DeliveryDate'] != null) {
+      try {
+        final deliveryDate = DateTime.parse(gc['DeliveryDate'].toString());
+        controller.deliveryDate.value = deliveryDate;
+        controller.deliveryDateCtrl.text = controller.formatDate(deliveryDate);
+      } catch (e) {
+        // Handle date parsing error
+      }
+    }
+
+    // Vehicle details
+    controller.selectedTruck.value = gc['TruckNumber']?.toString() ?? 'Select Truck';
+    controller.truckNumberCtrl.text = gc['TruckNumber']?.toString() ?? '';
+    controller.truckTypeCtrl.text = gc['TruckType']?.toString() ?? '';
+    controller.poNumberCtrl.text = gc['PoNumber']?.toString() ?? '';
+    controller.tripIdCtrl.text = gc['TripId']?.toString() ?? '';
+
+    // Location details
+    controller.fromCtrl.text = gc['TruckFrom']?.toString() ?? '';
+    controller.toCtrl.text = gc['TruckTo']?.toString() ?? '';
+
+    // Parties details
+    controller.selectedBroker.value = gc['BrokerName']?.toString() ?? 'Select Broker';
+    controller.brokerNameCtrl.text = gc['BrokerName']?.toString() ?? '';
+    controller.selectedDriver.value = gc['DriverName']?.toString() ?? '';
+    controller.driverNameCtrl.text = gc['DriverName']?.toString() ?? '';
+    controller.driverPhoneCtrl.text = gc['DriverPhoneNumber']?.toString() ?? '';
+
+    // Consignor details
+    controller.selectedConsignor.value = gc['ConsignorName']?.toString() ?? 'Select Consignor';
+    controller.consignorNameCtrl.text = gc['ConsignorName']?.toString() ?? '';
+    controller.consignorGstCtrl.text = gc['ConsignorGst']?.toString() ?? '';
+    controller.consignorAddressCtrl.text = gc['ConsignorAddress']?.toString() ?? '';
+    
+    // Consignee details
+    final consigneeAddress = gc['ConsigneeAddress']?.toString() ?? '';
+    controller.selectedConsignee.value = gc['ConsigneeName']?.toString() ?? 'Select Consignee';
+    controller.consigneeNameCtrl.text = gc['ConsigneeName']?.toString() ?? '';
+    controller.consigneeGstCtrl.text = gc['ConsigneeGst']?.toString() ?? '';
+    controller.consigneeAddressCtrl.text = consigneeAddress;
+    
+    // Goods details - using correct field names from the API response
+    final weight = gc['ActualWeightKgs']?.toString() ?? ''; // Using ActualWeightKgs instead of Weight
+    final natureOfGoods = gc['GoodContain']?.toString() ?? ''; // Using GoodContain for nature of goods
+    final methodOfPkg = (gc['MethodofPkg']?.toString() ?? '').isNotEmpty 
+        ? gc['MethodofPkg'].toString() 
+        : 'Boxes';
+        
+    print('Nature of goods from API: $natureOfGoods'); // Debug log
+    
+    // Update weight
+    controller.weightCtrl.text = weight;
+    
+    // Update nature of goods in both controllers
+    controller.natureOfGoodsCtrl.text = natureOfGoods;
+    controller.natureGoodsCtrl.text = natureOfGoods;
+    
+    // Update package method - convert to title case for consistency
+    final formattedMethod = (methodOfPkg?.isNotEmpty ?? false)
+        ? '${methodOfPkg![0].toUpperCase()}${methodOfPkg.substring(1).toLowerCase()}'
+        : 'Boxes';
+    controller.methodPackageCtrl.text = formattedMethod;
+    controller.selectedPackageMethod.value = formattedMethod;
+    
+    // Update other goods fields
+    controller.packagesCtrl.text = gc['NumberofPkg']?.toString() ?? '';
+    controller.actualWeightCtrl.text = weight; // Using the same weight value
+    
+    // Set billing address to consignee's address
+    controller.billingAddressCtrl.text = consigneeAddress;
+    
+    // Pre-fill KM and Rate BEFORE selecting weight so calculation has all inputs
+    controller.actualWeightCtrl.text = gc['ActualWeightKgs']?.toString() ?? '';
+    controller.kmCtrl.text = gc['km']?.toString() ?? '';
+    controller.rateCtrl.text = gc['Rate']?.toString() ?? '';
+
+    // Auto-select the appropriate weight bracket (e.g., 0-250, 251-500) for the given actual weight
+    if (weight.isNotEmpty) {
+      controller.selectWeightForActualWeight(weight);
+    } else {
+      controller.selectedWeight.value = null;
+      controller.calculateRate();
+    }
+
+    // Force update the UI
+    controller.update();
+
+    // Charges details
+    controller.hireAmountCtrl.text = gc['HireAmount']?.toString() ?? '';
+    controller.advanceAmountCtrl.text = gc['AdvanceAmount']?.toString() ?? '';
+    controller.deliveryAddressCtrl.text = gc['DeliveryAddress']?.toString() ?? '';
+    // If backend has a stored total, keep it only if calculation didn't produce one
+    if ((controller.freightChargeCtrl.text).isEmpty) {
+      controller.freightChargeCtrl.text = gc['FreightCharge']?.toString() ?? '';
+    }
+    controller.selectedPayment.value = gc['PaymentDetails']?.toString() ?? 'Cash';
+
+    // Additional fields that might be available
+    controller.customInvoiceCtrl.text = gc['CustInvNo']?.toString() ?? '';
+    controller.invValueCtrl.text = gc['InvValue']?.toString() ?? '';
+    controller.ewayBillCtrl.text = gc['EInv']?.toString() ?? '';
+    
+    // Handle E-way bill date
+    if (gc['EInvDate'] != null) {
+      try {
+        final ewayDate = DateTime.parse(gc['EInvDate'].toString());
+        controller.ewayBillDate.value = ewayDate;
+        controller.ewayBillDateCtrl.text = controller.formatDate(ewayDate);
+      } catch (e) {
+        // Handle date parsing error
+      }
+    }
+    
+    // Handle E-way bill expiry date
+    if (gc['Eda'] != null) {
+      try {
+        final ewayExpDate = DateTime.parse(gc['Eda'].toString());
+        controller.ewayExpired.value = ewayExpDate;
+        controller.ewayExpiredCtrl.text = controller.formatDate(ewayExpDate);
+      } catch (e) {
+        // Handle date parsing error
+      }
+    }
   }
 
   Widget _infoRow(String label, dynamic value) {

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:logistic/widgets/main_layout.dart';
+import 'package:logistic/controller/id_controller.dart';
 import 'routes.dart';
 
 class HomePage extends StatelessWidget {
@@ -10,183 +12,233 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isSmallScreen = MediaQuery.of(context).size.width < 700;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Logistics Dashboard'),
-        backgroundColor: const Color(0xFF1E2A44),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(icon: const Icon(Icons.notifications), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.account_circle), onPressed: () {}),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => Get.offAllNamed(AppRoutes.login),
+    final idController = Get.find<IdController>();
+    final isAdmin = idController.userRole.value == 'admin';
+
+    return MainLayout(
+        title: 'Logistics Dashboard',
+        showBackButton: false,
+        child: Container(
+        color: const Color(0xFFF7F9FC),
+    child: LayoutBuilder(
+    builder: (context, constraints) {
+    return SingleChildScrollView(
+    child: ConstrainedBox(
+    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+    child: SingleChildScrollView(
+    padding: const EdgeInsets.all(16.0),
+    child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+    // Summary Cards
+    _buildSummaryCards(isSmallScreen),
+    // const SizedBox(height: 24),
+    // // Search & Filter
+    // Row(
+    // children: [
+    // Expanded(
+    // child: TextField(
+    // decoration: InputDecoration(
+    // hintText: 'Search GC, Vehicle, Driver... ',
+    // prefixIcon: const Icon(Icons.search),
+    // filled: true,
+    // fillColor: Colors.white,
+    // contentPadding: const EdgeInsets.symmetric(
+    // vertical: 0,
+    // horizontal: 16,
+    // ),
+    // border: OutlineInputBorder(
+    // borderRadius: BorderRadius.circular(10),
+    // borderSide: BorderSide.none,
+    // ),
+    // ),
+    // ),
+    // ),
+    // const SizedBox(width: 12),
+    // ElevatedButton.icon(
+    // onPressed: () {},
+    // icon: const Icon(Icons.filter_alt),
+    // label: const Text('Filter'),
+    // style: ElevatedButton.styleFrom(
+    // backgroundColor: theme.primaryColor,
+    // foregroundColor: Colors.white,
+    // padding: const EdgeInsets.symmetric(
+    // horizontal: 18,
+    // vertical: 14,
+    // ),
+    // shape: RoundedRectangleBorder(
+    // borderRadius: BorderRadius.circular(10),
+    // ),
+    // ),
+    // ),
+    // ],
+    // ),
+    const SizedBox(height: 24),
+    // Quick Actions
+    const Text(
+    'Quick Actions',
+    style: TextStyle(
+    fontSize: 20,
+    fontWeight: FontWeight.bold,
+    color: Color(0xFF1E2A44),
+    ),
+    ),
+    const SizedBox(height: 16),
+    GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: isSmallScreen ? 2 : 4,
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 1.2,
+      children: [
+        // Operations
+        _buildActionCard(
+          context,
+          icon: Icons.note_add,
+          title: 'New GC Note',
+          color: const Color(0xFF4A90E2),
+          onTap: () => Get.toNamed(AppRoutes.gcForm),
+        ),
+        _buildActionCard(
+          context,
+          icon: Icons.list_alt,
+          title: 'GC List',
+          color: const Color(0xFF34A853),
+          onTap: () => Get.toNamed(AppRoutes.gcList),
+        ),
+        _buildActionCard(
+          context,
+          icon: Icons.update,
+          title: 'Update Transit',
+          color: const Color(0xFF8E24AA),
+          onTap: () => Get.toNamed(AppRoutes.updateTransit),
+        ),
+        if (isAdmin)
+          _buildActionCard(
+            context,
+            icon: Icons.bar_chart,
+            title: 'Reports',
+            color: const Color(0xFF388E3C),
+            onTap: () => Get.toNamed(AppRoutes.gcReport),
+          ),
+
+        // Fleet
+        if (isAdmin)
+          _buildActionCard(
+            context,
+            icon: Icons.local_shipping,
+            title: 'Truck Management',
+            color: const Color(0xFF5D4037),
+            onTap: () => Get.toNamed(AppRoutes.truckList),
+          ),
+
+        // Masters (Admin)
+        if (isAdmin) ...[
+          _buildActionCard(
+            context,
+            icon: Icons.speed,
+            title: 'KM Management',
+            color: const Color(0xFF00BFA5),
+            onTap: () => Get.toNamed(AppRoutes.kmList),
+          ),
+          _buildActionCard(
+            context,
+            icon: Icons.location_on,
+            title: 'Locations',
+            color: const Color(0xFF9C27B0),
+            onTap: () => Get.toNamed(AppRoutes.locationList),
+          ),
+          _buildActionCard(
+            context,
+            icon: Icons.people,
+            title: 'Customers',
+            color: const Color(0xFFFF9800),
+            onTap: () => Get.toNamed(AppRoutes.customerList),
+          ),
+          _buildActionCard(
+            context,
+            icon: Icons.inventory,
+            title: 'Suppliers',
+            color: const Color(0xFF795548),
+            onTap: () => Get.toNamed(AppRoutes.supplierList),
+          ),
+          _buildActionCard(
+            context,
+            icon: Icons.people,
+            title: 'Drivers',
+            color: const Color(0xFFEA4335),
+            onTap: () => Get.toNamed(AppRoutes.driverManagement),
+          ),
+          _buildActionCard(
+            context,
+            icon: Icons.business,
+            title: 'Consignors',
+            color: const Color(0xFF7B1FA2),
+            onTap: () => Get.toNamed(AppRoutes.consignorList),
+          ),
+          _buildActionCard(
+            context,
+            icon: Icons.person,
+            title: 'Consignees',
+            color: const Color(0xFF0288D1),
+            onTap: () => Get.toNamed(AppRoutes.consigneeList),
+          ),
+          _buildActionCard(
+            context,
+            icon: Icons.assignment,
+            title: 'Broker Management',
+            color: const Color(0xFF9C27B0),
+            onTap: () => Get.toNamed(AppRoutes.brokerList),
+          ),
+          _buildActionCard(
+            context,
+            icon: Icons.scale,
+            title: 'Weight Management',
+            color: const Color(0xFF607D8B),
+            onTap: () => Get.toNamed(AppRoutes.weightRateList),
+          ),
+          _buildActionCard(
+            context,
+            icon: Icons.receipt,
+            title: 'GST Management',
+            color: const Color(0xFF607D8B),
+            onTap: () => Get.toNamed(AppRoutes.gstList),
           ),
         ],
-      ),
-      backgroundColor: const Color(0xFFF7F9FC),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Summary Cards
-                    _buildSummaryCards(isSmallScreen),
-                    const SizedBox(height: 24),
-                    // Search & Filter
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            decoration: InputDecoration(
-                              hintText: 'Search GC, Vehicle, Driver... ',
-                              prefixIcon: const Icon(Icons.search),
-                              filled: true,
-                              fillColor: Colors.white,
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 0,
-                                horizontal: 16,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: () {},
-                          icon: const Icon(Icons.filter_alt),
-                          label: const Text('Filter'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 14,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    // Quick Actions
-                    const Text(
-                      'Quick Actions',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E2A44),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: isSmallScreen ? 2 : 4,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 1.2,
-                      children: [
-                        _buildActionCard(
-                          context,
-                          icon: Icons.note_add,
-                          title: 'New GC Note',
-                          color: const Color(0xFF4A90E2),
-                          onTap: () => Get.toNamed(AppRoutes.gcForm),
-                        ),
-                        _buildActionCard(
-                          context,
-                          icon: Icons.list_alt,
-                          title: 'GC List',
-                          color: const Color(0xFF34A853),
-                          onTap: () =>
-                              Navigator.of(context).pushNamed('/gcList'),
-                        ),
-                        _buildActionCard(
-                          context,
-                          icon: Icons.local_shipping,
-                          title: 'Vehicles',
-                          color: const Color(0xFFFBBC05),
-                          onTap: () {},
-                        ),
-                        _buildActionCard(
-                          context,
-                          icon: Icons.people,
-                          title: 'Drivers',
-                          color: const Color(0xFFEA4335),
-                          onTap: () {},
-                        ),
-                        _buildActionCard(
-                          context,
-                          icon: Icons.business,
-                          title: 'Consignors',
-                          color: const Color(0xFF7B1FA2),
-                          onTap: () {},
-                        ),
-                        _buildActionCard(
-                          context,
-                          icon: Icons.person,
-                          title: 'Consignees',
-                          color: const Color(0xFF0288D1),
-                          onTap: () {},
-                        ),
-                        _buildActionCard(
-                          context,
-                          icon: Icons.bar_chart,
-                          title: 'Reports',
-                          color: const Color(0xFF388E3C),
-                          onTap: () =>
-                              Navigator.of(context).pushNamed('/gcReport'),
-                        ),
-                        _buildActionCard(
-                          context,
-                          icon: Icons.settings,
-                          title: 'Settings',
-                          color: const Color(0xFF757575),
-                          onTap: () {},
-                        ),
-                        _buildActionCard(
-                          context,
-                          icon: Icons.update,
-                          title: 'Update Transit',
-                          color: const Color(0xFF8E24AA),
-                          onTap: () => Get.toNamed(AppRoutes.updateTransit),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    // Notifications/Alerts
-                    _buildNotificationsSection(),
-                    const SizedBox(height: 24),
-                    // Recent Activity
-                    const Text(
-                      'Recent Activity',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E2A44),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildRecentActivityList(constraints),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
+
+        // Utilities
+        _buildActionCard(
+          context,
+          icon: Icons.settings,
+          title: 'Settings',
+          color: const Color(0xFF757575),
+          onTap: () {},
+        ),
+      ],
+    ),
+    const SizedBox(height: 24),
+    // Notifications/Alerts
+    _buildNotificationsSection(),
+    const SizedBox(height: 24),
+    // Recent Activity
+    const Text(
+    'Recent Activity',
+    style: TextStyle(
+    fontSize: 20,
+    fontWeight: FontWeight.bold,
+    color: Color(0xFF1E2A44),
+    ),
+    ),
+    const SizedBox(height: 8),
+    _buildRecentActivityList(constraints),
+    ],
+    ),
+    ),
+    ),
+    );
+    },
+    ),)
     );
   }
 
@@ -244,11 +296,11 @@ class HomePage extends StatelessWidget {
   }
 
   Widget _buildSummaryCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+      String title,
+      String value,
+      IconData icon,
+      Color color,
+      ) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -288,12 +340,12 @@ class HomePage extends StatelessWidget {
   }
 
   Widget _buildActionCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
+      BuildContext context, {
+        required IconData icon,
+        required String title,
+        required Color color,
+        required VoidCallback onTap,
+      }) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -362,7 +414,7 @@ class HomePage extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         ...notifications.map(
-          (n) => Card(
+              (n) => Card(
             margin: const EdgeInsets.only(bottom: 8),
             elevation: 1,
             child: ListTile(

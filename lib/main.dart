@@ -8,9 +8,15 @@ import 'home_page.dart';
 import 'gc_form_screen.dart';
 import 'gc_report_page.dart';
 import 'controller/id_controller.dart';
+import 'controller/location_controller.dart';
+import 'controller/customer_controller.dart';
+import 'controller/weight_to_rate_controller.dart';
 
 void main() {
   Get.put(IdController());
+  Get.put(LocationController());
+  Get.put(CustomerController());
+  Get.put(WeightToRateController());
   runApp(const LogisticsGCApp());
 }
 
@@ -68,14 +74,6 @@ class LogisticsGCApp extends StatelessWidget {
       initialRoute: AppRoutes.login,
       getPages: AppRoutes.routes,
       debugShowCheckedModeBanner: false,
-      routes: {
-        AppRoutes.login: (context) => const LoginScreen(),
-        AppRoutes.home: (context) => const HomePage(),
-        AppRoutes.gcForm: (context) => const GCFormScreen(),
-        AppRoutes.gcList: (context) => const GCListPage(),
-        AppRoutes.gcReport: (context) => const GCReportPage(),
-        AppRoutes.updateTransit: (context) => const UpdateTransitPage(),
-      },
     );
   }
 }

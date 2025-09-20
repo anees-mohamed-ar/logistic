@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'dart:math' as math;
+import 'package:logistic/api_config.dart';
 import 'dart:convert';
-import 'api_config.dart';
+
 
 class GCReportPage extends StatefulWidget {
   const GCReportPage({Key? key}) : super(key: key);
@@ -10,12 +12,53 @@ class GCReportPage extends StatefulWidget {
   State<GCReportPage> createState() => _GCReportPageState();
 }
 
+class _GcDataSource extends DataTableSource {
+  final List<Map<String, dynamic>> data;
+  final List<String> fieldKeys;
+
+  _GcDataSource({required this.data, required this.fieldKeys});
+
+  @override
+  DataRow? getRow(int index) {
+    if (index < 0 || index >= data.length) return null;
+    final item = data[index];
+    return DataRow.byIndex(
+      index: index,
+      color: MaterialStateProperty.resolveWith<Color?>((states) {
+        // Zebra striping for readability
+        return index % 2 == 0 ? Colors.white : const Color(0xFFF7FAFF);
+      }),
+      cells: fieldKeys.map((key) {
+        final value = item[key];
+        return DataCell(
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 180),
+            child: Text(
+              value?.toString() ?? '',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  @override
+  bool get isRowCountApproximate => false;
+
+  @override
+  int get rowCount => data.length;
+
+  @override
+  int get selectedRowCount => 0;
+}
+
 class _GCReportPageState extends State<GCReportPage>
     with TickerProviderStateMixin {
   List<Map<String, dynamic>> gcList = [];
   bool isLoading = true;
   String? error;
-  int rowsPerPage = 10;
   late AnimationController _controller;
   late Animation<double> _totalGCsAnim,
       _totalHireAnim,
@@ -47,6 +90,7 @@ class _GCReportPageState extends State<GCReportPage>
   @override
   void dispose() {
     _controller.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -118,30 +162,27 @@ class _GCReportPageState extends State<GCReportPage>
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : error != null
-          ? Center(
-              child: Text(error!, style: const TextStyle(color: Colors.red)),
-            )
-          : Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSummaryCards(isSmallScreen),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'GC Entries',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+              ? Center(
+                  child: Text(error!, style: const TextStyle(color: Colors.red)),
+                )
+              : Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: ListView(
+                    children: [
+                      _buildSummaryCards(isSmallScreen),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'GC Entries',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildPaginatedTable(isSmallScreen),
-                  ],
+                      const SizedBox(height: 8),
+                      _buildPaginatedTable(isSmallScreen),
+                    ],
+                  ),
                 ),
-              ),
-            ),
     );
   }
 
@@ -229,143 +270,228 @@ class _GCReportPageState extends State<GCReportPage>
     );
   }
 
+  int _rowsPerPage = 10;
+  int _currentPage = 0;
+  final TextEditingController _pageController = TextEditingController(text: '1');
+
   Widget _buildPaginatedTable(bool isSmallScreen) {
     if (gcList.isEmpty) {
       return const Center(child: Text('No GC data available.'));
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = [
-          'GC Number',
-          'GC Date',
-          'Truck Number',
-          'PO Number',
-          'Trip ID',
-          'Broker Name',
-          'Driver Name',
-          'Consignor Name',
-          'Consignee Name',
-          'Number of Packages',
-          'Actual Weight (kg)',
-          'Rate',
-          'Hire Amount',
-          'Advance Amount',
-          'Freight Charge',
-        ];
-        final fieldKeys = [
-          'GcNumber',
-          'GcDate',
-          'TruckNumber',
-          'PoNumber',
-          'TripId',
-          'BrokerName',
-          'DriverName',
-          'ConsignorName',
-          'ConsigneeName',
-          'NumberofPkg',
-          'ActualWeightKgs',
-          'Rate',
-          'HireAmount',
-          'AdvanceAmount',
-          'FreightCharge',
-        ];
-        int pageCount = (gcList.length / rowsPerPage).ceil();
-        int currentPage = 0;
-        PageController pageController = PageController();
 
-        Widget buildTablePage(int page) {
-          final start = page * rowsPerPage;
-          final end = (start + rowsPerPage).clamp(0, gcList.length);
-          final pageRows = gcList.sublist(start, end);
-          return SingleChildScrollView(
+    final columns = [
+      'GC Number',
+      'GC Date',
+      'Truck Number',
+      'PO Number',
+      'Trip ID',
+      'Broker Name',
+      'Driver Name',
+      'Consignor Name',
+      'Consignee Name',
+      'Number of Packages',
+      'Actual Weight (kg)',
+      'Rate',
+      'Hire Amount',
+      'Advance Amount',
+      'Freight Charge',
+    ];
+
+    final fieldKeys = [
+      'GcNumber',
+      'GcDate',
+      'TruckNumber',
+      'PoNumber',
+      'TripId',
+      'BrokerName',
+      'DriverName',
+      'ConsignorName',
+      'ConsigneeName',
+      'NumberofPkg',
+      'ActualWeightKgs',
+      'Rate',
+      'HireAmount',
+      'AdvanceAmount',
+      'FreightCharge',
+    ];
+
+    // Pagination calculations
+    final int itemCount = gcList.length;
+    final int totalPages = itemCount == 0 ? 1 : (itemCount / _rowsPerPage).ceil();
+    _currentPage = _currentPage.clamp(0, totalPages - 1);
+    final int startIndex = _currentPage * _rowsPerPage;
+    final int endIndex = math.min(startIndex + _rowsPerPage, itemCount);
+    final List<Map<String, dynamic>> pageData = gcList.sublist(
+      startIndex,
+      endIndex,
+    );
+
+    void goToPage(int page) {
+      if (page >= 0 && page < totalPages) {
+        setState(() {
+          _currentPage = page;
+          _pageController.text = (page + 1).toString();
+        });
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Horizontally scrollable table only
+        LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowColor: MaterialStateProperty.all(
-                const Color(0xFFE3E8F0),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: math.max(constraints.maxWidth, 1000),
               ),
-              dataRowColor: MaterialStateProperty.resolveWith<Color?>((
-                Set<MaterialState> states,
-              ) {
-                if (states.contains(MaterialState.selected)) {
-                  return Colors.blue.withOpacity(0.08);
-                }
-                return null;
-              }),
-              columns: [
-                for (final col in columns)
-                  DataColumn(
-                    label: Text(
-                      col,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-              ],
-              rows: [
-                for (int i = 0; i < pageRows.length; i++)
-                  DataRow(
-                    color: MaterialStateProperty.resolveWith<Color?>((
-                      Set<MaterialState> states,
-                    ) {
-                      if (i % 2 == 0) {
-                        return Colors.white;
-                      } else {
-                        return const Color(0xFFF1F5FB);
-                      }
-                    }),
-                    cells: [
-                      for (final key in fieldKeys)
-                        DataCell(
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 140),
-                            child: Text(
-                              pageRows[i][key]?.toString() ?? '',
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 14),
-                            ),
+              child: DataTable(
+                headingRowColor: MaterialStateProperty.all(
+                  const Color(0xFFE3E8F0),
+                ),
+                columns: columns
+                    .map((c) => DataColumn(
+                          label: Text(
+                            c,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ))
+                    .toList(),
+                rows: pageData.map((item) {
+                  final rowIndex = pageData.indexOf(item);
+                  final Color? rowColor = rowIndex % 2 == 0
+                      ? Colors.white
+                      : const Color(0xFFF7FAFF);
+                  return DataRow(
+                    color: MaterialStateProperty.all(rowColor),
+                    cells: fieldKeys.map((key) {
+                      return DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 180),
+                          child: Text(
+                            item[key]?.toString() ?? '',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13),
                           ),
                         ),
-                    ],
-                  ),
-              ],
-            ),
-          );
-        }
-
-        return Column(
-          children: [
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.6,
-              child: PageView.builder(
-                controller: pageController,
-                itemCount: pageCount,
-                itemBuilder: (context, page) => buildTablePage(page),
+                      );
+                    }).toList(),
+                  );
+                }).toList(),
               ),
             ),
-            if (pageCount > 1) ...[
-              const SizedBox(height: 8),
+          ),
+        ),
+
+        // Fixed footer controls (do not scroll with horizontal table)
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              // Rows per page selector
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  for (int i = 0; i < pageCount; i++)
-                    GestureDetector(
-                      onTap: () => pageController.jumpToPage(i),
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.blue.withOpacity(0.5),
-                          border: Border.all(color: Colors.blue, width: 1),
-                        ),
-                      ),
-                    ),
+                  const Text('Rows per page:'),
+                  const SizedBox(width: 8),
+                  DropdownButton<int>(
+                    value: _rowsPerPage,
+                    items: const [5, 10, 20, 50, 100]
+                        .map((v) => DropdownMenuItem<int>(
+                              value: v,
+                              child: Text('$v'),
+                            ))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) {
+                        setState(() {
+                          _rowsPerPage = v;
+                          _currentPage = 0;
+                          _pageController.text = '1';
+                        });
+                      }
+                    },
+                  ),
                 ],
               ),
+
+              const SizedBox(width: 16),
+
+              // Page navigation
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.first_page),
+                    onPressed: _currentPage > 0 ? () => goToPage(0) : null,
+                    tooltip: 'First page',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left),
+                    onPressed:
+                        _currentPage > 0 ? () => goToPage(_currentPage - 1) : null,
+                    tooltip: 'Previous page',
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('Page'),
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    width: 56,
+                    child: TextField(
+                      controller: _pageController,
+                      textAlign: TextAlign.center,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(vertical: 8),
+                        border: OutlineInputBorder(),
+                      ),
+                      onSubmitted: (value) {
+                        final p = int.tryParse(value) ?? 1;
+                        if (p >= 1 && p <= totalPages) {
+                          goToPage(p - 1);
+                        } else {
+                          _pageController.text = (_currentPage + 1).toString();
+                        }
+                      },
+                    ),
+                  ),
+                  Text(' of $totalPages'),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    onPressed: _currentPage < totalPages - 1
+                        ? () => goToPage(_currentPage + 1)
+                        : null,
+                    tooltip: 'Next page',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.last_page),
+                    onPressed: _currentPage < totalPages - 1
+                        ? () => goToPage(totalPages - 1)
+                        : null,
+                    tooltip: 'Last page',
+                  ),
+                ],
+              ),
+
+              const SizedBox(width: 16),
+
+              // Range info
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 260),
+                child: Text(
+                  itemCount == 0
+                      ? 'No entries'
+                      : 'Showing ${startIndex + 1}–$endIndex of $itemCount entries',
+                  style: TextStyle(color: Colors.grey[700]),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
-          ],
-        );
-      },
+          ),
+        ),
+      ],
     );
   }
 }

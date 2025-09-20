@@ -22,20 +22,25 @@ class _GCFormScreenState extends State<GCFormScreen> {
     super.initState();
     searchCtrl = TextEditingController();
     
-    // Check for edit mode and load GC data if needed
+    // Initialize the controller
+    final controller = Get.isRegistered<GCFormController>()
+        ? Get.find<GCFormController>()
+        : Get.put(GCFormController());
+    
+    // Only clear the form if we're not in edit mode
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final args = Get.arguments;
-      if (args != null && args is Map && args['isEditMode'] == true) {
-        final gcData = args['gcData'] as Map<String, dynamic>;
-        final controller = Get.find<GCFormController>();
-        controller.loadGcData(gcData);
+      if (!controller.isEditMode.value) {
+        controller.clearForm();
       }
+      controller.currentTab.value = 0;
     });
   }
 
   @override
   void dispose() {
     searchCtrl.dispose();
+    // Don't dispose the controller here as it's managed by GetX
+    // The controller will be removed when the route is popped
     super.dispose();
   }
 
@@ -43,7 +48,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
   Widget build(BuildContext context) {
     final controller = Get.isRegistered<GCFormController>()
         ? Get.find<GCFormController>()
-        : Get.put(GCFormController(), permanent: true);
+        : Get.put(GCFormController());
     final theme = Theme.of(context);
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
 
@@ -107,7 +112,11 @@ class _GCFormScreenState extends State<GCFormScreen> {
                       children: List.generate(
                         4,
                             (index) => GestureDetector(
-                          onTap: () => controller.changeTab(index),
+                          onTap: () {
+                            controller.changeTab(index);
+                            // Force UI rebuild
+                            setState(() {});
+                          },
                           child: AnimatedContainer(
                             duration: 300.ms,
                             padding: const EdgeInsets.symmetric(
@@ -192,20 +201,16 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   ),
                   child: Column(
                     children: [
-                      if (controller.isDraftSaved.value)
-                        Text(
-                          'Draft saved automatically',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.primaryColor,
-                          ),
-                        ).animate().fadeIn().then().fadeOut(),
-                      const SizedBox(height: 8),
                       Row(
                         children: [
                           if (controller.currentTab.value > 0)
                             Expanded(
                               child: OutlinedButton(
-                                onPressed: controller.navigateToPreviousTab,
+                                onPressed: () {
+                                  controller.navigateToPreviousTab();
+                                  // Force UI rebuild
+                                  setState(() {});
+                                },
                                 style: OutlinedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 12,
@@ -239,7 +244,11 @@ class _GCFormScreenState extends State<GCFormScreen> {
                             Expanded(
                               flex: controller.currentTab.value > 0 ? 1 : 2,
                               child: ElevatedButton(
-                                onPressed: controller.navigateToNextTab,
+                                onPressed: () {
+                                  controller.navigateToNextTab();
+                                  // Force UI rebuild
+                                  setState(() {});
+                                },
                                 style: ElevatedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 12,
@@ -340,25 +349,15 @@ class _GCFormScreenState extends State<GCFormScreen> {
               ),
               const SizedBox(height: 16),
               Obx(() {
-                if (controller.branchesLoading.value) {
-                  return TextFormField(
-                    readOnly: true,
-                    decoration: _inputDecoration(
-                      'Branch',
-                      Icons.confirmation_number,
-                      hintText: 'Loading branches...',
-                    ),
-                  );
-                }
                 return _buildDropdownField(
                   context: context,
                   label: 'Branch',
                   value: controller.selectedBranch.value,
                   items: controller.branches.toList(),
-                  onChanged: (value) {
-                    controller.selectedBranch.value = value!;
-                    controller.autoSaveDraft();
-                  },
+                  onChanged: controller.onBranchSelected,
+                  isLoading: controller.branchesLoading.value,
+                  error: controller.branchesError.value,
+                  onRetry: () => controller.fetchBranches(),
                   compact: true,
                   searchable: true,
                 );
@@ -369,13 +368,17 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   Expanded(
                     child: TextFormField(
                       controller: controller.gcNumberCtrl,
+                      readOnly: true,
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.bold,
+                      ),
                       decoration: _inputDecoration(
                         'GC Number',
                         Icons.confirmation_number,
                       ),
-                      validator: (value) =>
-                      value == null || value.isEmpty ? 'Required' : null,
-                      onChanged: (_) => controller.autoSaveDraft(),
+                      validator: null,
+                      onChanged: (_) {},
                     ),
                   ),
                   if (!isSmallScreen) const SizedBox(width: 16),
@@ -413,8 +416,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     controller.gcDate,
                     textController: controller.gcDateCtrl,
                   ),
-                  validator: (value) =>
-                  controller.gcDate.value == null ? 'Required' : null,
+                  validator: null,
                 ),
               const SizedBox(height: 16),
               Row(
@@ -424,11 +426,9 @@ class _GCFormScreenState extends State<GCFormScreen> {
                       controller: controller.eDaysCtrl,
                       decoration: _inputDecoration('E-Days', Icons.schedule),
                       keyboardType: TextInputType.number,
-                      validator: (value) =>
-                      value == null || value.isEmpty ? 'Required' : null,
+                      validator: null,
                       onChanged: (_) {
                         controller.updateDeliveryDateFromInputs();
-                        controller.autoSaveDraft();
                       },
                     ),
                   ),
@@ -444,10 +444,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                             Icons.calendar_today,
                           ),
                           enableInteractiveSelection: false,
-                          validator: (value) =>
-                          controller.deliveryDate.value == null
-                              ? 'Required'
-                              : null,
+                          validator: null,
                         ),
                       ),
                     ),
@@ -463,8 +460,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     Icons.calendar_today,
                   ),
                   enableInteractiveSelection: false,
-                  validator: (value) =>
-                  controller.deliveryDate.value == null ? 'Required' : null,
+                  validator: null,
                 ),
               const SizedBox(height: 16),
               Text(
@@ -476,16 +472,6 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 children: [
                   Expanded(
                     child: Obx(() {
-                      if (controller.trucksLoading.value) {
-                        return TextFormField(
-                          readOnly: true,
-                          decoration: _inputDecoration(
-                            'Truck Number',
-                            Icons.local_shipping,
-                            hintText: 'Loading trucks...',
-                          ),
-                        );
-                      }
                       return _buildDropdownField(
                         context: context,
                         label: 'Truck Number',
@@ -494,16 +480,13 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         onChanged: (value) {
                           controller.selectedTruck.value = value!;
                           controller.truckNumberCtrl.text = value; // keep submission compatibility
-                          controller.autoSaveDraft();
                         },
-                        validator: (value) {
-                          if (value == null || value.isEmpty || value == 'Select Truck') {
-                            return 'Required';
-                          }
-                          return null;
-                        },
+                        validator: null,
                         compact: true,
                         searchable: true,
+                        isLoading: controller.trucksLoading.value,
+                        error: controller.trucksError.value,
+                        onRetry: () => controller.fetchTrucks(),
                       );
                     }),
                   ),
@@ -518,7 +501,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         ),
                         validator: (value) =>
                         value == null || value.isEmpty ? 'Required' : null,
-                        onChanged: (_) => controller.autoSaveDraft(),
+                        onChanged: (_) {},
                       ),
                     ),
                 ],
@@ -528,18 +511,16 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 TextFormField(
                   controller: controller.poNumberCtrl,
                   decoration: _inputDecoration('PO Number', Icons.description),
-                  validator: (value) =>
-                  value == null || value.isEmpty ? 'Required' : null,
-                  onChanged: (_) => controller.autoSaveDraft(),
+                  validator: null,
+                  onChanged: (_) {},
                 ),
               const SizedBox(height: 16),
               // Truck Type below Truck Number
               TextFormField(
                 controller: controller.truckTypeCtrl,
                 decoration: _inputDecoration('Truck Type', Icons.local_shipping),
-                validator: (value) =>
-                value == null || value.isEmpty ? 'Required' : null,
-                onChanged: (_) => controller.autoSaveDraft(),
+                validator: null,
+                onChanged: (_) {},
               ),
               const SizedBox(height: 16),
               // From / To after PO Number
@@ -588,9 +569,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
               TextFormField(
                 controller: controller.tripIdCtrl,
                 decoration: _inputDecoration('Trip ID', Icons.route),
-                validator: (value) =>
-                value == null || value.isEmpty ? 'Required' : null,
-                onChanged: (_) => controller.autoSaveDraft(),
+                validator: null,
+                onChanged: (_) {},
               ),
             ],
           ),
@@ -624,34 +604,40 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 children: [
                   Expanded(
                     child: Obx(() {
-                      if (controller.brokersLoading.value) {
-                        return TextFormField(
-                          readOnly: true,
-                          decoration: _inputDecoration(
-                            'Broker Name',
-                            Icons.person,
-                            hintText: 'Loading brokers...',
-                          ),
-                        );
+                      // Get the list of brokers, ensuring no empty or null names
+                      final brokerList = controller.brokers
+                          .where((b) => b != null && b.isNotEmpty)
+                          .toList();
+                          
+                      // If the selected broker is not in the list, clear it
+                      final selectedBroker = controller.selectedBroker.value;
+                      if (selectedBroker.isNotEmpty && !brokerList.contains(selectedBroker)) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          controller.selectedBroker.value = '';
+                          controller.brokerNameCtrl.clear();
+                        });
                       }
+                      
                       return _buildDropdownField(
                         context: context,
                         label: 'Broker Name',
-                        value: controller.selectedBroker.value,
-                        items: controller.brokers.toList(),
+                        value: brokerList.contains(selectedBroker) ? selectedBroker : '',
+                        items: brokerList,
                         onChanged: (value) {
-                          controller.selectedBroker.value = value!;
-                          controller.brokerNameCtrl.text = value;
-                          controller.autoSaveDraft();
-                        },
-                        validator: (value) {
-                          if (value == null || value.isEmpty || value == 'Select Broker') {
-                            return 'Required';
+                          if (value != null) {
+                            controller.selectedBroker.value = value;
+                            controller.brokerNameCtrl.text = value;
+                          } else {
+                            controller.selectedBroker.value = '';
+                            controller.brokerNameCtrl.clear();
                           }
-                          return null;
                         },
+                        validator: null,
                         compact: true,
                         searchable: true,
+                        isLoading: controller.brokersLoading.value,
+                        error: controller.brokersError.value,
+                        onRetry: () => controller.fetchBrokers(),
                       );
                     }),
                   ),
@@ -659,56 +645,54 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   if (!isSmallScreen)
                     Expanded(
                       child: Obx(() {
-                        if (controller.driversLoading.value) {
-                          return TextFormField(
-                            readOnly: true,
-                            decoration: _inputDecoration(
-                              'Driver Name',
-                              Icons.person,
-                              hintText: 'Loading drivers...',
-                            ),
-                          );
+                        // Get the list of driver names, ensuring no empty or null names
+                        final driverNames = controller.drivers
+                            .map((d) => d['driverName']?.toString() ?? '')
+                            .where((name) => name.isNotEmpty)
+                            .toList();
+                            
+                        // If the selected driver is not in the list, clear it
+                        final selectedDriver = controller.selectedDriver.value;
+                        if (selectedDriver.isNotEmpty && !driverNames.contains(selectedDriver)) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            controller.selectedDriver.value = '';
+                            controller.driverNameCtrl.clear();
+                            controller.driverPhoneCtrl.clear();
+                          });
                         }
+                        
                         return _buildDropdownField(
                           context: context,
                           label: 'Driver Name',
-                          value: controller.selectedDriver.value.isEmpty
-                              ? 'Select Driver'
-                              : controller.selectedDriver.value,
-                          items: ['Select Driver', ...controller.drivers
-                              .map((driver) => driver['driverName'].toString())
-                              .whereType<String>()
-                              .toList()],
+                          value: driverNames.contains(selectedDriver) ? selectedDriver : '',
+                          items: driverNames,
                           onChanged: (value) {
-                            if (value != null && value != 'Select Driver') {
-                              final driver = controller.drivers.firstWhere(
-                                    (d) => d['driverName'] == value,
-                                orElse: () => {},
-                              );
-                              if (driver.isNotEmpty) {
-                                // Update the observable first
-                                controller.selectedDriver.value = driver['driverName']?.toString() ?? '';
-                                // Then update the text controllers
-                                controller.driverNameCtrl.text = controller.selectedDriver.value;
+                            if (value != null && value.isNotEmpty) {
+                              try {
+                                final driver = controller.drivers.firstWhere(
+                                  (d) => (d['driverName']?.toString() ?? '') == value,
+                                );
+                                controller.selectedDriver.value = value;
+                                controller.driverNameCtrl.text = value;
                                 controller.driverPhoneCtrl.text = driver['phoneNumber']?.toString() ?? '';
-                                controller.autoSaveDraft();
+                              } catch (e) {
+                                // If driver not found, clear the fields
+                                controller.selectedDriver.value = '';
+                                controller.driverNameCtrl.clear();
+                                controller.driverPhoneCtrl.clear();
                               }
                             } else {
-                              // Clear both the observable and text controllers
                               controller.selectedDriver.value = '';
                               controller.driverNameCtrl.clear();
                               controller.driverPhoneCtrl.clear();
-                              controller.autoSaveDraft();
                             }
                           },
-                          validator: (value) {
-                            if (value == null || value.isEmpty || value == 'Select Driver') {
-                              return 'Required';
-                            }
-                            return null;
-                          },
+                          validator: null,
                           compact: true,
                           searchable: true,
+                          isLoading: controller.driversLoading.value,
+                          error: controller.driversError.value,
+                          onRetry: () => controller.fetchDrivers(),
                         );
                       }),
                     ),
@@ -717,53 +701,59 @@ class _GCFormScreenState extends State<GCFormScreen> {
               if (isSmallScreen) const SizedBox(height: 16),
               if (isSmallScreen)
                 Obx(() {
-                  if (controller.driversLoading.value) {
-                    return TextFormField(
-                      readOnly: true,
-                      decoration: _inputDecoration(
-                        'Driver Name',
-                        Icons.person,
-                        hintText: 'Loading drivers...',
-                      ),
-                    );
+                  // Get the list of driver names, ensuring no empty or null names
+                  final driverNames = controller.drivers
+                      .map((d) => d['driverName']?.toString() ?? '')
+                      .where((name) => name.isNotEmpty)
+                      .toList();
+                      
+                  // If the selected driver is not in the list, clear it
+                  final selectedDriver = controller.selectedDriver.value;
+                  if (selectedDriver.isNotEmpty && !driverNames.contains(selectedDriver)) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      controller.selectedDriver.value = '';
+                      controller.driverNameCtrl.clear();
+                      controller.driverPhoneCtrl.clear();
+                    });
                   }
+                  
                   return _buildDropdownField(
                     context: context,
                     label: 'Driver Name',
-                    value: controller.selectedDriver.value.isEmpty
-                        ? 'Select Driver'
-                        : controller.selectedDriver.value,
-                    items: ['Select Driver', ...controller.drivers
-                        .map((driver) => driver['driverName'].toString())
-                        .whereType<String>()
-                        .toList()],
+                    value: driverNames.contains(selectedDriver) ? selectedDriver : '',
+                    items: driverNames,
                     onChanged: (value) {
-                      if (value != null && value != 'Select Driver') {
-                        final driver = controller.drivers.firstWhere(
-                              (d) => d['driverName'] == value,
-                          orElse: () => {},
-                        );
-                        if (driver.isNotEmpty) {
-                          controller.selectedDriver.value = driver['driverName']?.toString() ?? '';
-                          controller.driverNameCtrl.text = controller.selectedDriver.value;
+                      if (value != null && value.isNotEmpty) {
+                        try {
+                          final driver = controller.drivers.firstWhere(
+                            (d) => (d['driverName']?.toString() ?? '') == value,
+                          );
+                          controller.selectedDriver.value = value;
+                          controller.driverNameCtrl.text = value;
                           controller.driverPhoneCtrl.text = driver['phoneNumber']?.toString() ?? '';
-                          controller.autoSaveDraft();
+                        } catch (e) {
+                          // If driver not found, clear the fields
+                          controller.selectedDriver.value = '';
+                          controller.driverNameCtrl.clear();
+                          controller.driverPhoneCtrl.clear();
                         }
                       } else {
                         controller.selectedDriver.value = '';
                         controller.driverNameCtrl.clear();
                         controller.driverPhoneCtrl.clear();
-                        controller.autoSaveDraft();
                       }
                     },
                     validator: (value) {
-                      if (value == null || value.isEmpty || value == 'Select Driver') {
+                      if (value == null || value.isEmpty) {
                         return 'Required';
                       }
                       return null;
                     },
                     compact: true,
                     searchable: true,
+                    isLoading: controller.driversLoading.value,
+                    error: controller.driversError.value,
+                    onRetry: () => controller.fetchDrivers(),
                   );
                 }),
               const SizedBox(height: 16),
@@ -789,42 +779,30 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 children: [
                   Expanded(
                     child: Obx(() {
-                      if (controller.consignorsLoading.value) {
-                        return TextFormField(
-                          readOnly: true,
-                          decoration: _inputDecoration(
-                            'Consignor Name',
-                            Icons.person,
-                            hintText: 'Loading consignors...',
-                          ),
-                        );
-                      }
                       return _buildDropdownField(
                         context: context,
                         label: 'Consignor Name',
                         value: controller.selectedConsignor.value,
                         items: controller.consignors.toList(),
                         onChanged: (value) {
-                          controller.selectedConsignor.value = value!;
-                          controller.consignorNameCtrl.text = value;
-                          final info = controller.consignorInfo[value];
-                          if (info != null) {
-                            controller.consignorGstCtrl.text = info['gst'] ?? '';
-                            final address = info['address'] ?? '';
-                            controller.consignorAddressCtrl.text = address;
-                            // Auto-fill From field with consignor's address
-                            controller.fromCtrl.text = address;
+                          if (value != null) {
+                            controller.selectedConsignor.value = value;
+                            controller.consignorNameCtrl.text = value;
+                            final info = controller.consignorInfo[value];
+                            if (info != null) {
+                              controller.consignorGstCtrl.text = info['gst'] ?? '';
+                              controller.consignorAddressCtrl.text = info['address'] ?? '';
+                            }
                           }
-                          controller.autoSaveDraft();
                         },
-                        validator: (value) {
-                          if (value == null || value.isEmpty || value == 'Select Consignor') {
-                            return 'Required';
-                          }
-                          return null;
-                        },
+                        validator: (value) => value == null || value.isEmpty || value == 'Select Consignor' 
+                            ? 'Required' 
+                            : null,
                         compact: true,
                         searchable: true,
+                        isLoading: controller.consignorsLoading.value,
+                        error: controller.consignorsError.value,
+                        onRetry: () => controller.fetchConsignors(),
                       );
                     }),
                   ),
@@ -839,7 +817,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                           validator: (value) => value == null || value.isEmpty
                               ? 'Required'
                               : null,
-                          onChanged: (_) => controller.autoSaveDraft(),
+                          onChanged: (_) {},
                         ),
                       ),
                     ),
@@ -852,9 +830,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   child: TextFormField(
                     controller: controller.consignorGstCtrl,
                     decoration: _inputDecoration('GST', Icons.business),
-                    validator: (value) =>
-                    value == null || value.isEmpty ? 'Required' : null,
-                    onChanged: (_) => controller.autoSaveDraft(),
+                    validator: null,
+                    onChanged: (_) {},
                   ),
                 ),
               const SizedBox(height: 16),
@@ -862,9 +839,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 controller: controller.consignorAddressCtrl,
                 decoration: _inputDecoration('Address', Icons.location_on),
                 maxLines: 2,
-                validator: (value) =>
-                value == null || value.isEmpty ? 'Required' : null,
-                onChanged: (_) => controller.autoSaveDraft(),
+                validator: null,
+                onChanged: (_) {},
               ),
               const SizedBox(height: 24),
               Text(
@@ -876,42 +852,32 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 children: [
                   Expanded(
                     child: Obx(() {
-                      if (controller.consigneesLoading.value) {
-                        return TextFormField(
-                          readOnly: true,
-                          decoration: _inputDecoration(
-                            'Consignee Name',
-                            Icons.person,
-                            hintText: 'Loading consignees...',
-                          ),
-                        );
-                      }
                       return _buildDropdownField(
                         context: context,
                         label: 'Consignee Name',
                         value: controller.selectedConsignee.value,
                         items: controller.consignees.toList(),
                         onChanged: (value) {
-                          controller.selectedConsignee.value = value!;
-                          controller.consigneeNameCtrl.text = value;
-                          final info = controller.consigneeInfo[value];
-                          if (info != null) {
-                            controller.consigneeGstCtrl.text = info['gst'] ?? '';
-                            final address = info['address'] ?? '';
-                            controller.consigneeAddressCtrl.text = address;
-                            // Auto-fill To field with consignee's address
-                            controller.toCtrl.text = address;
+                          if (value != null) {
+                            controller.selectedConsignee.value = value;
+                            controller.consigneeNameCtrl.text = value;
+                            final info = controller.consigneeInfo[value];
+                            if (info != null) {
+                              controller.consigneeGstCtrl.text = info['gst'] ?? '';
+                              final address = info['address'] ?? '';
+                              controller.consigneeAddressCtrl.text = address;
+                              // Auto-fill To field and Billing Address with consignee's address
+                              controller.toCtrl.text = address;
+                              controller.billingAddressCtrl.text = address;
+                            }
                           }
-                          controller.autoSaveDraft();
                         },
-                        validator: (value) {
-                          if (value == null || value.isEmpty || value == 'Select Consignee') {
-                            return 'Required';
-                          }
-                          return null;
-                        },
+                        validator: null,
                         compact: true,
                         searchable: true,
+                        isLoading: controller.consigneesLoading.value,
+                        error: controller.consigneesError.value,
+                        onRetry: () => controller.fetchConsignees(),
                       );
                     }),
                   ),
@@ -923,10 +889,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         child: TextFormField(
                           controller: controller.consigneeGstCtrl,
                           decoration: _inputDecoration('GST', Icons.business),
-                          validator: (value) => value == null || value.isEmpty
-                              ? 'Required'
-                              : null,
-                          onChanged: (_) => controller.autoSaveDraft(),
+                          validator: null,
+                          onChanged: (_) {},
                         ),
                       ),
                     ),
@@ -939,9 +903,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   child: TextFormField(
                     controller: controller.consigneeGstCtrl,
                     decoration: _inputDecoration('GST', Icons.business),
-                    validator: (value) =>
-                    value == null || value.isEmpty ? 'Required' : null,
-                    onChanged: (_) => controller.autoSaveDraft(),
+                    validator: null,
+                    onChanged: (_) {},
                   ),
                 ),
               const SizedBox(height: 16),
@@ -949,9 +912,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 controller: controller.consigneeAddressCtrl,
                 decoration: _inputDecoration('Address', Icons.location_on),
                 maxLines: 2,
-                validator: (value) =>
-                value == null || value.isEmpty ? 'Required' : null,
-                onChanged: (_) => controller.autoSaveDraft(),
+                validator: null,
+                onChanged: (_) {},
               ),
             ],
           ),
@@ -992,21 +954,48 @@ class _GCFormScreenState extends State<GCFormScreen> {
 
               // Select Weight dropdown (now searchable)
               Obx(() {
-                if (controller.isLoadingRates.value) {
-                  return TextFormField(
-                    readOnly: true,
-                    decoration: _inputDecoration(
-                      'Weight',
-                      Icons.scale,
-                      hintText: 'Loading weight options...',
-                    ),
+                // Show error state if there's an error
+                if (controller.weightRatesError.isNotEmpty) {
+                  return _buildDropdownField(
+                    context: context,
+                    label: 'Select Weight',
+                    value: 'Error loading weights',
+                    items: const ['Error loading weights'],
+                    onChanged: (_) {}, // No-op function
+                    validator: null,
+                    compact: true,
+                    error: controller.weightRatesError.value,
+                    onRetry: () => controller.fetchWeightRates(),
                   );
                 }
+
+                // Show loading state
+                if (controller.isLoadingRates.value) {
+                  return TextFormField(
+                    decoration: InputDecoration(
+                      labelText: 'Select Weight',
+                      suffixIcon: const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    readOnly: true,
+                    controller: TextEditingController(text: 'Loading weight rates...'),
+                  );
+                }
+                
+                // Get the current selected weight string from the controller's selectedWeight
+                final selectedWeight = controller.selectedWeight.value;
+                final selectedWeightString = selectedWeight?.weight ?? 'Select Weight';
+                
                 return _buildDropdownField(
                   context: context,
                   label: 'Select Weight',
-                  value: currentSelectedWeightString,
-                  items: ['Select Weight', ...weightOptions], // Include 'Select Weight' as first option
+                  value: selectedWeightString,
+                  items: ['Select Weight', ...weightOptions],
                   onChanged: (selectedString) {
                     if (selectedString != null && selectedString != 'Select Weight') {
                       final selectedWeightObject = controller.weightRates.firstWhere(
@@ -1015,7 +1004,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                       );
                       controller.onWeightSelected(selectedWeightObject);
                     } else {
-                      controller.onWeightSelected(null); // Clear selection
+                      controller.onWeightSelected(null);
                     }
                   },
                   validator: (value) =>
@@ -1039,7 +1028,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         ),
                         validator: (value) =>
                         value == null || value.isEmpty ? 'Required' : null,
-                        onChanged: (_) => controller.autoSaveDraft(),
+                        onChanged: (_) {},
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -1052,7 +1041,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         ),
                         validator: (value) =>
                         value == null || value.isEmpty ? 'Required' : null,
-                        onChanged: (_) => controller.autoSaveDraft(),
+                        onChanged: (_) {},
                       ),
                     ),
                   ],
@@ -1064,9 +1053,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     'Nature of Goods',
                     Icons.category,
                   ),
-                  validator: (value) =>
-                  value == null || value.isEmpty ? 'Required' : null,
-                  onChanged: (_) => controller.autoSaveDraft(),
+                  validator: null,
+                  onChanged: (_) {},
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -1075,9 +1063,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     'Package Method',
                     Icons.inventory_2_outlined,
                   ),
-                  validator: (value) =>
-                  value == null || value.isEmpty ? 'Required' : null,
-                  onChanged: (_) => controller.autoSaveDraft(),
+                  validator: null,
+                  onChanged: (_) {},
                 ),
               ],
               const SizedBox(height: 16),
@@ -1095,7 +1082,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         readOnly: !controller.isKmEditable.value,
                         onChanged: (value) {
-                          // The listener in GCFormController handles calculateRate and autoSaveDraft
+                          // The listener in GCFormController handles calculateRate
                         },
                         validator: (value) {
                           if (value == null || value.isEmpty) return 'Required';
@@ -1115,8 +1102,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         'Rate (Auto)',
                         Icons.attach_money,
                       ),
-                      validator: (value) =>
-                      value == null || value.isEmpty ? 'Required' : null,
+                      validator: null,
                     ),
                   ),
                 ],
@@ -1136,6 +1122,155 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 ),
               )),
               const SizedBox(height: 16),
+              
+              // Invoice Details Section
+              Text(
+                'Invoice & E-way Bill Details',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 16),
+              
+              // Customer Invoice Number and Invoice Value
+              if (!isSmallScreen)
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: controller.customInvoiceCtrl,
+                        decoration: _inputDecoration(
+                          'Cust Inv No',
+                          Icons.receipt_long,
+                          isOptional: true,
+                        ),
+                        onChanged: (_) {},
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: controller.invValueCtrl,
+                        decoration: _inputDecoration(
+                          'Inv Value',
+                          Icons.currency_rupee,
+                          isOptional: true,
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        onChanged: (_) {},
+                      ),
+                    ),
+                  ],
+                )
+              else ...[
+                TextFormField(
+                  controller: controller.customInvoiceCtrl,
+                  decoration: _inputDecoration(
+                    'Cust Inv No',
+                    Icons.receipt_long,
+                    isOptional: true,
+                  ),
+                  onChanged: (_) {},
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: controller.invValueCtrl,
+                  decoration: _inputDecoration(
+                    'Inv Value',
+                    Icons.currency_rupee,
+                    isOptional: true,
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (_) {},
+                ),
+              ],
+              
+              const SizedBox(height: 16),
+              
+              // E-way Bill Number
+              TextFormField(
+                controller: controller.ewayBillCtrl,
+                decoration: _inputDecoration(
+                  'Eway Bill No',
+                  Icons.description,
+                  isOptional: true,
+                ),
+                onChanged: (_) {},
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // E-way Bill Date and Expiry Date
+              if (!isSmallScreen)
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        readOnly: true,
+                        controller: controller.ewayBillDateCtrl,
+                        decoration: _inputDecoration(
+                          'Eway Bill Date',
+                          Icons.calendar_today,
+                          isOptional: true,
+                        ),
+                        onTap: () => controller.selectDate(
+                          context,
+                          controller.ewayBillDate,
+                          textController: controller.ewayBillDateCtrl,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        readOnly: true,
+                        controller: controller.ewayExpiredCtrl,
+                        decoration: _inputDecoration(
+                          'Eway Bill Exp Date',
+                          Icons.calendar_today,
+                          isOptional: true,
+                        ),
+                        onTap: () => controller.selectDate(
+                          context,
+                          controller.ewayExpired,
+                          textController: controller.ewayExpiredCtrl,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              else ...[
+                TextFormField(
+                  readOnly: true,
+                  controller: controller.ewayBillDateCtrl,
+                  decoration: _inputDecoration(
+                    'Eway Bill Date',
+                    Icons.calendar_today,
+                    isOptional: true,
+                  ),
+                  onTap: () => controller.selectDate(
+                    context,
+                    controller.ewayBillDate,
+                    textController: controller.ewayBillDateCtrl,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  readOnly: true,
+                  controller: controller.ewayExpiredCtrl,
+                  decoration: _inputDecoration(
+                    'Eway Bill Exp Date',
+                    Icons.calendar_today,
+                    isOptional: true,
+                  ),
+                  onTap: () => controller.selectDate(
+                    context,
+                    controller.ewayExpired,
+                    textController: controller.ewayExpiredCtrl,
+                  ),
+                ),
+              ],
+              
+              const SizedBox(height: 24),
+              
               // Private Mark in its own row
               TextFormField(
                 controller: controller.remarksCtrl,
@@ -1144,7 +1279,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   Icons.note_alt_outlined,
                   isOptional: true,
                 ),
-                onChanged: (_) => controller.autoSaveDraft(),
+                onChanged: (_) {},
               ),
               const SizedBox(height: 16),
               // Charges in its own row
@@ -1193,7 +1328,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 ),
                 maxLines: 2,
                 validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                onChanged: (_) => controller.autoSaveDraft(),
+                onChanged: (_) {},
               ),
               const SizedBox(height: 16),
 
@@ -1205,7 +1340,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   Icons.note_alt_outlined,
                 ),
                 maxLines: 2,
-                onChanged: (_) => controller.autoSaveDraft(),
+                onChanged: (_) {},
               ),
               const SizedBox(height: 16),
 
@@ -1217,7 +1352,6 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 items: controller.gstPayerOptions,
                 onChanged: (value) {
                   controller.selectedGstPayer.value = value!;
-                  controller.autoSaveDraft();
                 },
                 validator: (value) =>
                 value == null || value.isEmpty || value == 'Select GST Payer' ? 'Required' : null,
@@ -1247,12 +1381,11 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 decoration: _inputDecoration(
                   'Hire Amount',
                   Icons.money,
+                  isOptional: true,
                 ),
                 keyboardType: TextInputType.number,
-                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                 onChanged: (_) {
                   // Listener in controller updates balanceAmount
-                  controller.autoSaveDraft();
                 },
               ),
               const SizedBox(height: 16),
@@ -1267,7 +1400,6 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 keyboardType: TextInputType.number,
                 onChanged: (_) {
                   // Listener in controller updates balanceAmount
-                  controller.autoSaveDraft();
                 },
               ),
               const SizedBox(height: 16),
@@ -1297,41 +1429,199 @@ class _GCFormScreenState extends State<GCFormScreen> {
     FormFieldValidator<String>? validator,
     bool compact = false,
     bool searchable = false,
+    bool isLoading = false,
+    String? error,
+    VoidCallback? onRetry,
   }) {
-    // If the value passed is not in items, it means it's an unselected placeholder
-    // or an old value not found in current list, so reset it to the first item (e.g., 'Select X').
-    // This prevents the DropdownButtonFormField from throwing an error if 'value' is not in 'items'.
-    String? effectiveValue = items.contains(value) ? value : items.firstWhere((element) => element.startsWith('Select'), orElse: () => items.first);
+    final theme = Theme.of(context);
+    final isError = validator?.call(value) != null || error != null;
 
-
-    if (searchable) {
-      return _buildSearchableFormField(
-        context: context,
-        label: label,
-        value: effectiveValue!, // Use effectiveValue
-        items: items,
-        onChanged: onChanged,
-        validator: validator,
-        compact: compact,
+    // Show error state if there's an error message
+    if (error != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: theme.colorScheme.error,
+                width: 1.5,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  color: theme.colorScheme.error,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    error,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+                ),
+                if (onRetry != null) ...[
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('Retry'),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       );
     }
-    return DropdownButtonFormField<String>(
-      value: effectiveValue, // Use effectiveValue here
-      decoration: _inputDecoration(label, _getIconForLabel(label), compact: compact),
-      items: items.map((String val) { // Renamed 'value' to 'val' to avoid conflict
+
+    // Show loading state
+    if (isLoading) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: theme.dividerColor,
+                width: 1,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Loading...',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.hintColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    final dropdown = DropdownButtonFormField<String>(
+      value: value.isEmpty ? null : value,
+      items: items.map((item) {
         return DropdownMenuItem<String>(
-          value: val,
-          child: Text(val, style: Theme.of(context).textTheme.bodyMedium),
+          value: item,
+          child: Text(
+            item,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: item == 'Select $label' ? theme.hintColor : null,
+            ),
+          ),
         );
       }).toList(),
       onChanged: onChanged,
       validator: validator,
-      borderRadius: BorderRadius.circular(12),
-      icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF6B7280)),
       isExpanded: true,
-      isDense: compact,
-      menuMaxHeight: compact ? 280 : null,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: theme.textTheme.bodyMedium?.copyWith(
+          color: isError ? theme.colorScheme.error : null,
+        ),
+        errorText: isError ? (error ?? validator!(value)) : null,
+        errorStyle: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.error,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: isError ? theme.colorScheme.error : theme.dividerColor,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: isError ? theme.colorScheme.error : theme.dividerColor,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: isError ? theme.colorScheme.error : theme.primaryColor,
+            width: 2,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: theme.colorScheme.error,
+            width: 1.5,
+          ),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: theme.colorScheme.error,
+            width: 2,
+          ),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      ),
+      icon: Icon(
+        Icons.arrow_drop_down,
+        color: isError ? theme.colorScheme.error : theme.hintColor,
+      ),
+      style: theme.textTheme.bodyMedium,
     );
+
+    if (searchable) {
+      return GestureDetector(
+        onTap: () {
+          _showSearchPicker(
+            context: context,
+            title: 'Select $label',
+            items: items,
+            current: value,
+          ).then((selected) {
+            if (selected != null) {
+              onChanged(selected);
+            }
+          });
+        },
+        child: AbsorbPointer(
+          child: dropdown,
+        ),
+      );
+    }
+
+    return dropdown;
   }
 
   Widget _buildSearchableFormField({
@@ -1549,4 +1839,5 @@ class _GCFormScreenState extends State<GCFormScreen> {
       floatingLabelBehavior: FloatingLabelBehavior.auto,
     );
   }
+
 }

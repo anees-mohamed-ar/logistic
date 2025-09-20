@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:logistic/api_config.dart';
 import 'package:logistic/models/km_location.dart'; // Ensure this file exists and KMLocation is defined
+import 'package:fluttertoast/fluttertoast.dart';
 import 'dart:convert';
 import 'dart:async';
 
@@ -49,10 +50,6 @@ class GCFormController extends GetxController {
   final currentTab = 0.obs;
   final tabScrollController = ScrollController();
   final isLoading = false.obs;
-  final isDraftSaved = false.obs;
-  final isEditMode = false.obs;
-  String? gcNumberToEdit;
-  Timer? _draftDebounce;
   bool _tabScrollListenerAttached = false;
 
   // Shipment Tab Controllers
@@ -70,19 +67,41 @@ class GCFormController extends GetxController {
 
   // Shipment Tab Observables (fetched data)
   final selectedBranch = 'Select Branch'.obs;
+  final selectedBranchCode = ''.obs;
   final branchesLoading = false.obs;
   final branches = <String>['Select Branch'].obs;
+  final branchCodeMap = <String, String>{}.obs; // Maps branch name to branch code
+  final trucks = <String>['Select Truck'].obs;
   final selectedTruck = 'Select Truck'.obs;
   final trucksLoading = false.obs;
-  final truckNumbers = <String>['Select Truck'].obs;
   final truckNumberCtrl = TextEditingController(); // To hold selected truck number for submission
+  final truckNumbers = <String>['Select Truck'].obs; // For truck numbers dropdown
+  final selectedBroker = 'Select Broker'.obs;
+  final brokersLoading = false.obs;
+  final brokers = <String>['Select Broker'].obs;
+  final selectedConsignor = 'Select Consignor'.obs;
+  final consignorsLoading = false.obs;
+  final consignors = <String>['Select Consignor'].obs;
+  final selectedConsignee = 'Select Consignee'.obs;
+  final consigneesLoading = false.obs;
+  final consignees = <String>['Select Consignee'].obs;
 
+  // Error states for dropdowns
+  final branchesError = RxnString();
+  final trucksError = RxnString();
+  final brokersError = RxnString();
+  final consignorsError = RxnString();
+  final consigneesError = RxnString();
 
   // Parties Tab Controllers
   final brokerNameCtrl = TextEditingController();
   final driverNameCtrl = TextEditingController();
   final driverPhoneCtrl = TextEditingController();
   final consignorNameCtrl = TextEditingController();
+  
+  // Goods Tab Controllers
+  final weightCtrl = TextEditingController();
+  final natureOfGoodsCtrl = TextEditingController();
   final consignorGstCtrl = TextEditingController();
   final consignorAddressCtrl = TextEditingController();
   final consigneeNameCtrl = TextEditingController();
@@ -90,24 +109,17 @@ class GCFormController extends GetxController {
   final consigneeAddressCtrl = TextEditingController();
 
   // Parties Tab Observables (fetched data)
-  final selectedBroker = 'Select Broker'.obs;
-  final brokersLoading = false.obs;
-  final brokers = <String>['Select Broker'].obs;
   final selectedDriver = ''.obs; // This will hold the selected driver name
   final driversLoading = false.obs;
+  final driversError = RxnString();
   final drivers = <Map<String, dynamic>>[].obs; // Raw driver data from API
   final driverInfo = <String, Map<String, dynamic>>{}; // Map driver name -> details
-  final selectedConsignor = 'Select Consignor'.obs;
-  final consignorsLoading = false.obs;
-  final consignors = <String>['Select Consignor'].obs;
   final consignorInfo = <String, Map<String, String>>{}; // Map consignor name -> details
-  final selectedConsignee = 'Select Consignee'.obs;
-  final consigneesLoading = false.obs;
-  final consignees = <String>['Select Consignee'].obs;
   final consigneeInfo = <String, Map<String, String>>{}; // Map consignee name -> details
 
   // Goods Tab Controllers
   final customInvoiceCtrl = TextEditingController();
+  final invValueCtrl = TextEditingController();
   final ewayBillCtrl = TextEditingController();
   final ewayBillDate = Rxn<DateTime>();
   final ewayBillDateCtrl = TextEditingController(); // For UI display of Eway Bill Date
@@ -126,6 +138,7 @@ class GCFormController extends GetxController {
   // Goods Tab Observables
   final isLoadingRates = false.obs;
   final weightRates = <WeightRate>[].obs;
+  final RxString weightRatesError = RxString('');
   final selectedWeight = Rxn<WeightRate>();
   final RxString calculatedGoodsTotal = ''.obs; // Reactive total (rate * km) for Goods tab
   final RxList<KMLocation> kmLocations = <KMLocation>[].obs; // For KM data from API
@@ -145,6 +158,13 @@ class GCFormController extends GetxController {
   final freightChargeCtrl = TextEditingController(); // Represents total freight (auto-calculated)
   final billingAddressCtrl = TextEditingController();
   final deliveryInstructionsCtrl = TextEditingController();
+
+  // Helper method to safely dispose controllers
+  void _disposeIfMounted(TextEditingController? controller) {
+    if (controller != null) {
+      controller.dispose();
+    }
+  }
   // Removed gstCtrl, replaced by selectedGstPayer
   // final gstCtrl = TextEditingController();
 
@@ -152,6 +172,11 @@ class GCFormController extends GetxController {
   final RxString balanceAmount = '0.00'.obs; // Reactive balance amount
   final gstPayerOptions = ['Consignor', 'Consignee', 'Transporter'];
   final selectedGstPayer = 'Consignor'.obs; // Default value for GST Payer
+
+  // Edit Mode Variables
+  final isEditMode = false.obs;
+  final editingGcNumber = ''.obs;
+  final editingCompanyId = ''.obs;
 
 
   @override
@@ -178,54 +203,59 @@ class GCFormController extends GetxController {
 
   @override
   void onClose() {
-    // Cancel debounce timer
-    _draftDebounce?.cancel();
-
+    // Reset tab scroll listener flag
+    _tabScrollListenerAttached = false;
+    
     // Remove listeners
-    kmCtrl.removeListener(calculateRate);
-    fromCtrl.removeListener(_handleLocationChange);
-    toCtrl.removeListener(_handleLocationChange);
-    hireAmountCtrl.removeListener(_updateBalanceAmount);
-    advanceAmountCtrl.removeListener(_updateBalanceAmount);
+    try {
+      kmCtrl.removeListener(calculateRate);
+      fromCtrl.removeListener(_handleLocationChange);
+      toCtrl.removeListener(_handleLocationChange);
+      hireAmountCtrl.removeListener(_updateBalanceAmount);
+      advanceAmountCtrl.removeListener(_updateBalanceAmount);
+    } catch (e) {
+      // Ignore errors during listener removal
+    }
 
-    // Dispose all TextEditingControllers
-    gcNumberCtrl.dispose();
-    gcDateCtrl.dispose();
-    eDaysCtrl.dispose();
-    deliveryDateCtrl.dispose();
-    poNumberCtrl.dispose();
-    truckTypeCtrl.dispose();
-    fromCtrl.dispose();
-    toCtrl.dispose();
-    tripIdCtrl.dispose();
-    brokerNameCtrl.dispose();
-    driverNameCtrl.dispose();
-    driverPhoneCtrl.dispose();
-    customInvoiceCtrl.dispose();
-    ewayBillCtrl.dispose();
-    ewayBillDateCtrl.dispose();
-    ewayExpiredCtrl.dispose();
-    consignorNameCtrl.dispose();
-    consignorGstCtrl.dispose();
-    consignorAddressCtrl.dispose();
-    consigneeNameCtrl.dispose();
-    consigneeGstCtrl.dispose();
-    consigneeAddressCtrl.dispose();
-    packagesCtrl.dispose();
-    natureGoodsCtrl.dispose();
-    methodPackageCtrl.dispose();
-    actualWeightCtrl.dispose();
-    rateCtrl.dispose();
-    kmCtrl.dispose();
-    remarksCtrl.dispose();
-    fromLocationCtrl.dispose();
-    toLocationCtrl.dispose();
-    hireAmountCtrl.dispose();
-    advanceAmountCtrl.dispose();
-    deliveryAddressCtrl.dispose();
-    freightChargeCtrl.dispose();
-    billingAddressCtrl.dispose();
-    deliveryInstructionsCtrl.dispose();
+    // Dispose all TextEditingControllers safely
+    _disposeIfMounted(gcNumberCtrl);
+    _disposeIfMounted(gcDateCtrl);
+    _disposeIfMounted(eDaysCtrl);
+    _disposeIfMounted(deliveryDateCtrl);
+    _disposeIfMounted(poNumberCtrl);
+    _disposeIfMounted(truckTypeCtrl);
+    _disposeIfMounted(fromCtrl);
+    _disposeIfMounted(toCtrl);
+    _disposeIfMounted(tripIdCtrl);
+    _disposeIfMounted(brokerNameCtrl);
+    _disposeIfMounted(driverNameCtrl);
+    _disposeIfMounted(driverPhoneCtrl);
+    _disposeIfMounted(customInvoiceCtrl);
+    _disposeIfMounted(invValueCtrl);
+    _disposeIfMounted(ewayBillCtrl);
+    _disposeIfMounted(ewayBillDateCtrl);
+    _disposeIfMounted(ewayExpiredCtrl);
+    _disposeIfMounted(consignorNameCtrl);
+    _disposeIfMounted(consignorGstCtrl);
+    _disposeIfMounted(consignorAddressCtrl);
+    _disposeIfMounted(consigneeNameCtrl);
+    _disposeIfMounted(consigneeGstCtrl);
+    _disposeIfMounted(consigneeAddressCtrl);
+    _disposeIfMounted(packagesCtrl);
+    _disposeIfMounted(natureGoodsCtrl);
+    _disposeIfMounted(methodPackageCtrl);
+    _disposeIfMounted(actualWeightCtrl);
+    _disposeIfMounted(rateCtrl);
+    _disposeIfMounted(kmCtrl);
+    _disposeIfMounted(remarksCtrl);
+    _disposeIfMounted(fromLocationCtrl);
+    _disposeIfMounted(toLocationCtrl);
+    _disposeIfMounted(hireAmountCtrl);
+    _disposeIfMounted(advanceAmountCtrl);
+    _disposeIfMounted(deliveryAddressCtrl);
+    _disposeIfMounted(freightChargeCtrl);
+    _disposeIfMounted(billingAddressCtrl);
+    _disposeIfMounted(deliveryInstructionsCtrl);
     tabScrollController.dispose();
 
     super.onClose(); // Always call super.onClose() last
@@ -235,36 +265,36 @@ class GCFormController extends GetxController {
   void attachTabScrollListener(BuildContext context) {
     if (_tabScrollListenerAttached) return;
     _tabScrollListenerAttached = true;
+    
+    // Store context safely and check if mounted before using
     ever<int>(currentTab, (index) {
-      // You might need to adjust tabWidth based on actual item width + margin
-      // For accurate centering, calculate the total width of tabs before the current one
-      // and subtract half the screen width. This is a simplified estimate.
-      final double estimatedTabWidth = 120.0; // Estimate average tab width
-      final double screenWidth = MediaQuery.of(context).size.width;
-      double offset = (estimatedTabWidth * index) - (screenWidth / 2) + (estimatedTabWidth / 2);
+      try {
+        // Check if context is still valid and mounted
+        if (context.mounted) {
+          final double estimatedTabWidth = 120.0;
+          final double screenWidth = MediaQuery.of(context).size.width;
+          double offset = (estimatedTabWidth * index) - (screenWidth / 2) + (estimatedTabWidth / 2);
 
-      if (tabScrollController.hasClients) {
-        final double maxScroll = tabScrollController.position.maxScrollExtent;
-        offset = offset.clamp(0.0, maxScroll);
-        tabScrollController.animateTo(
-          offset,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.ease,
-        );
+          if (tabScrollController.hasClients) {
+            final double maxScroll = tabScrollController.position.maxScrollExtent;
+            offset = offset.clamp(0.0, maxScroll);
+            tabScrollController.animateTo(
+              offset,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.ease,
+            );
+          }
+        }
+      } catch (e) {
+        // Silently handle context errors
+        print('Tab scroll listener error: $e');
       }
     });
   }
 
   void changeTab(int index) {
-    // Only allow tab change if the current tab's form is valid
-    if (formKey.currentState?.validate() ?? false) {
-      currentTab.value = index;
-    } else {
-      Get.snackbar('Validation Error', 'Please fill all required fields in the current tab.',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white);
-    }
+    // Allow immediate tab change for better UX
+    currentTab.value = index;
   }
 
   void navigateToPreviousTab() {
@@ -274,26 +304,24 @@ class GCFormController extends GetxController {
   }
 
   void navigateToNextTab() {
-    if (formKey.currentState?.validate() ?? false) {
-      if (currentTab.value < 3) {
-        currentTab.value++;
-      } else {
-        submitFormToBackend(); // Submit if on the last tab
-      }
+    if (currentTab.value < 3) {
+      currentTab.value++;
     } else {
-      Get.snackbar('Validation Error', 'Please fill all required fields.',
-          snackPosition: SnackPosition.BOTTOM,
+      // Validate only when submitting on the last tab
+      if (formKey.currentState?.validate() ?? false) {
+        submitFormToBackend();
+      } else {
+        Fluttertoast.showToast(
+          msg: 'Please fill all required fields before submitting.',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
           backgroundColor: Colors.red,
-          colorText: Colors.white);
+          textColor: Colors.white,
+        );
+      }
     }
   }
 
-  // Load draft data from storage (placeholder)
-  void loadDraft() {
-    // TODO: Implement your draft loading logic here
-    // Example: retrieve data from SharedPreferences or a local database
-    // and populate the controllers and Rx variables.
-  }
 
   void selectDate(
       BuildContext context,
@@ -323,7 +351,6 @@ class GCFormController extends GetxController {
       }
       // Re-compute delivery date in case GC date changed
       updateDeliveryDateFromInputs();
-      autoSaveDraft();
     }
   }
 
@@ -342,49 +369,134 @@ class GCFormController extends GetxController {
     }
   }
 
-  void autoSaveDraft() {
-    _draftDebounce?.cancel(); // Cancel any existing debounce
-    _draftDebounce = Timer(const Duration(milliseconds: 600), () {
-      isDraftSaved.value = true;
-      Future.delayed(const Duration(seconds: 2), () {
-        isDraftSaved.value = false;
-      });
-      // TODO: Implement your actual draft saving logic here
-    });
-  }
 
   // API Call Methods
+
+  // Generate GC number based on branch code
+  Future<String> generateGcNumber() async {
+    if (selectedBranchCode.value.isEmpty || selectedBranch.value == 'Select Branch') {
+      return '';
+    }
+
+    try {
+      // Get all GC numbers for the company
+      final url = Uri.parse('${ApiConfig.baseUrl}/gc/gcList/search');
+      final response = await http.get(url).timeout(const Duration(seconds: 8));
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> gcList = jsonDecode(response.body);
+        final branchPrefix = selectedBranchCode.value;
+        
+        // Filter GC numbers for the current branch and extract numeric parts
+        final branchGcNumbers = gcList
+            .where((gc) => 
+                gc['GcNumber'] != null && 
+                gc['GcNumber'].toString().startsWith(branchPrefix) &&
+                gc['GcNumber'].toString().length > branchPrefix.length)
+            .map((gc) {
+              final gcNumber = gc['GcNumber'].toString();
+              final numericPart = gcNumber.substring(branchPrefix.length);
+              return int.tryParse(numericPart) ?? 0;
+            })
+            .where((number) => number > 0) // Filter out invalid numbers
+            .toList();
+        
+        // Find the highest number and increment
+        final nextNumber = branchGcNumbers.isNotEmpty 
+            ? (branchGcNumbers.reduce((a, b) => a > b ? a : b) + 1)
+            : 1; // Start from 1 if no existing GCs for this branch
+            
+        // Format with leading zeros (5 digits total)
+        return '${branchPrefix}${nextNumber.toString().padLeft(5, '0')}';
+      }
+      
+      // Fallback if API call fails
+      return '${selectedBranchCode.value}00001';
+    } catch (e) {
+      print('Error generating GC number: $e');
+      // Fallback in case of any error
+      return '${selectedBranchCode.value}00001';
+    }
+  }
+
+  // Handle branch selection
+  void onBranchSelected(String? branch) async {
+    if (branch == null || branch == 'Select Branch') {
+      selectedBranch.value = 'Select Branch';
+      selectedBranchCode.value = '';
+      gcNumberCtrl.clear();
+      return;
+    }
+    
+    // Only proceed if branch has changed
+    if (selectedBranch.value != branch) {
+      selectedBranch.value = branch;
+      selectedBranchCode.value = branchCodeMap[branch] ?? '';
+      
+      // Generate and set GC number
+      if (selectedBranchCode.value.isNotEmpty) {
+        try {
+          isLoading.value = true;
+          final newGcNumber = await generateGcNumber();
+          if (newGcNumber.isNotEmpty) {
+            gcNumberCtrl.text = newGcNumber;
+          } else {
+            // Fallback: Generate a default number if API call fails
+            gcNumberCtrl.text = '${selectedBranchCode.value}00001';
+          }
+        } catch (e) {
+          print('Error generating GC number: $e');
+          gcNumberCtrl.text = '${selectedBranchCode.value}00001';
+        } finally {
+          isLoading.value = false;
+        }
+      }
+    }
+  }
 
   Future<void> fetchBranches() async {
     try {
       branchesLoading.value = true;
+      branchesError.value = null;
       final url = Uri.parse('${ApiConfig.baseUrl}/location/search');
       final response = await http.get(url).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
         final dynamic decoded = jsonDecode(response.body);
         if (decoded is List) {
-          final names = decoded
-              .map((e) => (e['branchName'] ?? e['BranchName'] ?? '').toString())
-              .where((s) => s.isNotEmpty)
-              .toSet()
-              .toList();
-          branches
-            ..clear()
-            ..addAll(['Select Branch', ...names]);
+          // Clear existing data
+          branches.clear();
+          branchCodeMap.clear();
+          
+          // Add default option
+          branches.add('Select Branch');
+          
+          // Process each branch
+          for (var branch in decoded) {
+            final name = (branch['branchName'] ?? branch['BranchName'] ?? '').toString();
+            final code = (branch['branchCode'] ?? branch['BranchCode'] ?? '').toString();
+            
+            if (name.isNotEmpty && code.isNotEmpty) {
+              branches.add(name);
+              branchCodeMap[name] = code;
+            }
+          }
+          
+          // Remove duplicates and sort
+          branches.value = branches.toSet().toList()..sort((a, b) => a == 'Select Branch' ? -1 : a.compareTo(b));
+          
+          // Reset selection if needed
           if (!branches.contains(selectedBranch.value)) {
-            selectedBranch.value = 'Select Branch'; // Reset if old value not found
+            selectedBranch.value = 'Select Branch';
+            selectedBranchCode.value = '';
           }
         } else {
-          Get.snackbar('Error', 'Unexpected branches response format',
-              snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+          branchesError.value = 'Unexpected response format';
         }
       } else {
-        Get.snackbar('Error', 'Failed to load branches: ${response.statusCode}',
-            snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+        branchesError.value = 'Failed to load branches (${response.statusCode})';
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to load branches: $e',
-          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+      branchesError.value = 'Failed to load branches. Tap to retry.';
     } finally {
       branchesLoading.value = false;
     }
@@ -393,8 +505,10 @@ class GCFormController extends GetxController {
   Future<void> fetchTrucks() async {
     try {
       trucksLoading.value = true;
+      trucksError.value = null;
       final url = Uri.parse('${ApiConfig.baseUrl}/truckmaster/search');
       final response = await http.get(url).timeout(const Duration(seconds: 8));
+      
       if (response.statusCode == 200) {
         final dynamic decoded = jsonDecode(response.body);
         if (decoded is List) {
@@ -403,23 +517,27 @@ class GCFormController extends GetxController {
               .where((s) => s.isNotEmpty)
               .toSet()
               .toList();
+              
           truckNumbers
             ..clear()
             ..addAll(['Select Truck', ...list]);
+            
+          // Also update the trucks list for backward compatibility
+          trucks
+            ..clear()
+            ..addAll(['Select Truck', ...list]);
+            
           if (!truckNumbers.contains(selectedTruck.value)) {
-            selectedTruck.value = 'Select Truck'; // Reset if old value not found
+            selectedTruck.value = 'Select Truck';
           }
         } else {
-          Get.snackbar('Error', 'Unexpected trucks response format',
-              snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+          trucksError.value = 'Unexpected response format';
         }
       } else {
-        Get.snackbar('Error', 'Failed to load trucks: ${response.statusCode}',
-            snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+        trucksError.value = 'Failed to load trucks (${response.statusCode})';
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to load trucks: $e',
-          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+      trucksError.value = 'Failed to load trucks. Tap to retry.';
     } finally {
       trucksLoading.value = false;
     }
@@ -428,6 +546,7 @@ class GCFormController extends GetxController {
   Future<void> fetchBrokers() async {
     try {
       brokersLoading.value = true;
+      brokersError.value = null;
       final url = Uri.parse('${ApiConfig.baseUrl}/broker/search');
       final response = await http.get(url).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
@@ -445,16 +564,14 @@ class GCFormController extends GetxController {
             selectedBroker.value = 'Select Broker'; // Reset if old value not found
           }
         } else {
-          Get.snackbar('Error', 'Unexpected brokers response format',
-              snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+          brokersError.value = 'Unexpected brokers response format';
         }
       } else {
-        Get.snackbar('Error', 'Failed to load brokers: ${response.statusCode}',
-            snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+        brokersError.value = 'Failed to load brokers: Tap to retry.';
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to load brokers: $e',
-          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+      final errorMsg = 'Failed to load brokers: Tap to retry.';
+      brokersError.value = errorMsg;
     } finally {
       brokersLoading.value = false;
     }
@@ -463,7 +580,8 @@ class GCFormController extends GetxController {
   Future<void> fetchDrivers() async {
     try {
       driversLoading.value = true;
-      final url = Uri.parse('${ApiConfig.baseUrl}/driver/search'); // Using ApiConfig.baseUrl
+      driversError.value = null;
+      final url = Uri.parse('${ApiConfig.baseUrl}/driver/search');
       final response = await http.get(url).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
@@ -483,19 +601,44 @@ class GCFormController extends GetxController {
           };
         }
 
-        // Store the full list of maps in `drivers` observable
+        // Clear and update the drivers list with the new data
         drivers.assignAll(decoded.cast<Map<String, dynamic>>());
+        
+        // Force UI update by triggering a change in the observable list
+        drivers.refresh();
+        
+        if (driverNames.isEmpty) {
+          driversError.value = 'No drivers found';
+        }
 
         if (driverNames.isEmpty) {
-          Get.snackbar('Info', 'No drivers found', snackPosition: SnackPosition.BOTTOM);
+          Fluttertoast.showToast(
+            msg: 'No drivers found',
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
+          );
         }
       } else {
-        Get.snackbar('Error', 'Failed to load drivers: ${response.statusCode}',
-            snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+        final errorMsg = 'Failed to load drivers: Tap to retry.';
+        driversError.value = errorMsg;
+        Fluttertoast.showToast(
+          msg: errorMsg,
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+        );
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to load drivers: $e',
-          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+      final errorMsg = 'Failed to load drivers: Tap to retry.';
+      driversError.value = errorMsg;
+      Fluttertoast.showToast(
+        msg: errorMsg,
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
     } finally {
       driversLoading.value = false;
     }
@@ -505,6 +648,7 @@ class GCFormController extends GetxController {
   Future<void> fetchConsignors() async {
     try {
       consignorsLoading.value = true;
+      consignorsError.value = null;
       final url = Uri.parse('${ApiConfig.baseUrl}/consignor/search');
       final response = await http.get(url).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
@@ -528,19 +672,16 @@ class GCFormController extends GetxController {
             selectedConsignor.value = 'Select Consignor'; // Reset if old value not found
           }
           if (names.isEmpty) {
-            Get.snackbar('Info', 'No consignors found', snackPosition: SnackPosition.BOTTOM);
+            consignorsError.value = 'No consignors found';
           }
         } else {
-          Get.snackbar('Error', 'Unexpected consignors response format',
-              snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+          consignorsError.value = 'Unexpected response format';
         }
       } else {
-        Get.snackbar('Error', 'Failed to load consignors: ${response.statusCode}',
-            snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+        consignorsError.value = 'Failed to load consignors (${response.statusCode})';
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to load consignors: $e',
-          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+      consignorsError.value = 'Failed to load consignors. Tap to retry.';
     } finally {
       consignorsLoading.value = false;
     }
@@ -549,6 +690,7 @@ class GCFormController extends GetxController {
   Future<void> fetchConsignees() async {
     try {
       consigneesLoading.value = true;
+      consigneesError.value = null;
       final url = Uri.parse('${ApiConfig.baseUrl}/consignee/search');
       final response = await http.get(url).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
@@ -572,19 +714,16 @@ class GCFormController extends GetxController {
             selectedConsignee.value = 'Select Consignee'; // Reset if old value not found
           }
           if (names.isEmpty) {
-            Get.snackbar('Info', 'No consignees found', snackPosition: SnackPosition.BOTTOM);
+            consigneesError.value = 'No consignees found';
           }
         } else {
-          Get.snackbar('Error', 'Unexpected consignees response format',
-              snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+          consigneesError.value = 'Unexpected response format';
         }
       } else {
-        Get.snackbar('Error', 'Failed to load consignees: ${response.statusCode}',
-            snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+        consigneesError.value = 'Failed to load consignees (${response.statusCode})';
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to load consignees: $e',
-          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+      consigneesError.value = 'Failed to load consignees. Tap to retry.';
     } finally {
       consigneesLoading.value = false;
     }
@@ -593,6 +732,7 @@ class GCFormController extends GetxController {
   Future<void> fetchWeightRates() async {
     try {
       isLoadingRates.value = true;
+      weightRatesError.value = '';
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/weight_to_rate/search'),
         headers: {'Content-Type': 'application/json'},
@@ -603,11 +743,22 @@ class GCFormController extends GetxController {
         weightRates.assignAll(
           data.map((item) => WeightRate.fromJson(item)).toList(),
         );
+        if (weightRates.isEmpty) {
+          weightRatesError.value = 'No weight rates found';
+        }
+        // If we're editing and an actual weight is present but nothing selected yet,
+        // try to auto-select a matching weight rate now that data is available
+        if (isEditMode.value && selectedWeight.value == null) {
+          final wStr = actualWeightCtrl.text.trim();
+          if (wStr.isNotEmpty) {
+            selectWeightForActualWeight(wStr);
+          }
+        }
       } else {
-        Get.snackbar('Error', 'Failed to load weight rates: ${response.statusCode}');
+        weightRatesError.value = 'Failed to load weight rates. Tap to retry.';
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to connect to server for weight rates: $e');
+      weightRatesError.value = 'Failed to load weight rates. Tap to retry.';
     } finally {
       isLoadingRates.value = false;
     }
@@ -623,10 +774,22 @@ class GCFormController extends GetxController {
         final List<dynamic> data = json.decode(response.body);
         kmLocations.assignAll(data.map((json) => KMLocation.fromJson(json)).toList());
       } else {
-        Get.snackbar('Error', 'Failed to load KM locations: ${response.statusCode}');
+        Fluttertoast.showToast(
+          msg: 'Failed to load KM locations: ${response.statusCode}',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+        );
       }
     } catch (e) {
-      Get.snackbar('Error', 'Error fetching KM locations: $e');
+      Fluttertoast.showToast(
+        msg: 'Error fetching KM locations: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
     }
   }
 
@@ -664,45 +827,155 @@ class GCFormController extends GetxController {
 
   // Calculate rate based on KM and selected weight
   void calculateRate() {
-    if (selectedWeight.value == null || kmCtrl.text.isEmpty) {
-      rateCtrl.clear();
-      freightChargeCtrl.clear();
-      calculatedGoodsTotal.value = '';
-      autoSaveDraft();
-      return;
-    }
-
     final km = double.tryParse(kmCtrl.text) ?? 0.0;
+
+    // If KM is invalid or zero, clear only the total (keep any typed rate)
     if (km <= 0) {
-      rateCtrl.clear();
       freightChargeCtrl.clear();
       calculatedGoodsTotal.value = '';
-      autoSaveDraft();
       return;
     }
 
-    // Determine the base rate from selectedWeight based on KM
-    final baseRate = km <= 250
-        ? selectedWeight.value!.below250
-        : selectedWeight.value!.above250;
+    // Case 1: We have a selected weight rate -> derive rate from weight/km tier
+    if (selectedWeight.value != null) {
+      final baseRate = km <= 250
+          ? selectedWeight.value!.below250
+          : selectedWeight.value!.above250;
 
-    rateCtrl.text = baseRate.toStringAsFixed(2); // This is the rate per KM
+      rateCtrl.text = baseRate.toStringAsFixed(2); // rate per KM
 
-    // Calculate total freight charge
-    final totalFreight = baseRate * km;
-    freightChargeCtrl.text = totalFreight.toStringAsFixed(2);
+      final totalFreight = baseRate * km;
+      freightChargeCtrl.text = totalFreight.toStringAsFixed(2);
+      calculatedGoodsTotal.value = totalFreight.toStringAsFixed(2);
+      return;
+    }
 
-    // Update the reactive total for the Goods tab UI
-    calculatedGoodsTotal.value = totalFreight.toStringAsFixed(2);
+    // Case 2: No selected weight rate (e.g., editing existing GC)
+    // If a rate is already present, use it to compute the total
+    final existingRate = double.tryParse(rateCtrl.text);
+    if (existingRate != null && existingRate > 0) {
+      final totalFreight = existingRate * km;
+      freightChargeCtrl.text = totalFreight.toStringAsFixed(2);
+      calculatedGoodsTotal.value = totalFreight.toStringAsFixed(2);
+      return;
+    }
 
-    autoSaveDraft();
+    // Otherwise, nothing to compute yet
+    freightChargeCtrl.clear();
+    calculatedGoodsTotal.value = '';
   }
 
   // Update selected weight and calculate rate
   void onWeightSelected(WeightRate? weight) {
     selectedWeight.value = weight;
     calculateRate(); // Recalculate rate and total when weight changes
-    autoSaveDraft();
+  }
+
+  // Attempts to pick a WeightRate for a given actual weight string and trigger recalculation
+  void selectWeightForActualWeight(String weightStr) {
+    final rate = pickWeightRateForActualWeight(weightStr);
+    selectedWeight.value = rate;
+    calculateRate();
+  }
+
+  // Parses available weight rate labels and tries multiple strategies (including unit conversion)
+  // to match the given actual weight string
+  WeightRate? pickWeightRateForActualWeight(String weightStr) {
+    final cleanedInput = weightStr.trim().toLowerCase();
+    final actualRaw = double.tryParse(cleanedInput.replaceAll(RegExp(r'[^0-9\.]'), ''));
+
+    WeightRate? exactTextMatch;
+    WeightRate? containsTextMatch;
+    WeightRate? numericMatch;
+
+    for (final wr in weightRates) {
+      final labelRaw = wr.weight;
+      final label = labelRaw.trim().toLowerCase();
+
+      // 1) Exact, case-insensitive text match
+      if (label == cleanedInput) {
+        exactTextMatch = wr;
+        break;
+      }
+
+      // 2) Contains match either way (handles labels like "19MT" vs input "19" or vice versa)
+      if (label.contains(cleanedInput) || cleanedInput.contains(label)) {
+        containsTextMatch ??= wr;
+      }
+
+      // 3) Numeric-normalized matching (supports kg and ton inputs)
+      if (actualRaw != null) {
+        // Try multiple interpretations: as-is, kg->tons, tons->kg
+        final candidates = <double>{
+          actualRaw,
+          actualRaw / 1000.0,
+          actualRaw * 1000.0,
+        };
+
+        final labelNum = double.tryParse(label.replaceAll(RegExp(r'[^0-9\.]'), ''));
+        if (labelNum != null) {
+          for (final actual in candidates) {
+            if ((labelNum - actual).abs() < 0.0001) {
+              numericMatch ??= wr;
+              break;
+            }
+          }
+        }
+
+        // Also support common bracket-like labels (e.g., "0-250", ">250")
+        final dash = RegExp(r'^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$');
+        final plus = RegExp(r'^(\d+(?:\.\d+)?)\s*\+$');
+        final above = RegExp(r'^(?:above|>)\s*(\d+(?:\.\d+)?)$');
+        final below = RegExp(r'^(?:below|<)\s*(\d+(?:\.\d+)?)$');
+        final eqNum = RegExp(r'^(\d+(?:\.\d+)?)$');
+
+        RegExpMatch? m;
+        if ((m = dash.firstMatch(label)) != null) {
+          final low = double.tryParse(m!.group(1)!) ?? double.negativeInfinity;
+          final high = double.tryParse(m.group(2)!) ?? double.infinity;
+          for (final actual in candidates) {
+            if (actual >= low && actual <= high) {
+              numericMatch ??= wr;
+              break;
+            }
+          }
+        } else if ((m = plus.firstMatch(label)) != null) {
+          final base = double.tryParse(m!.group(1)!) ?? double.negativeInfinity;
+          for (final actual in candidates) {
+            if (actual >= base) {
+              numericMatch ??= wr;
+              break;
+            }
+          }
+        } else if ((m = above.firstMatch(label)) != null) {
+          final th = double.tryParse(m!.group(1)!) ?? double.negativeInfinity;
+          for (final actual in candidates) {
+            if (actual > th) {
+              numericMatch ??= wr;
+              break;
+            }
+          }
+        } else if ((m = below.firstMatch(label)) != null) {
+          final th = double.tryParse(m!.group(1)!) ?? double.infinity;
+          for (final actual in candidates) {
+            if (actual <= th) {
+              numericMatch ??= wr;
+              break;
+            }
+          }
+        } else if ((m = eqNum.firstMatch(label)) != null) {
+          final num = double.tryParse(m!.group(1)!) ?? double.nan;
+          for (final actual in candidates) {
+            if ((num - actual).abs() < 0.0001) {
+              numericMatch ??= wr;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    return exactTextMatch ?? numericMatch ?? containsTextMatch; // best available
   }
 
   // Calculate balance amount
@@ -715,107 +988,39 @@ class GCFormController extends GetxController {
     } catch (e) {
       balanceAmount.value = '0.00';
     }
-    autoSaveDraft(); // Save draft after balance update
   }
 
 
-  // Load GC data into the form for editing
-  void loadGcData(Map<String, dynamic> gcData) {
-    try {
-      // Shipment Tab
-      gcNumberCtrl.text = gcData['gcNumber'] ?? '';
-      gcNumberToEdit = gcData['gcNumber'];
-      
-      if (gcData['gcDate'] != null) {
-        gcDate.value = DateTime.tryParse(gcData['gcDate']);
-        if (gcDate.value != null) {
-          gcDateCtrl.text = DateFormat('dd-MM-yyyy').format(gcDate.value!);
-        }
-      }
-      
-      selectedBranch.value = gcData['branch'] ?? 'Select Branch';
-      selectedTruck.value = gcData['truckNumber'] ?? 'Select Truck';
-      truckNumberCtrl.text = gcData['truckNumber'] ?? '';
-      poNumberCtrl.text = gcData['poNumber'] ?? '';
-      tripIdCtrl.text = gcData['tripId'] ?? '';
-      
-      // Parties Tab
-      selectedBroker.value = gcData['brokerName'] ?? 'Select Broker';
-      selectedDriver.value = gcData['driverName'] ?? '';
-      driverNameCtrl.text = gcData['driverName'] ?? '';
-      driverPhoneCtrl.text = gcData['driverPhone'] ?? '';
-      
-      selectedConsignor.value = gcData['consignorName'] ?? 'Select Consignor';
-      consignorNameCtrl.text = gcData['consignorName'] ?? '';
-      consignorGstCtrl.text = gcData['consignorGst'] ?? '';
-      consignorAddressCtrl.text = gcData['consignorAddress'] ?? '';
-      
-      selectedConsignee.value = gcData['consigneeName'] ?? 'Select Consignee';
-      consigneeNameCtrl.text = gcData['consigneeName'] ?? '';
-      consigneeGstCtrl.text = gcData['consigneeGst'] ?? '';
-      consigneeAddressCtrl.text = gcData['consigneeAddress'] ?? '';
-      
-      // Goods Tab
-      packagesCtrl.text = gcData['numberOfPackages']?.toString() ?? '';
-      selectedPackageMethod.value = gcData['packageMethod'] ?? 'Boxes';
-      actualWeightCtrl.text = gcData['actualWeight']?.toString() ?? '';
-      kmCtrl.text = gcData['distance']?.toString() ?? '';
-      rateCtrl.text = gcData['rate']?.toString() ?? '';
-      
-      // Charges Tab
-      hireAmountCtrl.text = gcData['hireAmount']?.toString() ?? '';
-      advanceAmountCtrl.text = gcData['advanceAmount']?.toString() ?? '';
-      deliveryAddressCtrl.text = gcData['deliveryAddress'] ?? '';
-      freightChargeCtrl.text = gcData['freightCharge']?.toString() ?? '';
-      selectedPayment.value = gcData['paymentMethod'] ?? 'Cash';
-      
-      // Update balance amount
-      _updateBalanceAmount();
-      
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to load GC data: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    }
-  }
   
-  // Clear all form fields
+
+  // Clear all form fields and reset state
   void clearForm() {
+    // Reset form validation state
     formKey.currentState?.reset();
+    
+    // Clear all text controllers
     gcNumberCtrl.clear();
-    gcDate.value = null;
     gcDateCtrl.clear();
     eDaysCtrl.clear();
-    deliveryDate.value = null;
     deliveryDateCtrl.clear();
-    selectedTruck.value = 'Select Truck';
     truckNumberCtrl.clear();
     truckTypeCtrl.clear();
     fromCtrl.clear();
     toCtrl.clear();
     poNumberCtrl.clear();
     tripIdCtrl.clear();
-    selectedBroker.value = 'Select Broker';
-    selectedDriver.value = '';
     driverNameCtrl.clear();
     driverPhoneCtrl.clear();
-    selectedConsignor.value = 'Select Consignor';
     consignorNameCtrl.clear();
     consignorGstCtrl.clear();
     consignorAddressCtrl.clear();
-    selectedConsignee.value = 'Select Consignee';
     consigneeNameCtrl.clear();
     consigneeGstCtrl.clear();
     consigneeAddressCtrl.clear();
     customInvoiceCtrl.clear();
+    invValueCtrl.clear();
     ewayBillCtrl.clear();
-    ewayBillDate.value = null;
     ewayBillDateCtrl.clear();
-    ewayExpired.value = null;
     ewayExpiredCtrl.clear();
     packagesCtrl.clear();
     natureGoodsCtrl.clear();
@@ -830,11 +1035,40 @@ class GCFormController extends GetxController {
     freightChargeCtrl.clear();
     billingAddressCtrl.clear();
     deliveryInstructionsCtrl.clear();
+    
+    // Reset reactive values
+    gcDate.value = null;
+    deliveryDate.value = null;
+    ewayBillDate.value = null;
+    ewayExpired.value = null;
     balanceAmount.value = '0.00';
+    
+    // Reset dropdowns to default values
+    selectedTruck.value = 'Select Truck';
+    selectedBroker.value = 'Select Broker';
+    selectedDriver.value = '';
+    selectedConsignor.value = 'Select Consignor';
+    selectedConsignee.value = 'Select Consignee';
     selectedPayment.value = 'Cash';
     selectedService.value = 'Express';
-    selectedGstPayer.value = 'No';
+    selectedGstPayer.value = 'Consignor';
     selectedPackageMethod.value = 'Boxes';
+    
+    // Reset weight selection
+    selectedWeight.value = null;
+    
+    // Clear edit mode
+    isEditMode.value = false;
+    editingGcNumber.value = '';
+    editingCompanyId.value = '';
+    
+    // Clear calculated values
+    calculatedGoodsTotal.value = '';
+  }
+
+  // Helper method to format dates
+  String formatDate(DateTime date) {
+    return DateFormat('dd-MMM-yyyy').format(date);
   }
 
   Future<void> submitFormToBackend() async {
@@ -844,58 +1078,105 @@ class GCFormController extends GetxController {
     
     final Map<String, dynamic> data = {
       'Branch': selectedBranch.value,
+      'BranchCode': '', // Add if available
       'GcNumber': gcNumberCtrl.text,
       'GcDate': gcDate.value?.toIso8601String(),
-      'EDays': eDaysCtrl.text,
-      'DeliveryDate': deliveryDate.value?.toIso8601String(),
       'TruckNumber': selectedTruck.value,
+      'vechileNumber': selectedTruck.value, // Backend expects this field name
       'TruckType': truckTypeCtrl.text,
-      'From': fromCtrl.text,
-      'To': toCtrl.text,
-      'PoNumber': poNumberCtrl.text,
-      'TripId': tripIdCtrl.text,
-      'BrokerName': selectedBroker.value,
       'BrokerNameShow': selectedBroker.value,
-      'DriverName': selectedDriver.value,
+      'BrokerName': selectedBroker.value,
+      'TruckFrom': fromCtrl.text,
+      'TruckTo': toCtrl.text,
+      'PaymentDetails': selectedPayment.value,
+      'LcNo': '', // Add if available
+      'DeliveryDate': deliveryDate.value?.toIso8601String(),
+      'EBillDate': ewayBillDate.value?.toIso8601String(),
       'DriverNameShow': selectedDriver.value,
+      'DriverName': selectedDriver.value,
       'DriverPhoneNumber': driverPhoneCtrl.text,
       'Consignor': selectedConsignor.value,
       'ConsignorName': selectedConsignor.value,
-      'ConsignorGst': consignorGstCtrl.text,
       'ConsignorAddress': consignorAddressCtrl.text,
+      'ConsignorGst': consignorGstCtrl.text,
       'Consignee': selectedConsignee.value,
       'ConsigneeName': selectedConsignee.value,
-      'ConsigneeGst': consigneeGstCtrl.text,
       'ConsigneeAddress': consigneeAddressCtrl.text,
+      'ConsigneeGst': consigneeGstCtrl.text,
+      'CustInvNo': customInvoiceCtrl.text,
+      'InvValue': invValueCtrl.text,
+      'EInv': ewayBillCtrl.text,
+      'EInvDate': ewayBillDate.value?.toIso8601String(),
+      'Eda': ewayExpired.value?.toIso8601String(),
       'NumberofPkg': packagesCtrl.text,
       'MethodofPkg': selectedPackageMethod.value,
       'ActualWeightKgs': actualWeightCtrl.text,
+      'NumberofPkg2': '', // Add if available
+      'MethodofPkg2': '', // Add if available
+      'ActualWeightKgs2': '', // Add if available
       'km': kmCtrl.text,
+      'km2': '', // Add if available
+      'km3': '', // Add if available
+      'km4': '', // Add if available
+      'NumberofPkg3': '', // Add if available
+      'MethodofPkg3': '', // Add if available
+      'ActualWeightKgs3': '', // Add if available
+      'NumberofPkg4': '', // Add if available
+      'MethodofPkg4': '', // Add if available
+      'ActualWeightKgs4': '', // Add if available
+      'PrivateMark': remarksCtrl.text,
+      'PrivateMark2': '', // Add if available
+      'PrivateMark3': '', // Add if available
+      'PrivateMark4': '', // Add if available
+      'Charges': '', // Add if available
+      'Charges2': '', // Add if available
+      'Charges3': '', // Add if available
+      'Charges4': '', // Add if available
+      'GoodContain': natureGoodsCtrl.text,
+      'GoodContain2': '', // Add if available
+      'GoodContain3': '', // Add if available
+      'GoodContain4': '', // Add if available
       'Rate': rateCtrl.text,
+      'Total': freightChargeCtrl.text,
+      'Rate2': '', // Add if available
+      'Total2': '', // Add if available
+      'Rate3': '', // Add if available
+      'Total3': '', // Add if available
+      'Rate4': '', // Add if available
+      'Total4': '', // Add if available
+      'PoNumber': poNumberCtrl.text,
+      'TripId': tripIdCtrl.text,
+      'DeliveryFromSpecial': '', // Add if available
+      'DeliveryAddress': deliveryAddressCtrl.text,
+      'ServiceTax': '', // Add if available
+      'ReceiptBillNo': '', // Add if available
+      'ReceiptBillNoAmount': '', // Add if available
+      'ReceiptBillNoDate': '', // Add if available
+      'TotalRate': rateCtrl.text,
+      'TotalWeight': actualWeightCtrl.text,
       'HireAmount': hireAmountCtrl.text,
       'AdvanceAmount': advanceAmountCtrl.text,
       'BalanceAmount': balanceAmount.value,
-      'DeliveryAddress': deliveryAddressCtrl.text,
       'FreightCharge': freightChargeCtrl.text,
-      'PaymentDetails': selectedPayment.value,
-      'ServiceType': selectedService.value,
-      'GstPayer': selectedGstPayer.value,
-      'Remarks': remarksCtrl.text,
-      'CustomInvoiceNo': customInvoiceCtrl.text,
-      'EwayBillNo': ewayBillCtrl.text,
-      'EwayBillDate': ewayBillDate.value?.toIso8601String(),
-      'EwayBillExpiryDate': ewayExpired.value?.toIso8601String(),
-      'BillingAddress': billingAddressCtrl.text,
-      'DeliveryInstructions': deliveryInstructionsCtrl.text,
+      'Day1': '', // Add if available
+      'Day1Place': '', // Add if available
+      'Day2': '', // Add if available
+      'Day3': '', // Add if available
+      'Day4': '', // Add if available
+      'Day5': '', // Add if available
+      'Day6': '', // Add if available
+      'Day7': '', // Add if available
+      'Day8': '', // Add if available
+      'CompanyId': editingCompanyId.value.isNotEmpty ? editingCompanyId.value : '1', // Use stored company ID or default
     };
 
     try {
       final Uri url;
       final http.Response response;
       
-      if (isEditMode.value && gcNumberToEdit != null) {
+      if (isEditMode.value && editingGcNumber.value.isNotEmpty) {
         // Update existing GC
-        url = Uri.parse('${ApiConfig.baseUrl}/updateGC/$gcNumberToEdit');
+        url = Uri.parse('${ApiConfig.baseUrl}/gc/updateGC/${editingGcNumber.value}');
         response = await http.put(
           url,
           headers: {'Content-Type': 'application/json'},
@@ -914,18 +1195,19 @@ class GCFormController extends GetxController {
       isLoading.value = false;
       
       if (response.statusCode == 200) {
-        Get.snackbar(
-          'Success',
-          isEditMode.value ? 'GC updated successfully!' : 'GC created successfully!',
-          snackPosition: SnackPosition.BOTTOM,
+        final message = isEditMode.value ? 'GC updated successfully!' : 'GC created successfully!';
+        
+        Fluttertoast.showToast(
+          msg: message,
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
           backgroundColor: const Color(0xFF4A90E2),
-          colorText: Colors.white,
+          textColor: Colors.white,
+          fontSize: 16.0,
         );
         
-        // Clear the form if not in edit mode
-        if (!isEditMode.value) {
-          clearForm();
-        }
+        // Clear the form after successful operation
+        clearForm();
         
         // Navigate back to GC list
         Get.until((route) => route.isFirst);
@@ -934,12 +1216,14 @@ class GCFormController extends GetxController {
       }
     } catch (e) {
       isLoading.value = false;
-      Get.snackbar(
-        'Error',
-        'Failed to ${isEditMode.value ? 'update' : 'create'} GC: $e',
-        snackPosition: SnackPosition.BOTTOM,
+      final operation = isEditMode.value ? 'update' : 'create';
+      Fluttertoast.showToast(
+        msg: 'Failed to $operation GC: $e',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
         backgroundColor: Colors.red,
-        colorText: Colors.white,
+        textColor: Colors.white,
+        fontSize: 16.0,
       );
     }
   }

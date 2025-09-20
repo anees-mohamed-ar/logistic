@@ -1,8 +1,254 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'dart:math' as math;
 import 'package:logistic/controller/login_controller.dart';
 import 'package:logistic/controller/id_controller.dart';
+import 'package:logistic/routes.dart';
+
+class AnimatedTruck extends StatefulWidget {
+  const AnimatedTruck({Key? key}) : super(key: key);
+
+  @override
+  State<AnimatedTruck> createState() => _AnimatedTruckState();
+}
+
+class _AnimatedTruckState extends State<AnimatedTruck> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  static const double truckWidth = 50.0; // Width of the truck icon
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 6), // Slightly faster for better loop
+      vsync: this,
+    )..repeat();
+
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.linear),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        
+        // Calculate position
+        // Start with truck just off-screen left to off-screen right
+        // The truck's left edge will be at -truckWidth when animation starts (value = 0)
+        // The truck's left edge will be at screenWidth when animation ends (value = 1)
+        double x = _animation.value * (screenWidth + truckWidth) - 210.0;
+        
+        // When animation starts (value = 0): x = -truckWidth (just off-screen left)
+        // When animation ends (value = 1): x = screenWidth (just off-screen right)
+        
+        return Transform.translate(
+          offset: Offset(x, 0),
+          child: const Icon(
+            Icons.local_shipping_rounded,
+            size: 50,
+            color: Color(0xFF1E2A44),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class MovingWind extends StatefulWidget {
+  const MovingWind({Key? key}) : super(key: key);
+
+  @override
+  State<MovingWind> createState() => _MovingWindState();
+}
+
+class _MovingWindState extends State<MovingWind> with SingleTickerProviderStateMixin {
+  late AnimationController _windController;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    _windController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _windController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _windController,
+      builder: (context, child) {
+        return CustomPaint(
+          painter: MovingWindPainter(_windController.value),
+          size: const Size(double.infinity, 60),
+        );
+      },
+    );
+  }
+}
+
+class MovingWindPainter extends CustomPainter {
+  final double progress;
+  
+  MovingWindPainter(this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final windPaint = Paint()
+      ..color = const Color(0xFF1E2A44).withOpacity(0.15)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    // Create multiple wind lines at different positions
+    final windLines = [
+      {'y': size.height * 0.2, 'length': 25.0, 'speed': 1.0},
+      {'y': size.height * 0.4, 'length': 20.0, 'speed': 1.2},
+      {'y': size.height * 0.6, 'length': 30.0, 'speed': 0.8},
+      {'y': size.height * 0.8, 'length': 15.0, 'speed': 1.1},
+    ];
+
+    for (var line in windLines) {
+      final y = line['y'] as double;
+      final length = line['length'] as double;
+      final speed = line['speed'] as double;
+      
+      // Calculate moving position (right to left)
+      final totalWidth = size.width + length + 50;
+      final x = size.width + 25 - (progress * speed * totalWidth) % totalWidth;
+      
+      // Draw wind line
+      canvas.drawLine(
+        Offset(x, y),
+        Offset(x - length, y),
+        windPaint,
+      );
+      
+      // Draw additional segments for longer wind effect
+      canvas.drawLine(
+        Offset(x - length - 10, y),
+        Offset(x - length - 25, y),
+        windPaint..color = const Color(0xFF1E2A44).withOpacity(0.08),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class MovingRoad extends StatefulWidget {
+  const MovingRoad({Key? key}) : super(key: key);
+
+  @override
+  State<MovingRoad> createState() => _MovingRoadState();
+}
+
+class _MovingRoadState extends State<MovingRoad> with SingleTickerProviderStateMixin {
+  late AnimationController _roadController;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    _roadController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _roadController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return AnimatedBuilder(
+          animation: _roadController,
+          builder: (context, child) {
+            return SizedBox(
+              width: constraints.maxWidth,
+              child: CustomPaint(
+                painter: MovingRoadPainter(_roadController.value),
+                size: Size(constraints.maxWidth, 6),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class MovingRoadPainter extends CustomPainter {
+  final double progress;
+  
+  MovingRoadPainter(this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF1E2A44).withOpacity(0.4)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+
+    final dashPaint = Paint()
+      ..color = const Color(0xFF1E2A44).withOpacity(0.6)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    // Draw road base - extend slightly beyond screen edges for full coverage
+    canvas.drawLine(
+      Offset(-100, size.height / 2),  // Start 100px left of screen
+      Offset(size.width + 100, size.height / 2),  // End 100px right of screen
+      paint,
+    );
+
+    // Draw moving road dashes (right to left movement)
+    const dashWidth = 12.0;
+    const dashSpacing = 18.0;
+    const totalDashLength = dashWidth + dashSpacing;
+    
+    // Calculate offset for smooth movement from right to left
+    final offset = (progress * totalDashLength * 2) % totalDashLength;
+    
+    // Draw dashes that extend beyond screen edges for smooth animation
+    for (double x = size.width + dashWidth + 100 - offset; 
+         x > -dashWidth - 100; 
+         x -= totalDashLength) {
+      canvas.drawLine(
+        Offset(x - dashWidth, size.height / 2 - 1),
+        Offset(x, size.height / 2 - 1),
+        dashPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -27,32 +273,75 @@ class LoginScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Logo and Title
-                Animate(
-                  effects: const [ScaleEffect()],
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E2A44).withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.local_shipping_rounded, size: 40),
+                
+                // Enhanced Animated Truck Logo
+                SizedBox(
+                  height: 140,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Static background gradient
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: RadialGradient(
+                              center: Alignment.center,
+                              radius: 0.8,
+                              colors: [
+                                const Color(0xFF1E2A44).withOpacity(0.05),
+                                Colors.transparent,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(70),
+                          ),
+                        ),
+                      ),
+                      
+                      // Moving wind effects (behind truck)
+                      const Positioned.fill(
+                        child: MovingWind(),
+                      ),
+                      
+                      // Moving Road with dashes
+                      const Positioned(
+                        bottom: 35,
+                        left: 0,
+                        right: 0,
+                        child: MovingRoad(),
+                      ),
+                      
+                      // Animated Truck (positioned on road)
+                      Positioned(
+                        bottom: 25,
+                        left: 0,
+                        right: 0,
+                        height: 50, // Match the truck size
+                        child: const AnimatedTruck(),
+                      ),
+                    ],
                   ),
                 ),
+                
+                // App Title with subtle animation
                 const SizedBox(height: 16),
                 const Text(
                   'Logistics GC',
                   style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-                ),
+                ).animate().fadeIn(duration: const Duration(milliseconds: 600))
+                 .slideY(begin: 0.3, end: 0),
+                
                 const SizedBox(height: 8),
                 const Text(
                   'Ground Control System',
                   style: TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
-                ),
+                ).animate().fadeIn(
+                  delay: const Duration(milliseconds: 200),
+                  duration: const Duration(milliseconds: 600),
+                ).slideY(begin: 0.3, end: 0),
+                
                 const SizedBox(height: 48),
 
-                // Login Form
+                // Login Form (keeping original form code)
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -210,12 +499,15 @@ class LoginScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                ),
+                ).animate().fadeIn(
+                  delay: const Duration(milliseconds: 400),
+                  duration: const Duration(milliseconds: 600),
+                ).slideY(begin: 0.3, end: 0),
 
                 // Sign Up Prompt
                 const SizedBox(height: 24),
                 TextButton(
-                  onPressed: () => controller.handleSocialLogin('Sign Up'),
+                  onPressed: () => Get.toNamed(AppRoutes.register),
                   child: const Text.rich(
                     TextSpan(
                       text: "Don't have an account? ",
@@ -227,6 +519,9 @@ class LoginScreen extends StatelessWidget {
                       ],
                     ),
                   ),
+                ).animate().fadeIn(
+                  delay: const Duration(milliseconds: 600),
+                  duration: const Duration(milliseconds: 600),
                 ),
               ],
             ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:fluttertoast/fluttertoast.dart';
 
 import 'package:logistic/api_config.dart';
 import 'package:logistic/routes.dart';
@@ -83,61 +84,66 @@ class LoginController extends GetxController {
             },
           );
 
-      isLoading.value = false;
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final userData = data[0];
 
-        // Extract userId and companyId from API response (adjust keys as needed)
-        final String fetchedUserId = data[0]['userId'].toString();
-        final String fetchedCompanyId = data[0]['companyId'].toString();
-
-        // Store in GetX for global access
-        userId.value = fetchedUserId;
-        companyId.value = fetchedCompanyId;
-        // Also store in IdController for global access
+        // Store all user data in IdController
         final idController = Get.find<IdController>();
-        idController.setUserId(fetchedUserId);
-        idController.setCompanyId(fetchedCompanyId);
+        idController.setAllUserData(userData);
 
-        // Show success message and navigate
-        Get.snackbar(
-          '',
-          'Login Successful!',
-          snackPosition: SnackPosition.BOTTOM,
-          duration: const Duration(seconds: 2),
-          backgroundColor: const Color(0xFF4A90E2).withOpacity(0.9),
-          colorText: Colors.white,
+        // Also store in local variables for backward compatibility
+        userId.value = userData['userId'].toString();
+        companyId.value = userData['companyId'].toString();
+
+        // Stop loading immediately before navigation
+        isLoading.value = false;
+
+        // Show success toast message
+        Fluttertoast.showToast(
+          msg: "Login Successful!",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: const Color(0xFF4A90E2),
+          textColor: Colors.white,
+          fontSize: 16.0,
         );
-        Get.offNamed(AppRoutes.home); // Navigate to home screen
+
+        // Navigate to home screen
+        Get.offNamed(AppRoutes.home);
       } else {
-        // Handle API errors
+        isLoading.value = false;
+        // Handle API errors with toast
         final errorData = jsonDecode(response.body);
-        Get.snackbar(
-          'Error',
-          errorData['error'] ?? 'Invalid credentials',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red.withOpacity(0.9),
-          colorText: Colors.white,
+        Fluttertoast.showToast(
+          msg: errorData['error'] ?? 'Invalid credentials',
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+          fontSize: 16.0,
         );
       }
     } catch (e) {
       isLoading.value = false;
-      Get.snackbar(
-        'Error',
-        'Failed to connect: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red.withOpacity(0.9),
-        colorText: Colors.white,
+      Fluttertoast.showToast(
+        msg: 'Failed to connect: ${e.toString()}',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 16.0,
       );
     }
   }
 
   @override
   void onClose() {
-    emailController.dispose();
-    passwordController.dispose();
-    ipController.dispose();
+    // Intentionally do not dispose controllers here.
+    // GetX may rebuild LoginScreen after navigation (e.g., from Register),
+    // and disposing these controllers can lead to 'used after disposed' errors
+    // if the same instance is reused by Get.
+    // Rely on app shutdown or GetX cleanup to release them.
     super.onClose();
   }
 }
