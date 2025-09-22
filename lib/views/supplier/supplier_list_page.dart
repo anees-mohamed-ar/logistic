@@ -33,10 +33,35 @@ class SupplierListPage extends StatelessWidget {
             }
             
             if (controller.suppliers.isEmpty) {
-              return const Center(child: Text('No suppliers found'));
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('No suppliers found'),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                      child: ElevatedButton.icon(
+                        onPressed: controller.fetchSuppliers,
+                        icon: const Icon(Icons.refresh),
+                        label: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+                          child: Text('Retry'),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E2A44),
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
             }
 
-            return ListView.builder(
+            return RefreshIndicator(
+              onRefresh: () => controller.fetchSuppliers(),
+              child: ListView.builder(
               padding: const EdgeInsets.only(bottom: 80), // Space for FAB
               itemCount: controller.suppliers.length,
               itemBuilder: (context, index) {
@@ -66,7 +91,8 @@ class SupplierListPage extends StatelessWidget {
                     },
                   ),
                 );
-              },
+                },
+              ),
             );
           }),
           

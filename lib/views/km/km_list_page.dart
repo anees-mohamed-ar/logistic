@@ -17,12 +17,42 @@ class KMListPage extends StatelessWidget {
       child: Stack(
         children: [
           Obx(() {
-            if (controller.isLoading.value) {
+            if (controller.isLoading.value && controller.kmList.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
-            return ListView.builder(
-              padding: const EdgeInsets.only(bottom: 80), // Space for FAB
-              itemCount: controller.kmList.length,
+            
+            if (controller.kmList.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('No KM records found'),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                      child: ElevatedButton.icon(
+                        onPressed: controller.fetchKMList,
+                        icon: const Icon(Icons.refresh),
+                        label: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+                          child: Text('Retry'),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E2A44),
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            
+            return RefreshIndicator(
+              onRefresh: () => controller.fetchKMList(),
+              child: ListView.builder(
+                padding: const EdgeInsets.only(bottom: 80), // Space for FAB
+                itemCount: controller.kmList.length,
               itemBuilder: (context, index) {
                 final km = controller.kmList[index];
                 return Card(
@@ -44,7 +74,8 @@ class KMListPage extends StatelessWidget {
                     ),
                   ),
                 );
-              },
+                },
+              ),
             );
           }),
           Positioned(

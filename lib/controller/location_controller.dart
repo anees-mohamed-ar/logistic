@@ -7,6 +7,7 @@ import 'package:logistic/api_config.dart';
 class LocationController extends GetxController {
   final isLoading = false.obs;
   final locations = <Location>[].obs;
+  final error = ''.obs;
   final _client = http.Client();
 
   @override
@@ -17,19 +18,21 @@ class LocationController extends GetxController {
 
   Future<void> fetchLocations() async {
     try {
+      error.value = '';
       isLoading.value = true;
       final response = await _client.get(
         Uri.parse('${ApiConfig.baseUrl}/location/search'),
         headers: {'Content-Type': 'application/json'},
-      );
+      ).timeout(const Duration(seconds: 30));
       
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         locations.value = data.map((json) => Location.fromJson(json)).toList();
       } else {
-        throw Exception('Failed to load locations');
+        throw Exception('Failed to load locations. Status code: ${response.statusCode}');
       }
     } catch (e) {
+      error.value = e.toString().replaceAll('Exception: ', '');
       Get.snackbar('Error', 'Failed to load locations');
     } finally {
       isLoading.value = false;

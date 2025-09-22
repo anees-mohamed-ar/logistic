@@ -81,12 +81,11 @@ class _TruckListPageState extends State<TruckListPage> {
     return Scaffold(
       appBar: CustomAppBar(
         title: 'Truck Management',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => Get.toNamed(AppRoutes.truckForm)?.then((_) => _controller.fetchTrucks()),
-          ),
-        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Get.toNamed(AppRoutes.truckForm)?.then((_) => _controller.fetchTrucks()),
+        backgroundColor: const Color(0xFF1E2A44),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
       body: Obx(() {
         if (_controller.isLoading.value && _controller.trucks.isEmpty) {
@@ -126,6 +125,7 @@ class _TruckListPageState extends State<TruckListPage> {
           ],
         );
       }),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -172,9 +172,11 @@ class _TruckListPageState extends State<TruckListPage> {
       );
     }
 
-    return ListView.builder(
-      itemCount: _controller.filteredTrucks.length,
-      itemBuilder: (context, index) {
+    return RefreshIndicator(
+      onRefresh: () => _controller.fetchTrucks(),
+      child: ListView.builder(
+        itemCount: _controller.filteredTrucks.length,
+        itemBuilder: (context, index) {
         final truck = _controller.filteredTrucks[index];
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -224,6 +226,7 @@ class _TruckListPageState extends State<TruckListPage> {
           ),
         );
       },
+      ),
     );
   }
 

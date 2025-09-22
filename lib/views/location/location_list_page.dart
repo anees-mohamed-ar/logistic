@@ -21,13 +21,38 @@ class LocationListPage extends StatelessWidget {
             }
             
             if (_controller.locations.isEmpty) {
-              return const Center(child: Text('No locations found'));
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('No locations found'),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                      child: ElevatedButton.icon(
+                        onPressed: _controller.fetchLocations,
+                        icon: const Icon(Icons.refresh),
+                        label: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+                          child: Text('Retry'),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E2A44),
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
             }
 
-            return ListView.builder(
-              padding: const EdgeInsets.only(bottom: 80), // Space for FAB
-              itemCount: _controller.locations.length,
-              itemBuilder: (context, index) {
+            return RefreshIndicator(
+              onRefresh: () => _controller.fetchLocations(),
+              child: ListView.builder(
+                padding: const EdgeInsets.only(bottom: 80), // Space for FAB
+                itemCount: _controller.locations.length,
+                itemBuilder: (context, index) {
                 final location = _controller.locations[index];
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -58,6 +83,7 @@ class LocationListPage extends StatelessWidget {
                   ),
                 );
               },
+            ),
             );
           }),
           Positioned(
