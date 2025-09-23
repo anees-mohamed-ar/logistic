@@ -3,10 +3,11 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:logistic/api_config.dart';
-import 'package:logistic/models/km_location.dart'; // Ensure this file exists and KMLocation is defined
+import 'package:logistic/models/km_location.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'dart:convert';
 import 'dart:async';
+import 'package:collection/collection.dart';
 
 class WeightRate {
   final int id;
@@ -199,6 +200,7 @@ class GCFormController extends GetxController {
     fetchConsignors();
     fetchConsignees();
     fetchWeightRates();
+    fetchKMLocations();
   }
 
   @override
@@ -868,6 +870,12 @@ class GCFormController extends GetxController {
   // Update selected weight and calculate rate
   void onWeightSelected(WeightRate? weight) {
     selectedWeight.value = weight;
+    // Also update the actualWeightCtrl.text with the weight value so it gets sent to backend
+    if (weight != null) {
+      actualWeightCtrl.text = weight.weight;
+    } else {
+      actualWeightCtrl.clear();
+    }
     calculateRate(); // Recalculate rate and total when weight changes
   }
 
@@ -875,6 +883,12 @@ class GCFormController extends GetxController {
   void selectWeightForActualWeight(String weightStr) {
     final rate = pickWeightRateForActualWeight(weightStr);
     selectedWeight.value = rate;
+    // Also update the actualWeightCtrl.text with the weight value so it gets sent to backend
+    if (rate != null) {
+      actualWeightCtrl.text = rate.weight;
+    } else {
+      actualWeightCtrl.clear();
+    }
     calculateRate();
   }
 

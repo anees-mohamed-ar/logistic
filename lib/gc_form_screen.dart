@@ -792,6 +792,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                             if (info != null) {
                               controller.consignorGstCtrl.text = info['gst'] ?? '';
                               controller.consignorAddressCtrl.text = info['address'] ?? '';
+                              // Auto-fill From field with consignor's address
+                              controller.fromCtrl.text = info['address'] ?? '';
                             }
                           }
                         },
