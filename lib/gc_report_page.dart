@@ -4,7 +4,6 @@ import 'dart:math' as math;
 import 'package:logistic/api_config.dart';
 import 'dart:convert';
 
-
 class GCReportPage extends StatefulWidget {
   const GCReportPage({Key? key}) : super(key: key);
 
@@ -12,51 +11,10 @@ class GCReportPage extends StatefulWidget {
   State<GCReportPage> createState() => _GCReportPageState();
 }
 
-class _GcDataSource extends DataTableSource {
-  final List<Map<String, dynamic>> data;
-  final List<String> fieldKeys;
-
-  _GcDataSource({required this.data, required this.fieldKeys});
-
-  @override
-  DataRow? getRow(int index) {
-    if (index < 0 || index >= data.length) return null;
-    final item = data[index];
-    return DataRow.byIndex(
-      index: index,
-      color: MaterialStateProperty.resolveWith<Color?>((states) {
-        // Zebra striping for readability
-        return index % 2 == 0 ? Colors.white : const Color(0xFFF7FAFF);
-      }),
-      cells: fieldKeys.map((key) {
-        final value = item[key];
-        return DataCell(
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 180),
-            child: Text(
-              value?.toString() ?? '',
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  @override
-  bool get isRowCountApproximate => false;
-
-  @override
-  int get rowCount => data.length;
-
-  @override
-  int get selectedRowCount => 0;
-}
-
 class _GCReportPageState extends State<GCReportPage>
     with TickerProviderStateMixin {
   List<Map<String, dynamic>> gcList = [];
+  List<Map<String, dynamic>> filteredGcList = [];
   bool isLoading = true;
   String? error;
   late AnimationController _controller;
@@ -65,13 +23,25 @@ class _GCReportPageState extends State<GCReportPage>
       _totalAdvanceAnim,
       _totalFreightAnim;
 
-  int get totalGCs => gcList.length;
+  // Search and filter
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  // Pagination
+  int _rowsPerPage = 10;
+  int _currentPage = 0;
+  final TextEditingController _pageController = TextEditingController(text: '1');
+
+  // Table view mode
+  bool _isCardView = false;
+
+  int get totalGCs => filteredGcList.length;
   double get totalHireAmount =>
-      gcList.fold(0, (sum, gc) => sum + _parseDouble(gc['HireAmount']));
+      filteredGcList.fold(0, (sum, gc) => sum + _parseDouble(gc['HireAmount']));
   double get totalAdvanceAmount =>
-      gcList.fold(0, (sum, gc) => sum + _parseDouble(gc['AdvanceAmount']));
+      filteredGcList.fold(0, (sum, gc) => sum + _parseDouble(gc['AdvanceAmount']));
   double get totalFreightCharge =>
-      gcList.fold(0, (sum, gc) => sum + _parseDouble(gc['FreightCharge']));
+      filteredGcList.fold(0, (sum, gc) => sum + _parseDouble(gc['FreightCharge']));
 
   @override
   void initState() {
@@ -79,19 +49,74 @@ class _GCReportPageState extends State<GCReportPage>
     fetchGCList();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 1),
+      duration: const Duration(milliseconds: 1200),
     );
-    _totalGCsAnim = Tween<double>(begin: 0, end: 0).animate(_controller);
-    _totalHireAnim = Tween<double>(begin: 0, end: 0).animate(_controller);
-    _totalAdvanceAnim = Tween<double>(begin: 0, end: 0).animate(_controller);
-    _totalFreightAnim = Tween<double>(begin: 0, end: 0).animate(_controller);
+    _setupAnimations();
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _pageController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  void _setupAnimations() {
+    _totalGCsAnim = Tween<double>(begin: 0, end: 0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    );
+    _totalHireAnim = Tween<double>(begin: 0, end: 0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    );
+    _totalAdvanceAnim = Tween<double>(begin: 0, end: 0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    );
+    _totalFreightAnim = Tween<double>(begin: 0, end: 0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    );
+  }
+
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text.toLowerCase();
+      _filterData();
+      _currentPage = 0;
+      _pageController.text = '1';
+    });
+  }
+
+  void _filterData() {
+    if (_searchQuery.isEmpty) {
+      filteredGcList = List.from(gcList);
+    } else {
+      filteredGcList = gcList.where((gc) {
+        return gc.values.any((value) =>
+        value?.toString().toLowerCase().contains(_searchQuery) ?? false);
+      }).toList();
+    }
+    _updateAnimations();
+  }
+
+  void _updateAnimations() {
+    _totalGCsAnim = Tween<double>(
+      begin: 0,
+      end: totalGCs.toDouble(),
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _totalHireAnim = Tween<double>(
+      begin: 0,
+      end: totalHireAmount,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _totalAdvanceAnim = Tween<double>(
+      begin: 0,
+      end: totalAdvanceAmount,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _totalFreightAnim = Tween<double>(
+      begin: 0,
+      end: totalFreightCharge,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _controller.forward(from: 0);
   }
 
   Future<void> fetchGCList() async {
@@ -106,25 +131,10 @@ class _GCReportPageState extends State<GCReportPage>
         final List<dynamic> data = jsonDecode(response.body);
         setState(() {
           gcList = data.cast<Map<String, dynamic>>();
+          filteredGcList = List.from(gcList);
           isLoading = false;
-          _totalGCsAnim = Tween<double>(
-            begin: 0,
-            end: totalGCs.toDouble(),
-          ).animate(_controller);
-          _totalHireAnim = Tween<double>(
-            begin: 0,
-            end: totalHireAmount,
-          ).animate(_controller);
-          _totalAdvanceAnim = Tween<double>(
-            begin: 0,
-            end: totalAdvanceAmount,
-          ).animate(_controller);
-          _totalFreightAnim = Tween<double>(
-            begin: 0,
-            end: totalFreightCharge,
-          ).animate(_controller);
         });
-        _controller.forward(from: 0);
+        _updateAnimations();
       } else {
         setState(() {
           error = 'Failed to load GC report: ${response.body}';
@@ -148,121 +158,273 @@ class _GCReportPageState extends State<GCReportPage>
     }
   }
 
+  String _formatCurrency(double amount) {
+    return '₹${amount.toStringAsFixed(2)}';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isSmallScreen = MediaQuery.of(context).size.width < 900;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
+    final isTablet = screenWidth >= 768 && screenWidth < 1024;
+    final bottomPadding = isMobile ? 80.0 : 24.0;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('GC Report'),
-        backgroundColor: const Color(0xFF1E2A44),
-        foregroundColor: Colors.white,
+      appBar: _buildAppBar(isMobile),
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: Padding(
+        padding: EdgeInsets.only(bottom: bottomPadding),
+        child: RefreshIndicator(
+          onRefresh: fetchGCList,
+          child: isLoading
+              ? _buildLoadingState()
+              : error != null
+                  ? _buildErrorState()
+                  : _buildMainContent(isMobile, isTablet),
+        ),
       ),
-      backgroundColor: const Color(0xFFF7F9FC),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : error != null
-              ? Center(
-                  child: Text(error!, style: const TextStyle(color: Colors.red)),
-                )
-              : Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: ListView(
-                    children: [
-                      _buildSummaryCards(isSmallScreen),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'GC Entries',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildPaginatedTable(isSmallScreen),
-                    ],
-                  ),
-                ),
     );
   }
 
-  Widget _buildSummaryCards(bool isSmallScreen) {
+  PreferredSizeWidget _buildAppBar(bool isMobile) {
+    return AppBar(
+      title: Text(
+        'GC Report',
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: isMobile ? 18 : 20,
+        ),
+      ),
+      backgroundColor: const Color(0xFF1E2A44),
+      foregroundColor: Colors.white,
+      elevation: 0,
+      actions: [
+        // Always show view toggle in app bar for both mobile and desktop
+        IconButton(
+          icon: Icon(_isCardView ? Icons.table_chart : Icons.view_agenda),
+          onPressed: () => setState(() => _isCardView = !_isCardView),
+          tooltip: _isCardView ? 'Switch to Table View' : 'Switch to Card View',
+        ),
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          onPressed: fetchGCList,
+          tooltip: 'Refresh Data',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1E3A8A)),
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Loading GC Report...',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.red.shade300,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Error Loading Data',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Colors.red.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: fetchGCList,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1E3A8A),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainContent(bool isMobile, bool isTablet) {
+    return CustomScrollView(
+      slivers: [
+        // Summary Cards
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
+            child: _buildSummaryCards(isMobile, isTablet),
+          ),
+        ),
+
+        // Search and Controls
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 12.0 : 16.0,
+              vertical: 8.0,
+            ),
+            child: _buildSearchAndControls(isMobile),
+          ),
+        ),
+
+        // Data Table/Cards
+        if (filteredGcList.isEmpty)
+          const SliverToBoxAdapter(
+            child: _EmptyState(),
+          )
+        else if (_isCardView && isMobile)
+          _buildCardView()
+        else
+          _buildTableView(isMobile),
+      ],
+    );
+  }
+
+  Widget _buildSummaryCards(bool isMobile, bool isTablet) {
     final cards = [
-      _animatedSummaryCard(
-        'Total GCs',
-        _totalGCsAnim,
-        Icons.assignment,
-        Colors.blue,
-      ),
-      _animatedSummaryCard(
-        'Total Hire',
-        _totalHireAnim,
-        Icons.currency_rupee,
-        Colors.green,
-      ),
-      _animatedSummaryCard(
-        'Total Advance',
-        _totalAdvanceAnim,
-        Icons.account_balance_wallet,
-        Colors.orange,
-      ),
-      _animatedSummaryCard(
-        'Total Freight',
-        _totalFreightAnim,
-        Icons.local_shipping,
-        Colors.purple,
-      ),
+      _SummaryCardData('Total GCs', _totalGCsAnim, Icons.assignment, const Color(0xFF3B82F6), true),
+      _SummaryCardData('Total Hire', _totalHireAnim, Icons.currency_rupee, const Color(0xFF10B981), false),
+      _SummaryCardData('Total Advance', _totalAdvanceAnim, Icons.account_balance_wallet, const Color(0xFFF59E0B), false),
+      _SummaryCardData('Total Freight', _totalFreightAnim, Icons.local_shipping, const Color(0xFF8B5CF6), false),
     ];
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 140),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
+
+    if (isMobile) {
+      return SizedBox(
+        height: 120,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: cards.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 12),
+          itemBuilder: (context, i) => _buildAnimatedSummaryCard(cards[i], isMobile),
+        ),
+      );
+    } else {
+      return GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: isTablet ? 2 : 4,
+          childAspectRatio: isTablet ? 2.5 : 2.8,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+        ),
         itemCount: cards.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 16),
-        itemBuilder: (context, i) => cards[i],
-      ),
-    );
+        itemBuilder: (context, i) => _buildAnimatedSummaryCard(cards[i], isMobile),
+      );
+    }
   }
 
-  Widget _animatedSummaryCard(
-    String label,
-    Animation<double> anim,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _buildAnimatedSummaryCard(_SummaryCardData cardData, bool isMobile) {
     return AnimatedBuilder(
-      animation: anim,
+      animation: cardData.animation,
       builder: (context, child) => Card(
-        elevation: 4,
+        elevation: 2,
+        shadowColor: cardData.color.withOpacity(0.1),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
-          width: 180,
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          width: isMobile ? 160 : null,
+          padding: EdgeInsets.all(isMobile ? 10 : 14),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [color.withOpacity(0.15), color.withOpacity(0.05)],
+              colors: [
+                cardData.color.withOpacity(0.08),
+                cardData.color.withOpacity(0.02)
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: cardData.color.withOpacity(0.1),
+              width: 1,
+            ),
           ),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: color, size: 32),
-              const SizedBox(height: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: cardData.color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      cardData.icon,
+                      color: cardData.color,
+                      size: isMobile ? 18 : 22,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.trending_up,
+                    color: cardData.color.withOpacity(0.6),
+                    size: 14,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               Text(
-                label.contains('Total GCs')
-                    ? anim.value.toInt().toString()
-                    : anim.value.toStringAsFixed(2),
+                cardData.isCount
+                    ? cardData.animation.value.toInt().toString()
+                    : _formatCurrency(cardData.animation.value),
                 style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                  color: color,
+                  fontWeight: FontWeight.w700,
+                  fontSize: isMobile ? 16 : 20,
+                  color: cardData.color,
+                  height: 1.1,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(label, style: const TextStyle(fontSize: 14)),
+              const SizedBox(height: 2),
+              Text(
+                cardData.label,
+                style: TextStyle(
+                  fontSize: isMobile ? 11 : 13,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                  height: 1.1,
+                ),
+              ),
             ],
           ),
         ),
@@ -270,31 +432,285 @@ class _GCReportPageState extends State<GCReportPage>
     );
   }
 
-  int _rowsPerPage = 10;
-  int _currentPage = 0;
-  final TextEditingController _pageController = TextEditingController(text: '1');
+  Widget _buildSearchAndControls(bool isMobile) {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search GC records...',
+                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                        },
+                      )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                if (!isMobile) ...[
+                  const SizedBox(width: 12),
+                  Text(
+                    '${filteredGcList.length} records',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (isMobile && filteredGcList.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                '${filteredGcList.length} records found',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
-  Widget _buildPaginatedTable(bool isSmallScreen) {
-    if (gcList.isEmpty) {
-      return const Center(child: Text('No GC data available.'));
+  SliverList _buildCardView() {
+    final int itemCount = filteredGcList.length;
+    final int totalPages = itemCount == 0 ? 1 : (itemCount / _rowsPerPage).ceil();
+    _currentPage = _currentPage.clamp(0, totalPages - 1);
+    final int startIndex = _currentPage * _rowsPerPage;
+    final int endIndex = math.min(startIndex + _rowsPerPage, itemCount);
+    final List<Map<String, dynamic>> pageData = filteredGcList.sublist(
+      startIndex,
+      endIndex,
+    );
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+            (context, index) {
+          if (index == pageData.length) {
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: _buildPaginationControls(totalPages, true),
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: _buildGCCard(pageData[index]),
+          );
+        },
+        childCount: pageData.length + 1,
+      ),
+    );
+  }
+
+  Widget _buildGCCard(Map<String, dynamic> gc) {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'GC #${gc['GcNumber'] ?? 'N/A'}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E3A8A),
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Text(
+                    gc['TruckNumber'] ?? 'N/A',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.green.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildCardRow('Date', gc['GcDate']),
+            _buildCardRow('Driver', gc['DriverName']),
+            _buildCardRow('Broker', gc['BrokerName']),
+            _buildCardRow('Consignor', gc['ConsignorName']),
+            _buildCardRow('Consignee', gc['ConsigneeName']),
+            const SizedBox(height: 8),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildAmountChip(
+                    'Hire',
+                    _formatCurrency(_parseDouble(gc['HireAmount'])),
+                    Colors.blue,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildAmountChip(
+                    'Advance',
+                    _formatCurrency(_parseDouble(gc['AdvanceAmount'])),
+                    Colors.orange,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildAmountChip(
+                    'Freight',
+                    _formatCurrency(_parseDouble(gc['FreightCharge'])),
+                    Colors.purple,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardRow(String label, dynamic value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value?.toString() ?? 'N/A',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAmountChip(String label, String amount, Color color) {
+    // Create darker variants of the color for text
+    final darkerColor = Color.alphaBlend(Colors.black.withOpacity(0.3), color);
+    final evenDarkerColor = Color.alphaBlend(Colors.black.withOpacity(0.5), color);
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: darkerColor,
+              fontWeight: FontWeight.w500,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            amount,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: evenDarkerColor,
+              height: 1.1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  SliverToBoxAdapter _buildTableView(bool isMobile) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: isMobile ? 12.0 : 16.0),
+        child: _buildPaginatedTable(isMobile),
+      ),
+    );
+  }
+
+  Widget _buildPaginatedTable(bool isMobile) {
+    if (filteredGcList.isEmpty) {
+      return const SizedBox.shrink();
     }
 
     final columns = [
       'GC Number',
-      'GC Date',
-      'Truck Number',
+      'Date',
+      'Truck',
       'PO Number',
       'Trip ID',
-      'Broker Name',
-      'Driver Name',
-      'Consignor Name',
-      'Consignee Name',
-      'Number of Packages',
-      'Actual Weight (kg)',
+      'Broker',
+      'Driver',
+      'Consignor',
+      'Consignee',
+      'Packages',
+      'Weight (kg)',
       'Rate',
       'Hire Amount',
-      'Advance Amount',
-      'Freight Charge',
+      'Advance',
+      'Freight',
     ];
 
     final fieldKeys = [
@@ -316,63 +732,111 @@ class _GCReportPageState extends State<GCReportPage>
     ];
 
     // Pagination calculations
-    final int itemCount = gcList.length;
+    final int itemCount = filteredGcList.length;
     final int totalPages = itemCount == 0 ? 1 : (itemCount / _rowsPerPage).ceil();
     _currentPage = _currentPage.clamp(0, totalPages - 1);
     final int startIndex = _currentPage * _rowsPerPage;
     final int endIndex = math.min(startIndex + _rowsPerPage, itemCount);
-    final List<Map<String, dynamic>> pageData = gcList.sublist(
+    final List<Map<String, dynamic>> pageData = filteredGcList.sublist(
       startIndex,
       endIndex,
     );
 
-    void goToPage(int page) {
-      if (page >= 0 && page < totalPages) {
-        setState(() {
-          _currentPage = page;
-          _pageController.text = (page + 1).toString();
-        });
-      }
-    }
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Table Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E3A8A).withOpacity(0.05),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Text(
+                  'GC Entries',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E3A8A),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  'Showing ${startIndex + 1}–$endIndex of $itemCount entries',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Horizontally scrollable table only
-        LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
+          // Scrollable table
+          SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minWidth: math.max(constraints.maxWidth, 1000),
+                minWidth: MediaQuery.of(context).size.width - (isMobile ? 24 : 32),
               ),
               child: DataTable(
+                headingRowHeight: 56,
+                dataRowHeight: 56,
                 headingRowColor: MaterialStateProperty.all(
-                  const Color(0xFFE3E8F0),
+                  Colors.grey.shade50,
                 ),
                 columns: columns
                     .map((c) => DataColumn(
-                          label: Text(
-                            c,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ))
+                  label: Expanded(
+                    child: Text(
+                      c,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ))
                     .toList(),
-                rows: pageData.map((item) {
-                  final rowIndex = pageData.indexOf(item);
-                  final Color? rowColor = rowIndex % 2 == 0
+                rows: pageData.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final item = entry.value;
+                  final Color? rowColor = index % 2 == 0
                       ? Colors.white
-                      : const Color(0xFFF7FAFF);
+                      : Colors.grey[50]; // Changed from shade25 to [50]
                   return DataRow(
                     color: MaterialStateProperty.all(rowColor),
                     cells: fieldKeys.map((key) {
+                      String displayValue = item[key]?.toString() ?? '';
+
+                      // Format currency fields
+                      if (['HireAmount', 'AdvanceAmount', 'FreightCharge'].contains(key)) {
+                        displayValue = _formatCurrency(_parseDouble(item[key]));
+                      }
+
                       return DataCell(
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 180),
+                        Container(
+                          constraints: const BoxConstraints(maxWidth: 140),
                           child: Text(
-                            item[key]?.toString() ?? '',
+                            displayValue,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: ['HireAmount', 'AdvanceAmount', 'FreightCharge'].contains(key)
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                              color: ['HireAmount', 'AdvanceAmount', 'FreightCharge'].contains(key)
+                                  ? const Color(0xFF1E3A8A)
+                                  : Colors.black87,
+                            ),
                           ),
                         ),
                       );
@@ -382,116 +846,265 @@ class _GCReportPageState extends State<GCReportPage>
               ),
             ),
           ),
-        ),
 
-        // Fixed footer controls (do not scroll with horizontal table)
-        const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              // Rows per page selector
-              Row(
-                children: [
-                  const Text('Rows per page:'),
-                  const SizedBox(width: 8),
-                  DropdownButton<int>(
-                    value: _rowsPerPage,
-                    items: const [5, 10, 20, 50, 100]
-                        .map((v) => DropdownMenuItem<int>(
-                              value: v,
-                              child: Text('$v'),
-                            ))
-                        .toList(),
-                    onChanged: (v) {
-                      if (v != null) {
-                        setState(() {
-                          _rowsPerPage = v;
-                          _currentPage = 0;
-                          _pageController.text = '1';
-                        });
-                      }
-                    },
-                  ),
-                ],
+          // Pagination controls
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[50], // Changed from shade25 to [50]
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
               ),
+            ),
+            child: _buildPaginationControls(totalPages, isMobile),
+          ),
+        ],
+      ),
+    );
+  }
 
-              const SizedBox(width: 16),
+  Widget _buildPaginationControls(int totalPages, bool isMobile) {
+    void goToPage(int page) {
+      if (page >= 0 && page < totalPages) {
+        setState(() {
+          _currentPage = page;
+          _pageController.text = (page + 1).toString();
+        });
+      }
+    }
 
-              // Page navigation
+    if (isMobile) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              const Text('Rows per page:'),
+              const SizedBox(width: 8),
+              DropdownButton<int>(
+                value: _rowsPerPage,
+                items: const [5, 10, 20, 50]
+                    .map((v) => DropdownMenuItem<int>(
+                  value: v,
+                  child: Text('$v'),
+                ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) {
+                    setState(() {
+                      _rowsPerPage = v;
+                      _currentPage = 0;
+                      _pageController.text = '1';
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Page ${_currentPage + 1} of $totalPages',
+                style: const TextStyle(fontSize: 14),
+              ),
               Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.first_page),
-                    onPressed: _currentPage > 0 ? () => goToPage(0) : null,
-                    tooltip: 'First page',
-                  ),
                   IconButton(
                     icon: const Icon(Icons.chevron_left),
-                    onPressed:
-                        _currentPage > 0 ? () => goToPage(_currentPage - 1) : null,
-                    tooltip: 'Previous page',
+                    onPressed: _currentPage > 0 ? () => goToPage(_currentPage - 1) : null,
+                    visualDensity: VisualDensity.compact,
                   ),
-                  const SizedBox(width: 8),
-                  const Text('Page'),
-                  const SizedBox(width: 6),
-                  SizedBox(
-                    width: 56,
-                    child: TextField(
-                      controller: _pageController,
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(vertical: 8),
-                        border: OutlineInputBorder(),
-                      ),
-                      onSubmitted: (value) {
-                        final p = int.tryParse(value) ?? 1;
-                        if (p >= 1 && p <= totalPages) {
-                          goToPage(p - 1);
-                        } else {
-                          _pageController.text = (_currentPage + 1).toString();
-                        }
-                      },
-                    ),
-                  ),
-                  Text(' of $totalPages'),
-                  const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.chevron_right),
                     onPressed: _currentPage < totalPages - 1
                         ? () => goToPage(_currentPage + 1)
                         : null,
-                    tooltip: 'Next page',
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.last_page),
-                    onPressed: _currentPage < totalPages - 1
-                        ? () => goToPage(totalPages - 1)
-                        : null,
-                    tooltip: 'Last page',
+                    visualDensity: VisualDensity.compact,
                   ),
                 ],
               ),
+            ],
+          ),
+        ],
+      );
+    }
 
-              const SizedBox(width: 16),
-
-              // Range info
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 260),
-                child: Text(
-                  itemCount == 0
-                      ? 'No entries'
-                      : 'Showing ${startIndex + 1}–$endIndex of $itemCount entries',
-                  style: TextStyle(color: Colors.grey[700]),
-                  overflow: TextOverflow.ellipsis,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          // Rows per page selector
+          Row(
+            children: [
+              const Text(
+                'Rows per page:',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: DropdownButton<int>(
+                  value: _rowsPerPage,
+                  underline: const SizedBox(),
+                  items: const [5, 10, 20, 50, 100]
+                      .map((v) => DropdownMenuItem<int>(
+                    value: v,
+                    child: Text('$v'),
+                  ))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) {
+                      setState(() {
+                        _rowsPerPage = v;
+                        _currentPage = 0;
+                        _pageController.text = '1';
+                      });
+                    }
+                  },
                 ),
               ),
             ],
           ),
-        ),
-      ],
+
+          const SizedBox(width: 24),
+
+          // Page navigation
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.first_page),
+                onPressed: _currentPage > 0 ? () => goToPage(0) : null,
+                tooltip: 'First page',
+                style: IconButton.styleFrom(
+                  backgroundColor: _currentPage > 0 ? Colors.grey.shade100 : null,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_left),
+                onPressed: _currentPage > 0 ? () => goToPage(_currentPage - 1) : null,
+                tooltip: 'Previous page',
+                style: IconButton.styleFrom(
+                  backgroundColor: _currentPage > 0 ? Colors.grey.shade100 : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Page',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 60,
+                height: 36,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: TextField(
+                  controller: _pageController,
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(fontSize: 14),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: 8),
+                  ),
+                  onSubmitted: (value) {
+                    final p = int.tryParse(value) ?? 1;
+                    if (p >= 1 && p <= totalPages) {
+                      goToPage(p - 1);
+                    } else {
+                      _pageController.text = (_currentPage + 1).toString();
+                    }
+                  },
+                ),
+              ),
+              Text(
+                ' of $totalPages',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.chevron_right),
+                onPressed: _currentPage < totalPages - 1
+                    ? () => goToPage(_currentPage + 1)
+                    : null,
+                tooltip: 'Next page',
+                style: IconButton.styleFrom(
+                  backgroundColor: _currentPage < totalPages - 1 ? Colors.grey.shade100 : null,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.last_page),
+                onPressed: _currentPage < totalPages - 1
+                    ? () => goToPage(totalPages - 1)
+                    : null,
+                tooltip: 'Last page',
+                style: IconButton.styleFrom(
+                  backgroundColor: _currentPage < totalPages - 1 ? Colors.grey.shade100 : null,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+// Helper classes
+class _SummaryCardData {
+  final String label;
+  final Animation<double> animation;
+  final IconData icon;
+  final Color color;
+  final bool isCount;
+
+  _SummaryCardData(this.label, this.animation, this.icon, this.color, this.isCount);
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(48),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.inbox_outlined,
+            size: 64,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No GC Records Found',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Try adjusting your search criteria or check back later.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

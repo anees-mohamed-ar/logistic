@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:logistic/controller/gc_form_controller.dart';
 import 'package:flutter/services.dart';
+import 'package:logistic/widgets/gc_pdf.dart';
 // Note: WeightRate is now defined in gc_form_controller.dart,
 // so 'show WeightRate' import is redundant if not also needed from this file's context
 // import 'package:logistic/controller/gc_form_controller.dart' show WeightRate;
@@ -73,16 +74,43 @@ class _GCFormScreenState extends State<GCFormScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.help_outline),
-            onPressed: () {
-              Get.snackbar(
-                'Help',
-                'Fill all required fields and navigate through tabs',
-                snackPosition: SnackPosition.BOTTOM,
-                backgroundColor: Colors.blueGrey,
-                colorText: Colors.white,
-              );
-            },
+            icon: const Icon(Icons.picture_as_pdf, size: 24),
+            tooltip: 'Export to PDF',
+            onPressed: () => GCPdfGenerator.showPdfPreview(context, controller),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'export_pdf',
+                child: const Text('Save PDF to Device'),
+                onTap: () => GCPdfGenerator.savePdfToDevice(controller),
+              ),
+              PopupMenuItem(
+                value: 'share_pdf',
+                child: const Text('Share PDF'),
+                onTap: () => GCPdfGenerator.sharePdf(controller),
+              ),
+              PopupMenuItem(
+                value: 'print_pdf',
+                child: const Text('Print PDF'),
+                onTap: () => GCPdfGenerator.printPdf(controller),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'help',
+                child: const Text('Help'),
+                onTap: () {
+                  Get.snackbar(
+                    'Help',
+                    'Fill all required fields and navigate through tabs',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.blueGrey,
+                    colorText: Colors.white,
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),
@@ -1017,6 +1045,20 @@ class _GCFormScreenState extends State<GCFormScreen> {
               }),
 
               const SizedBox(height: 16),
+
+              // Number of Packages
+              TextFormField(
+                controller: controller.packagesCtrl,
+                decoration: _inputDecoration(
+                  'No. of Packages',
+                  Icons.inventory_2_outlined,
+                ),
+                keyboardType: TextInputType.number,
+                validator: null,
+                onChanged: (_) {},
+              ),
+              const SizedBox(height: 16),
+
               // Nature of Goods and Package Method - Conditional Layout
               if (!isSmallScreen) // For large screens, display side-by-side
                 Row(
@@ -1095,19 +1137,18 @@ class _GCFormScreenState extends State<GCFormScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      controller: controller.rateCtrl,
-                      readOnly: true, // Assuming Rate is always auto-calculated and read-only here
-                      decoration: _inputDecoration(
-                        'Rate (Auto)',
-                        Icons.attach_money,
-                      ),
-                      validator: null,
-                    ),
-                  ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              // Rate in its own row
+              TextFormField(
+                controller: controller.rateCtrl,
+                readOnly: true, // Assuming Rate is always auto-calculated and read-only here
+                decoration: _inputDecoration(
+                  'Rate per KM',
+                  Icons.attach_money,
+                ),
+                validator: null,
               ),
               const SizedBox(height: 16),
               // Total in its own row
@@ -1362,6 +1403,24 @@ class _GCFormScreenState extends State<GCFormScreen> {
               )),
               const SizedBox(height: 16),
 
+              // Payment Method (Dropdown)
+              Obx(() => _buildDropdownField(
+                context: context,
+                label: 'Payment Method',
+                value: controller.selectedPayment.value,
+                items: ['Select Payment', ...controller.paymentOptions],
+                onChanged: (value) {
+                  if (value != null && value != 'Select Payment') {
+                    controller.selectedPayment.value = value;
+                  }
+                },
+                validator: (value) =>
+                value == null || value.isEmpty || value == 'Select Payment' ? 'Required' : null,
+                compact: true,
+                searchable: false,
+              )),
+              const SizedBox(height: 16),
+
               // Freight Charge (referenced from goods total)
               Obx(() => TextFormField(
                 readOnly: true,
@@ -1536,7 +1595,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
     }
 
     final dropdown = DropdownButtonFormField<String>(
-      value: value.isEmpty ? null : value,
+      value: (value.isEmpty || !items.contains(value)) ? null : value,
       items: items.map((item) {
         return DropdownMenuItem<String>(
           value: item,

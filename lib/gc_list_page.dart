@@ -95,57 +95,209 @@ class _GCListPageState extends State<GCListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('GC List'),
-        backgroundColor: const Color(0xFF1E2A44),
-        foregroundColor: Colors.white,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: searchController,
-              onChanged: filterSearchResults,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Search GCs...',
-                hintStyle: const TextStyle(color: Colors.white70),
-                prefixIcon: const Icon(Icons.search, color: Colors.white70),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(25),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.2),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(25),
-                  borderSide: const BorderSide(color: Colors.white54),
-                ),
+      appBar: _buildAppBar(),
+      backgroundColor: const Color(0xFFF7F9FC),
+      body: _buildBody(),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.description, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('GC Management', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text('Goods Consignment List', style: TextStyle(fontSize: 12, color: Colors.white70)),
+            ],
+          ),
+        ],
+      ),
+      backgroundColor: const Color(0xFF1E2A44),
+      foregroundColor: Colors.white,
+      elevation: 0,
+      actions: [
+        Container(
+          margin: const EdgeInsets.only(right: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '${filteredGcList.length} GCs',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+        ),
+      ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(70),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: TextField(
+            controller: searchController,
+            onChanged: filterSearchResults,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Search by GC Number, Truck, Driver, etc...',
+              hintStyle: const TextStyle(color: Colors.white60),
+              prefixIcon: const Icon(Icons.search, color: Colors.white70),
+              suffixIcon: searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: Colors.white70),
+                      onPressed: () {
+                        searchController.clear();
+                        filterSearchResults('');
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.15),
+              contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.white54, width: 1),
               ),
             ),
           ),
         ),
       ),
-      backgroundColor: const Color(0xFFF7F9FC),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : error != null
-          ? Center(
-        child: Text(error!, style: const TextStyle(color: Colors.red)),
-      )
-          : filteredGcList.isEmpty
-          ? Center(
+    );
+  }
+
+  Widget _buildBody() {
+    if (isLoading) {
+      return _buildLoadingState();
+    }
+    
+    if (error != null) {
+      return _buildErrorState();
+    }
+    
+    if (filteredGcList.isEmpty) {
+      return _buildEmptyState();
+    }
+    
+    return _buildGCList();
+  }
+
+  Widget _buildLoadingState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: Color(0xFF1E2A44)),
+          SizedBox(height: 16),
+          Text(
+            'Loading GC records...',
+            style: TextStyle(color: Colors.grey, fontSize: 16),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.red.shade200),
+        ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.search_off, size: 64, color: Colors.grey),
+            Icon(Icons.error_outline, size: 48, color: Colors.red.shade400),
             const SizedBox(height: 16),
             Text(
-              'No GCs found',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey),
+              'Error Loading Data',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.red.shade700,
+              ),
             ),
             const SizedBox(height: 8),
+            Text(
+              error!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.red.shade600),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: fetchGCList,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade600,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                searchController.text.isNotEmpty ? Icons.search_off : Icons.description,
+                size: 48,
+                color: Colors.grey.shade400,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              searchController.text.isNotEmpty ? 'No matching GCs found' : 'No GC records available',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              searchController.text.isNotEmpty
+                  ? 'Try adjusting your search criteria'
+                  : 'GC records will appear here once created',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
             if (searchController.text.isNotEmpty)
               ElevatedButton.icon(
                 onPressed: () {
@@ -155,114 +307,314 @@ class _GCListPageState extends State<GCListPage> {
                 icon: const Icon(Icons.clear),
                 label: const Text('Clear Search'),
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  minimumSize: const Size(0, 40),
-                  visualDensity: VisualDensity.compact,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  backgroundColor: const Color(0xFF1E2A44),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
           ],
-        ),
-      )
-          : RefreshIndicator(
-        onRefresh: fetchGCList,
-        child: ListView.builder(
-          itemCount: filteredGcList.length,
-          itemBuilder: (context, index) {
-            final gc = filteredGcList[index];
-            return Card(
-              margin: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: ExpansionTile(
-                title: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        gc['GcNumber'] ?? '',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-                subtitle: Text('Branch: ${gc['Branch'] ?? ''}'),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _infoRow('GC Date', gc['GcDate']),
-                        _infoRow('Truck Number', gc['TruckNumber']),
-                        _infoRow('PO Number', gc['PoNumber']),
-                        _infoRow('Trip ID', gc['TripId']),
-                        _infoRow('Broker Name', gc['BrokerName']),
-                        _infoRow('Driver Name', gc['DriverName']),
-                        _infoRow('Consignor Name', gc['ConsignorName']),
-                        _infoRow('Consignor GST', gc['ConsignorGst']),
-                        _infoRow(
-                          'Consignor Address',
-                          gc['ConsignorAddress'],
-                        ),
-                        _infoRow('Consignee Name', gc['ConsigneeName']),
-                        _infoRow('Consignee GST', gc['ConsigneeGst']),
-                        _infoRow(
-                          'Consignee Address',
-                          gc['ConsigneeAddress'],
-                        ),
-                        _infoRow('Number of Packages', gc['NumberofPkg']),
-                        _infoRow('Package Method', gc['MethodofPkg']),
-                        _infoRow(
-                          'Actual Weight (kg)',
-                          gc['ActualWeightKgs'],
-                        ),
-                        _infoRow('Rate', gc['Rate']),
-                        _infoRow('Distance (KM)', gc['km']),
-                        _infoRow('Hire Amount', gc['HireAmount']),
-                        _infoRow('Advance Amount', gc['AdvanceAmount']),
-                        _infoRow('Delivery Address', gc['DeliveryAddress']),
-                        _infoRow('Freight Charge', gc['FreightCharge']),
-                        _infoRow('Payment Method', gc['PaymentDetails']),
-                        const SizedBox(height: 16),
-                        // Edit button
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () => _editGC(gc),
-                            icon: const Icon(Icons.edit, size: 18),
-                            label: const Text('Edit GC'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4A90E2),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ].where((w) => w != null).cast<Widget>().toList(),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
         ),
       ),
     );
   }
 
+  Widget _buildGCList() {
+    return RefreshIndicator(
+      onRefresh: fetchGCList,
+      color: const Color(0xFF1E2A44),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: filteredGcList.length,
+        itemBuilder: (context, index) {
+          final gc = filteredGcList[index];
+          return _buildGCCard(gc, index);
+        },
+      ),
+    );
+  }
 
+  Widget _buildGCCard(Map<String, dynamic> gc, int index) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+          expansionTileTheme: const ExpansionTileThemeData(
+            tilePadding: EdgeInsets.zero,
+          ),
+        ),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.all(16),
+          childrenPadding: EdgeInsets.zero,
+          title: _buildCardHeader(gc),
+          subtitle: _buildCardSubtitle(gc),
+          trailing: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E2A44).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.expand_more,
+              color: Color(0xFF1E2A44),
+            ),
+          ),
+          children: [
+            _buildCardDetails(gc),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardHeader(Map<String, dynamic> gc) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E2A44),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            gc['GcNumber'] ?? 'N/A',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                gc['TruckNumber'] ?? 'No Truck',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  color: Colors.black87,
+                ),
+              ),
+              if (gc['DriverName']?.toString().isNotEmpty == true) ...[
+                const SizedBox(height: 2),
+                Text(
+                  'Driver: ${gc['DriverName']}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCardSubtitle(Map<String, dynamic> gc) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          _buildInfoChip(Icons.business, gc['Branch']),
+          const SizedBox(width: 8),
+          if (gc['GcDate']?.toString().isNotEmpty == true)
+            _buildInfoChip(Icons.calendar_today, _formatDisplayDate(gc['GcDate'])),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoChip(IconData icon, String? text) {
+    if (text == null || text.isEmpty) return const SizedBox.shrink();
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: Colors.grey.shade600),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardDetails(Map<String, dynamic> gc) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(12),
+          bottomRight: Radius.circular(12),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Key Information Section
+          _buildDetailSection(
+            'Trip Information',
+            Icons.local_shipping,
+            [
+              _infoRow('PO Number', gc['PoNumber']),
+              _infoRow('Trip ID', gc['TripId']),
+              _infoRow('Distance (KM)', gc['km']),
+              _infoRow('Route', '${gc['TruckFrom'] ?? ''} → ${gc['TruckTo'] ?? ''}'),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Parties Information Section
+          _buildDetailSection(
+            'Parties Information',
+            Icons.people,
+            [
+              _infoRow('Broker', gc['BrokerName']),
+              _infoRow('Consignor', gc['ConsignorName']),
+              _infoRow('Consignor GST', gc['ConsignorGst']),
+              _infoRow('Consignor Address', gc['ConsignorAddress']),
+              _infoRow('Consignee', gc['ConsigneeName']),
+              _infoRow('Consignee GST', gc['ConsigneeGst']),
+              _infoRow('Consignee Address', gc['ConsigneeAddress']),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Goods Information Section
+          _buildDetailSection(
+            'Goods Information',
+            Icons.inventory,
+            [
+              _infoRow('Packages', gc['NumberofPkg']),
+              _infoRow('Package Method', gc['MethodofPkg']),
+              _infoRow('Actual Weight (kg)', gc['ActualWeightKgs']),
+              _infoRow('Goods Description', gc['GoodContain']),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Financial Information Section
+          _buildDetailSection(
+            'Financial Details',
+            Icons.account_balance_wallet,
+            [
+              _infoRow('Rate', gc['Rate']),
+              _infoRow('Hire Amount', gc['HireAmount']),
+              _infoRow('Advance Amount', gc['AdvanceAmount']),
+              _infoRow('Freight Charge', gc['FreightCharge']),
+              _infoRow('Payment Method', gc['PaymentDetails']),
+            ],
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Edit Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _editGC(gc),
+              icon: const Icon(Icons.edit, size: 18),
+              label: const Text('Edit GC Record'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4A90E2),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailSection(String title, IconData icon, List<Widget> children) {
+    final validChildren = children.where((child) => child is! SizedBox || child.height != 0).toList();
+    
+    if (validChildren.isEmpty) return const SizedBox.shrink();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 18, color: const Color(0xFF1E2A44)),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E2A44),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            children: validChildren,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatDisplayDate(dynamic date) {
+    if (date == null) return '';
+    try {
+      final dateTime = DateTime.parse(date.toString());
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    } catch (e) {
+      return date.toString();
+    }
+  }
+
+  // [Previous methods remain the same: _editGC and _populateFormWithGCData]
   void _editGC(Map<String, dynamic> gc) {
-    // Get company ID from IdController
     final idController = Get.find<IdController>();
     final companyId = idController.companyId.value;
     
@@ -277,51 +629,40 @@ class _GCListPageState extends State<GCListPage> {
       return;
     }
 
-    // Check if we already have a controller (e.g., when coming back from another screen)
     final gcController = Get.put(GCFormController(), permanent: false);
-    
-    // Reset the form before populating with new data
     gcController.clearForm();
-    
-    // Set edit mode before populating the form
     gcController.isEditMode.value = true;
     gcController.editingGcNumber.value = gc['GcNumber']?.toString() ?? '';
     gcController.editingCompanyId.value = companyId;
 
-    // Populate form with existing GC data
-    _populateFormWithGCData(gcController, gc, companyId);
+    if (gcController.weightRates.isEmpty) {
+      gcController.fetchWeightRates().then((_) {
+        _populateFormWithGCData(gcController, gc, companyId);
+      });
+    } else {
+      _populateFormWithGCData(gcController, gc, companyId);
+    }
 
-    // Navigate to GC form screen
     Get.to(
       () => const GCFormScreen(),
       preventDuplicates: false,
-    )?.then((_) {
-      // Don't dispose the controller here as it might still be in use
-      // The controller will be properly managed by GetX's dependency injection
-    });
+    );
   }
 
   void _populateFormWithGCData(GCFormController controller, Map<String, dynamic> gc, String companyId) {
-    // Store the GC number and company ID for update operation
     controller.gcNumberCtrl.text = gc['GcNumber']?.toString() ?? '';
-    
-    // Set edit mode flag (we'll add this to the controller)
     controller.isEditMode.value = true;
     controller.editingGcNumber.value = gc['GcNumber']?.toString() ?? '';
     controller.editingCompanyId.value = companyId;
 
-    // Populate all available fields from the GC data
     controller.selectedBranch.value = gc['Branch']?.toString() ?? 'Select Branch';
     
-    // Handle dates
     if (gc['GcDate'] != null) {
       try {
         final gcDate = DateTime.parse(gc['GcDate'].toString());
         controller.gcDate.value = gcDate;
         controller.gcDateCtrl.text = controller.formatDate(gcDate);
-      } catch (e) {
-        // Handle date parsing error
-      }
+      } catch (e) {}
     }
     
     if (gc['DeliveryDate'] != null) {
@@ -329,78 +670,60 @@ class _GCListPageState extends State<GCListPage> {
         final deliveryDate = DateTime.parse(gc['DeliveryDate'].toString());
         controller.deliveryDate.value = deliveryDate;
         controller.deliveryDateCtrl.text = controller.formatDate(deliveryDate);
-      } catch (e) {
-        // Handle date parsing error
-      }
+      } catch (e) {}
     }
 
-    // Vehicle details
     controller.selectedTruck.value = gc['TruckNumber']?.toString() ?? 'Select Truck';
     controller.truckNumberCtrl.text = gc['TruckNumber']?.toString() ?? '';
     controller.truckTypeCtrl.text = gc['TruckType']?.toString() ?? '';
     controller.poNumberCtrl.text = gc['PoNumber']?.toString() ?? '';
     controller.tripIdCtrl.text = gc['TripId']?.toString() ?? '';
 
-    // Location details
     controller.fromCtrl.text = gc['TruckFrom']?.toString() ?? '';
     controller.toCtrl.text = gc['TruckTo']?.toString() ?? '';
 
-    // Parties details
     controller.selectedBroker.value = gc['BrokerName']?.toString() ?? 'Select Broker';
     controller.brokerNameCtrl.text = gc['BrokerName']?.toString() ?? '';
     controller.selectedDriver.value = gc['DriverName']?.toString() ?? '';
     controller.driverNameCtrl.text = gc['DriverName']?.toString() ?? '';
     controller.driverPhoneCtrl.text = gc['DriverPhoneNumber']?.toString() ?? '';
 
-    // Consignor details
     controller.selectedConsignor.value = gc['ConsignorName']?.toString() ?? 'Select Consignor';
     controller.consignorNameCtrl.text = gc['ConsignorName']?.toString() ?? '';
     controller.consignorGstCtrl.text = gc['ConsignorGst']?.toString() ?? '';
     controller.consignorAddressCtrl.text = gc['ConsignorAddress']?.toString() ?? '';
     
-    // Consignee details
     final consigneeAddress = gc['ConsigneeAddress']?.toString() ?? '';
     controller.selectedConsignee.value = gc['ConsigneeName']?.toString() ?? 'Select Consignee';
     controller.consigneeNameCtrl.text = gc['ConsigneeName']?.toString() ?? '';
     controller.consigneeGstCtrl.text = gc['ConsigneeGst']?.toString() ?? '';
     controller.consigneeAddressCtrl.text = consigneeAddress;
     
-    // Goods details - using correct field names from the API response
-    final weight = gc['ActualWeightKgs']?.toString() ?? ''; // Using ActualWeightKgs instead of Weight
-    final natureOfGoods = gc['GoodContain']?.toString() ?? ''; // Using GoodContain for nature of goods
+    final weight = gc['ActualWeightKgs']?.toString() ?? '';
+    final natureOfGoods = gc['GoodContain']?.toString() ?? '';
     final methodOfPkg = (gc['MethodofPkg']?.toString() ?? '').isNotEmpty 
         ? gc['MethodofPkg'].toString() 
         : 'Boxes';
         
-    print('Nature of goods from API: $natureOfGoods'); // Debug log
-    
-    // Update weight
     controller.weightCtrl.text = weight;
-    
-    // Update nature of goods in both controllers
     controller.natureOfGoodsCtrl.text = natureOfGoods;
     controller.natureGoodsCtrl.text = natureOfGoods;
     
-    // Update package method - convert to title case for consistency
     final formattedMethod = (methodOfPkg?.isNotEmpty ?? false)
         ? '${methodOfPkg![0].toUpperCase()}${methodOfPkg.substring(1).toLowerCase()}'
         : 'Boxes';
     controller.methodPackageCtrl.text = formattedMethod;
     controller.selectedPackageMethod.value = formattedMethod;
     
-    // Update other goods fields
     controller.packagesCtrl.text = gc['NumberofPkg']?.toString() ?? '';
-    controller.actualWeightCtrl.text = weight; // Using the same weight value
-    
-    // Set billing address to consignee's address
+    controller.actualWeightCtrl.text = weight;
+    controller.remarksCtrl.text = gc['PrivateMark']?.toString() ?? '';
     controller.billingAddressCtrl.text = consigneeAddress;
     
-    // Pre-fill KM and Rate BEFORE selecting weight so calculation has all inputs
     controller.actualWeightCtrl.text = gc['ActualWeightKgs']?.toString() ?? '';
     controller.kmCtrl.text = gc['km']?.toString() ?? '';
     controller.rateCtrl.text = gc['Rate']?.toString() ?? '';
 
-    // Auto-select the appropriate weight bracket (e.g., 0-250, 251-500) for the given actual weight
     if (weight.isNotEmpty) {
       controller.selectWeightForActualWeight(weight);
     } else {
@@ -408,62 +731,65 @@ class _GCListPageState extends State<GCListPage> {
       controller.calculateRate();
     }
 
-    // Force update the UI
     controller.update();
 
-    // Charges details
     controller.hireAmountCtrl.text = gc['HireAmount']?.toString() ?? '';
     controller.advanceAmountCtrl.text = gc['AdvanceAmount']?.toString() ?? '';
     controller.deliveryAddressCtrl.text = gc['DeliveryAddress']?.toString() ?? '';
-    // If backend has a stored total, keep it only if calculation didn't produce one
     if ((controller.freightChargeCtrl.text).isEmpty) {
       controller.freightChargeCtrl.text = gc['FreightCharge']?.toString() ?? '';
     }
     controller.selectedPayment.value = gc['PaymentDetails']?.toString() ?? 'Cash';
 
-    // Additional fields that might be available
     controller.customInvoiceCtrl.text = gc['CustInvNo']?.toString() ?? '';
+    controller.deliveryInstructionsCtrl.text = gc['DeliveryFromSpecial']?.toString() ?? '';
     controller.invValueCtrl.text = gc['InvValue']?.toString() ?? '';
     controller.ewayBillCtrl.text = gc['EInv']?.toString() ?? '';
     
-    // Handle E-way bill date
     if (gc['EInvDate'] != null) {
       try {
         final ewayDate = DateTime.parse(gc['EInvDate'].toString());
         controller.ewayBillDate.value = ewayDate;
         controller.ewayBillDateCtrl.text = controller.formatDate(ewayDate);
-      } catch (e) {
-        // Handle date parsing error
-      }
+      } catch (e) {}
     }
     
-    // Handle E-way bill expiry date
-    if (gc['Eda'] != null) {
+    controller.eDaysCtrl.text = gc['Eda']?.toString() ?? '';
+
+    if (gc['EBillExpDate'] != null) {
       try {
-        final ewayExpDate = DateTime.parse(gc['Eda'].toString());
+        final ewayExpDate = DateTime.parse(gc['EBillExpDate'].toString());
         controller.ewayExpired.value = ewayExpDate;
         controller.ewayExpiredCtrl.text = controller.formatDate(ewayExpDate);
-      } catch (e) {
-        // Handle date parsing error
-      }
+      } catch (e) {}
     }
   }
 
   Widget _infoRow(String label, dynamic value) {
     if (value == null || value.toString().isEmpty) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$label: ',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: Colors.grey.shade700,
+              ),
+            ),
           ),
           Expanded(
             child: Text(
               value.toString(),
-              style: const TextStyle(fontSize: 13),
+              style: const TextStyle(
+                fontSize: 13,
+                color: Colors.black87,
+              ),
             ),
           ),
         ],

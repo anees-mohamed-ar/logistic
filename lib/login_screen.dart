@@ -330,14 +330,14 @@ class LoginScreen extends StatelessWidget {
                 ).animate().fadeIn(duration: const Duration(milliseconds: 600))
                  .slideY(begin: 0.3, end: 0),
                 
-                const SizedBox(height: 8),
-                const Text(
-                  'Ground Control System',
-                  style: TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
-                ).animate().fadeIn(
-                  delay: const Duration(milliseconds: 200),
-                  duration: const Duration(milliseconds: 600),
-                ).slideY(begin: 0.3, end: 0),
+                // const SizedBox(height: 8),
+                // const Text(
+                //   'Ground Control System',
+                //   style: TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
+                // ).animate().fadeIn(
+                //   delay: const Duration(milliseconds: 200),
+                //   duration: const Duration(milliseconds: 600),
+                // ).slideY(begin: 0.3, end: 0),
                 
                 const SizedBox(height: 48),
 

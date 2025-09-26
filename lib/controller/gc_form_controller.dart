@@ -144,7 +144,7 @@ class GCFormController extends GetxController {
   final RxString calculatedGoodsTotal = ''.obs; // Reactive total (rate * km) for Goods tab
   final RxList<KMLocation> kmLocations = <KMLocation>[].obs; // For KM data from API
   final RxBool isKmEditable = true.obs; // Controls if KM field can be edited manually
-  final paymentOptions = ['Cash', 'Credit', 'Online'];
+  final paymentOptions = ['To be billed','Paid','To pay'];
   final serviceOptions = ['Express', 'Standard', 'Pickup'];
   final packageMethods = ['Boxes', 'Cartons', 'Pallets', 'Bags', 'Barrels'];
   final selectedPayment = 'Cash'.obs;
@@ -485,11 +485,13 @@ class GCFormController extends GetxController {
           
           // Remove duplicates and sort
           branches.value = branches.toSet().toList()..sort((a, b) => a == 'Select Branch' ? -1 : a.compareTo(b));
-          
-          // Reset selection if needed
+
+          // Reset selection if current selection is not in the updated list
           if (!branches.contains(selectedBranch.value)) {
             selectedBranch.value = 'Select Branch';
             selectedBranchCode.value = '';
+            // Clear GC number if branch was changed
+            gcNumberCtrl.clear();
           }
         } else {
           branchesError.value = 'Unexpected response format';
@@ -753,7 +755,10 @@ class GCFormController extends GetxController {
         if (isEditMode.value && selectedWeight.value == null) {
           final wStr = actualWeightCtrl.text.trim();
           if (wStr.isNotEmpty) {
-            selectWeightForActualWeight(wStr);
+            // Add a small delay to ensure the UI has updated with the weight value
+            Future.delayed(const Duration(milliseconds: 100), () {
+              selectWeightForActualWeight(wStr);
+            });
           }
         }
       } else {
@@ -1092,7 +1097,7 @@ class GCFormController extends GetxController {
     
     final Map<String, dynamic> data = {
       'Branch': selectedBranch.value,
-      'BranchCode': '', // Add if available
+      'BranchCode': selectedBranchCode.value, // Add if available
       'GcNumber': gcNumberCtrl.text,
       'GcDate': gcDate.value?.toIso8601String(),
       'TruckNumber': selectedTruck.value,
@@ -1103,9 +1108,9 @@ class GCFormController extends GetxController {
       'TruckFrom': fromCtrl.text,
       'TruckTo': toCtrl.text,
       'PaymentDetails': selectedPayment.value,
-      'LcNo': '', // Add if available
       'DeliveryDate': deliveryDate.value?.toIso8601String(),
       'EBillDate': ewayBillDate.value?.toIso8601String(),
+      'EBillExpDate': ewayExpired.value?.toIso8601String(),
       'DriverNameShow': selectedDriver.value,
       'DriverName': selectedDriver.value,
       'DriverPhoneNumber': driverPhoneCtrl.text,
@@ -1121,67 +1126,28 @@ class GCFormController extends GetxController {
       'InvValue': invValueCtrl.text,
       'EInv': ewayBillCtrl.text,
       'EInvDate': ewayBillDate.value?.toIso8601String(),
-      'Eda': ewayExpired.value?.toIso8601String(),
+      'Eda': eDaysCtrl.text,
       'NumberofPkg': packagesCtrl.text,
       'MethodofPkg': selectedPackageMethod.value,
       'ActualWeightKgs': actualWeightCtrl.text,
-      'NumberofPkg2': '', // Add if available
-      'MethodofPkg2': '', // Add if available
-      'ActualWeightKgs2': '', // Add if available
       'km': kmCtrl.text,
-      'km2': '', // Add if available
-      'km3': '', // Add if available
-      'km4': '', // Add if available
-      'NumberofPkg3': '', // Add if available
-      'MethodofPkg3': '', // Add if available
-      'ActualWeightKgs3': '', // Add if available
-      'NumberofPkg4': '', // Add if available
-      'MethodofPkg4': '', // Add if available
-      'ActualWeightKgs4': '', // Add if available
       'PrivateMark': remarksCtrl.text,
-      'PrivateMark2': '', // Add if available
-      'PrivateMark3': '', // Add if available
-      'PrivateMark4': '', // Add if available
-      'Charges': '', // Add if available
-      'Charges2': '', // Add if available
-      'Charges3': '', // Add if available
-      'Charges4': '', // Add if available
       'GoodContain': natureGoodsCtrl.text,
-      'GoodContain2': '', // Add if available
-      'GoodContain3': '', // Add if available
-      'GoodContain4': '', // Add if available
       'Rate': rateCtrl.text,
       'Total': freightChargeCtrl.text,
-      'Rate2': '', // Add if available
-      'Total2': '', // Add if available
-      'Rate3': '', // Add if available
-      'Total3': '', // Add if available
-      'Rate4': '', // Add if available
-      'Total4': '', // Add if available
       'PoNumber': poNumberCtrl.text,
       'TripId': tripIdCtrl.text,
-      'DeliveryFromSpecial': '', // Add if available
+      'DeliveryFromSpecial': deliveryInstructionsCtrl.text, // Add if available
       'DeliveryAddress': deliveryAddressCtrl.text,
-      'ServiceTax': '', // Add if available
-      'ReceiptBillNo': '', // Add if available
-      'ReceiptBillNoAmount': '', // Add if available
-      'ReceiptBillNoDate': '', // Add if available
+      'ServiceTax': selectedGstPayer.value, // Add if available
       'TotalRate': rateCtrl.text,
       'TotalWeight': actualWeightCtrl.text,
       'HireAmount': hireAmountCtrl.text,
       'AdvanceAmount': advanceAmountCtrl.text,
       'BalanceAmount': balanceAmount.value,
       'FreightCharge': freightChargeCtrl.text,
-      'Day1': '', // Add if available
-      'Day1Place': '', // Add if available
-      'Day2': '', // Add if available
-      'Day3': '', // Add if available
-      'Day4': '', // Add if available
-      'Day5': '', // Add if available
-      'Day6': '', // Add if available
-      'Day7': '', // Add if available
-      'Day8': '', // Add if available
-      'CompanyId': editingCompanyId.value.isNotEmpty ? editingCompanyId.value : '1', // Use stored company ID or default
+      'Charges': 'FTL', // Hardcoded value for Charges field
+      'CompanyId': editingCompanyId.value.isNotEmpty ? editingCompanyId.value : '4', // Use stored company ID or default
     };
 
     try {
@@ -1190,6 +1156,9 @@ class GCFormController extends GetxController {
       
       if (isEditMode.value && editingGcNumber.value.isNotEmpty) {
         // Update existing GC
+        print('DEBUG: Updating GC - Eda value being sent to backend: ${data['Eda']}');
+        print('DEBUG: Updating GC - EBillExpDate value being sent to backend: ${data['EBillExpDate']}');
+        print('DEBUG: Updating GC - GoodContain (Nature of Goods) value being sent to backend: ${data['GoodContain']}');
         url = Uri.parse('${ApiConfig.baseUrl}/gc/updateGC/${editingGcNumber.value}');
         response = await http.put(
           url,

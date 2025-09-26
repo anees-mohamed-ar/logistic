@@ -3,12 +3,11 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'api_config.dart'; // Assuming ApiConfig file with baseUrl
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
-import 'package:logistic/widgets/searchable_dropdown.dart';
 
 class UpdateTransitPage extends StatefulWidget {
   const UpdateTransitPage({Key? key}) : super(key: key);
@@ -26,18 +25,17 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
   final List<DateTime?> transitDates = List.filled(8, null);
   final List<TextEditingController> placeControllers = List.generate(
     8,
-    (_) => TextEditingController(),
+        (_) => TextEditingController(),
   );
 
+  final TextEditingController searchCtrl = TextEditingController();
   final TextEditingController reportRemarksController = TextEditingController();
   DateTime? unloadedDate;
   TimeOfDay? unloadedTime;
-  final TextEditingController unloadedRemarksController =
-      TextEditingController();
+  final TextEditingController unloadedRemarksController = TextEditingController();
   DateTime? receiptDate;
   TimeOfDay? receiptTime;
-  final TextEditingController receiptRemarksController =
-      TextEditingController();
+  final TextEditingController receiptRemarksController = TextEditingController();
 
   bool isSaving = false;
   bool isLoadingGc = false;
@@ -49,6 +47,16 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
   bool isReceiptDateEditable = true;
   bool isReceiptTimeEditable = true;
   bool isReceiptRemarksEditable = true;
+
+  // Theme constants
+  static const Color primaryColor = Color(0xFF1E2A44);
+  static const Color secondaryColor = Color(0xFF2E3A59);
+  static const Color accentColor = Color(0xFF3B82F6);
+  static const Color backgroundColor = Color(0xFFF8FAFC);
+  static const Color cardColor = Colors.white;
+  static const Color successColor = Color(0xFF10B981);
+  static const Color errorColor = Color(0xFFEF4444);
+  static const Color warningColor = Color(0xFFF59E0B);
 
   @override
   void initState() {
@@ -71,28 +79,14 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
               .map((item) => item['GcNumber']?.toString() ?? '')
               .where((gc) => gc.isNotEmpty)
               .toList();
-          if (gcNumbers.isNotEmpty) {
-            selectedGcNumber = gcNumbers[0];
-            fetchGcDetails(selectedGcNumber!);
-          }
+          selectedGcNumber = null;
+          gcDetails = null;
         });
       } else {
-        Get.snackbar(
-          'Error',
-          'Failed to fetch GC numbers: ${response.statusCode}',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
+        _showErrorSnackbar('Failed to fetch GC numbers: ${response.statusCode}');
       }
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Error fetching GC numbers: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      _showErrorSnackbar('Error fetching GC numbers: $e');
     } finally {
       setState(() {
         isLoadingGc = false;
@@ -102,39 +96,28 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
 
   Future<void> fetchGcDetails(String gcNumber) async {
     setState(() {
-      isLoadingGc = true;
       gcDetails = null;
       lastEditableTransitIndex = 7;
-      for (var ctrl in placeControllers) {
-        ctrl.clear();
-      }
-      transitDates.fillRange(0, 8, null);
-      reportRemarksController.clear();
-      unloadedRemarksController.clear();
-      receiptRemarksController.clear();
-      unloadedDate = null;
-      unloadedTime = null;
-      receiptDate = null;
-      receiptTime = null;
+      _clearAllFields();
     });
 
     try {
       print('Fetching GC details for: $gcNumber');
-      
-      // First, try to get the GC details directly by GC number
+
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/gc/search?GcNumber=$gcNumber'),
       );
 
       if (response.statusCode == 200) {
-        print('GC search response: ${response.body}');
-        
         final responseData = jsonDecode(response.body);
-        
+
         if (responseData is List && responseData.isNotEmpty) {
-          // If we got a list, take the first item
-          final gcData = responseData[0];
-          
+          final gcData = responseData.firstWhere(
+                (item) => item is Map<String, dynamic> &&
+                item['GcNumber']?.toString() == gcNumber,
+            orElse: () => responseData[0],
+          );
+
           if (gcData is Map<String, dynamic>) {
             setState(() {
               gcDetails = gcData;
@@ -142,60 +125,70 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
             });
             return;
           }
-        } 
-        
-        // If direct search didn't work, try getting by ID
+        }
+
         if (responseData is List && responseData.isNotEmpty && responseData[0]['Id'] != null) {
           final gcId = responseData[0]['Id'];
-          print('Fetching GC details by ID: $gcId');
-          
           final detailResponse = await http.get(
             Uri.parse('${ApiConfig.baseUrl}/gc/search/$gcId'),
           );
-          
+
           if (detailResponse.statusCode == 200) {
-            print('GC details response: ${detailResponse.body}');
             final detailData = jsonDecode(detailResponse.body);
-            
             if (detailData is List && detailData.isNotEmpty) {
+              final specificGcData = detailData.firstWhere(
+                    (item) => item is Map<String, dynamic> &&
+                    item['GcNumber']?.toString() == gcNumber,
+                orElse: () => detailData[0],
+              );
+
               setState(() {
-                gcDetails = detailData[0];
+                gcDetails = specificGcData;
                 _processGcDetails();
               });
               return;
             }
           }
         }
-        
+
         throw Exception('Invalid GC data format received');
       } else {
         throw Exception('Failed to fetch GC details: ${response.statusCode}');
       }
     } catch (e) {
       print('Error in fetchGcDetails: $e');
-      Get.snackbar(
-        'Error',
-        'Failed to fetch GC details: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    } finally {
-      setState(() => isLoadingGc = false);
+      setState(() {
+        gcDetails = null;
+      });
+      _showErrorSnackbar('Failed to fetch GC details: ${e.toString()}');
     }
   }
-  
+
+  void _clearAllFields() {
+    for (var ctrl in placeControllers) {
+      ctrl.clear();
+    }
+    transitDates.fillRange(0, 8, null);
+    reportRemarksController.clear();
+    unloadedRemarksController.clear();
+    receiptRemarksController.clear();
+    unloadedDate = null;
+    unloadedTime = null;
+    receiptDate = null;
+    receiptTime = null;
+  }
+
   void _processGcDetails() {
     if (gcDetails == null) return;
-    
+
     isGcDetailsExpanded = true;
-    
+
     try {
-      // Parse transit dates
+      // Parse transit dates and places
       for (int i = 1; i <= 8; i++) {
         final dayKey = 'Day$i';
         final placeKey = 'Day${i}Place';
-        
+
         if (gcDetails!.containsKey(dayKey) && gcDetails![dayKey] != null) {
           try {
             transitDates[i-1] = DateTime.tryParse(gcDetails![dayKey].toString());
@@ -203,63 +196,94 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
             print('Error parsing date for $dayKey: ${gcDetails![dayKey]}');
           }
         }
-        
+
         if (gcDetails!.containsKey(placeKey)) {
           placeControllers[i-1].text = gcDetails![placeKey]?.toString() ?? '';
-          
-          // Check if this is the destination
+
           if (placeControllers[i-1].text.trim().isNotEmpty &&
               gcDetails!.containsKey('TruckTo') &&
-              placeControllers[i-1].text.trim().toLowerCase() == 
-              gcDetails!['TruckTo']?.toString().trim().toLowerCase()) {
+              placeControllers[i-1].text.trim().toLowerCase() ==
+                  gcDetails!['TruckTo']?.toString().trim().toLowerCase()) {
             lastEditableTransitIndex = i-1;
           }
         }
       }
 
       // Set first location to TruckFrom if empty
-      if (placeControllers[0].text.isEmpty && 
+      if (placeControllers[0].text.isEmpty &&
           gcDetails!.containsKey('TruckFrom') &&
           gcDetails!['TruckFrom'] != null) {
         placeControllers[0].text = gcDetails!['TruckFrom'].toString();
       }
 
-      // Parse other dates
-      if (gcDetails!.containsKey('UnloadedDate') && 
+      // Parse other dates and fields
+      if (gcDetails!.containsKey('UnloadedDate') &&
           gcDetails!['UnloadedDate'] != null) {
         unloadedDate = DateTime.tryParse(gcDetails!['UnloadedDate'].toString());
       }
-      
-      if (gcDetails!.containsKey('NewReceiptDate') && 
+
+      if (gcDetails!.containsKey('NewReceiptDate') &&
           gcDetails!['NewReceiptDate'] != null) {
         receiptDate = DateTime.tryParse(gcDetails!['NewReceiptDate'].toString());
       }
-      
-      // Parse remarks
+
       reportRemarksController.text = gcDetails!['ReportRemarks']?.toString() ?? '';
       unloadedRemarksController.text = gcDetails!['UnloadedRemark']?.toString() ?? '';
       receiptRemarksController.text = gcDetails!['ReceiptRemarks']?.toString() ?? '';
-      
-      // Disable fields if dates are in the past
+
       final now = DateTime.now();
       isUnloadedDateEditable = unloadedDate == null || unloadedDate!.isAfter(now);
       isReceiptDateEditable = receiptDate == null || receiptDate!.isAfter(now);
-      
+
     } catch (e) {
       print('Error processing GC details: $e');
-      Get.snackbar(
-        'Error',
-        'Error processing GC details: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      _showErrorSnackbar('Error processing GC details: ${e.toString()}');
     }
+  }
+
+  void _showErrorSnackbar(String message) {
+    Get.snackbar(
+      'Error',
+      message,
+      snackPosition: SnackPosition.TOP,
+      backgroundColor: errorColor,
+      colorText: Colors.white,
+      icon: const Icon(Icons.error, color: Colors.white),
+      margin: const EdgeInsets.all(16),
+      borderRadius: 12,
+      duration: const Duration(seconds: 4),
+    );
+  }
+
+  void _showSuccessSnackbar(String message) {
+    Get.snackbar(
+      'Success',
+      message,
+      snackPosition: SnackPosition.TOP,
+      backgroundColor: successColor,
+      colorText: Colors.white,
+      icon: const Icon(Icons.check_circle, color: Colors.white),
+      margin: const EdgeInsets.all(16),
+      borderRadius: 12,
+      duration: const Duration(seconds: 3),
+    );
   }
 
   String formatDateIndian(DateTime? date) {
     if (date == null) return 'Select Date';
     return DateFormat('dd-MM-yyyy').format(date);
+  }
+
+  String formatDate(DateTime? date) {
+    if (date == null) return '';
+    return DateFormat('yyyy-MM-dd').format(date);
+  }
+
+  String formatTime(TimeOfDay? time) {
+    if (time == null) return 'Select Time';
+    final now = DateTime.now();
+    final dt = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+    return DateFormat('HH:mm:ss').format(dt);
   }
 
   Future<void> pickDate(int index, BuildContext context) async {
@@ -269,6 +293,16 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       initialDate: transitDates[index] ?? transitDates[0] ?? DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: primaryColor,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -287,6 +321,16 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       initialDate: unloadedDate ?? DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: primaryColor,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -300,6 +344,16 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
     final picked = await showTimePicker(
       context: context,
       initialTime: unloadedTime ?? TimeOfDay.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: primaryColor,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -315,6 +369,16 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       initialDate: receiptDate ?? DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: primaryColor,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -328,24 +392,22 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
     final picked = await showTimePicker(
       context: context,
       initialTime: receiptTime ?? TimeOfDay.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: primaryColor,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
         receiptTime = picked;
       });
     }
-  }
-
-  String formatDate(DateTime? date) {
-    if (date == null) return '';
-    return DateFormat('yyyy-MM-dd').format(date);
-  }
-
-  String formatTime(TimeOfDay? time) {
-    if (time == null) return 'Select Time';
-    final now = DateTime.now();
-    final dt = DateTime(now.year, now.month, now.day, time.hour, time.minute);
-    return DateFormat('HH:mm:ss').format(dt);
   }
 
   void downloadPDF() async {
@@ -1181,13 +1243,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
     if (selectedGcNumber == null ||
         gcDetails == null ||
         gcDetails!['Id'] == null) {
-      Get.snackbar(
-        'Error',
-        'Please select a valid GC number',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      _showErrorSnackbar('Please select a valid GC number');
       return;
     }
 
@@ -1200,35 +1256,35 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
         'Day1': transitDates[0] != null ? formatDate(transitDates[0]) : null,
         'Day1Place': placeControllers[0].text.isNotEmpty
             ? placeControllers[0].text
-            : null,
+            : '',
         'Day2': transitDates[1] != null ? formatDate(transitDates[1]) : null,
         'Day2Place': placeControllers[1].text.isNotEmpty
             ? placeControllers[1].text
-            : null,
+            : '',
         'Day3': transitDates[2] != null ? formatDate(transitDates[2]) : null,
         'Day3Place': placeControllers[2].text.isNotEmpty
             ? placeControllers[2].text
-            : null,
+            : '',
         'Day4': transitDates[3] != null ? formatDate(transitDates[3]) : null,
         'Day4Place': placeControllers[3].text.isNotEmpty
             ? placeControllers[3].text
-            : null,
+            : '',
         'Day5': transitDates[4] != null ? formatDate(transitDates[4]) : null,
         'Day5Place': placeControllers[4].text.isNotEmpty
             ? placeControllers[4].text
-            : null,
+            : '',
         'Day6': transitDates[5] != null ? formatDate(transitDates[5]) : null,
         'Day6Place': placeControllers[5].text.isNotEmpty
             ? placeControllers[5].text
-            : null,
+            : '',
         'Day7': transitDates[6] != null ? formatDate(transitDates[6]) : null,
         'Day7Place': placeControllers[6].text.isNotEmpty
             ? placeControllers[6].text
-            : null,
+            : '',
         'Day8': transitDates[7] != null ? formatDate(transitDates[7]) : null,
         'Day8Place': placeControllers[7].text.isNotEmpty
             ? placeControllers[7].text
-            : null,
+            : '',
         'ReceiptRemarks': receiptRemarksController.text.isNotEmpty
             ? receiptRemarksController.text
             : null,
@@ -1241,29 +1297,15 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
         'UnloadedDate': unloadedDate != null ? formatDate(unloadedDate) : null,
         'NewReceiptDate': receiptDate != null ? formatDate(receiptDate) : null,
         'UnloadedRemark': unloadedRemarksController.text.isNotEmpty
-              ? unloadedRemarksController.text
+            ? unloadedRemarksController.text
             : null,
+        'Success': '1',
       };
 
-      // Add Success field to payload
-      payload['Success'] = '1';
-      
-      // Log the request for debugging
-      print('Sending update request to backend:');
-      print('URL: ${ApiConfig.baseUrl}/gc/update/${gcDetails!['Id']}/${gcDetails!['GcNumber']}');
-      print('Body: $payload');
-
-      // Validate payload
-      if (gcDetails!['Id'] == null || gcDetails!['GcNumber'] == null) {
-        throw Exception('Invalid GC details: Missing ID or GC Number');
-      }
-
-      // Remove null values from payload
       payload.removeWhere((key, value) => value == null);
 
       final url = '${ApiConfig.baseUrl}/gc/update/${gcDetails!['Id']}/${gcDetails!['GcNumber']}';
       print('Sending PUT request to: $url');
-      print('Payload: $payload');
 
       final response = await http.put(
         Uri.parse(url),
@@ -1279,34 +1321,15 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
         },
       );
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
       if (response.statusCode == 200) {
-        // Refresh the GC details after successful update
         await fetchGcDetails(selectedGcNumber!);
-        
-        Get.snackbar(
-          'Success',
-          'Transit details updated successfully',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-          duration: Duration(seconds: 3),
-        );
+        _showSuccessSnackbar('Transit details updated successfully');
       } else {
-        throw Exception('Failed to update transit details: ${response.statusCode} - ${response.body}');
+        throw Exception('Failed to update: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       print('Error updating transit details: $e');
-      Get.snackbar(
-        'Error',
-        'Failed to update transit details: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        duration: Duration(seconds: 5),
-      );
+      _showErrorSnackbar('Failed to update transit details: ${e.toString()}');
     } finally {
       setState(() {
         isSaving = false;
@@ -1314,8 +1337,152 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
     }
   }
 
+  Future<String?> _showSearchPicker({
+    required BuildContext context,
+    required String title,
+    required List<String> items,
+    required String current,
+  }) async {
+    List<String> filtered = List<String>.from(items);
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            return Container(
+              height: MediaQuery.of(ctx).size.height * 0.75,
+              decoration: const BoxDecoration(
+                color: cardColor,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  // Handle bar
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Select $title',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: primaryColor),
+                          onPressed: () {
+                            searchCtrl.clear();
+                            Navigator.of(ctx).pop();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Search bar
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: backgroundColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey[200]!),
+                      ),
+                      child: TextField(
+                        controller: searchCtrl,
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.search, color: primaryColor),
+                          hintText: 'Search GC Numbers...',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        ),
+                        onChanged: (q) {
+                          setState(() {
+                            final query = q.trim().toLowerCase();
+                            filtered = items
+                                .where((e) => e.toLowerCase().contains(query))
+                                .toList();
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  // List
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off, size: 48, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text(
+                            'No GC numbers found',
+                            style: TextStyle(color: Colors.grey, fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    )
+                        : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final val = filtered[index];
+                        final selected = val == current;
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: selected ? primaryColor.withOpacity(0.1) : null,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            title: Text(
+                              val,
+                              style: TextStyle(
+                                color: selected ? primaryColor : Colors.black87,
+                                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                              ),
+                            ),
+                            trailing: selected
+                                ? const Icon(Icons.check_circle, color: primaryColor)
+                                : const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                            onTap: () {
+                              searchCtrl.clear();
+                              Navigator.of(ctx).pop(val);
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
+    searchCtrl.dispose();
     for (final ctrl in placeControllers) {
       ctrl.dispose();
     }
@@ -1327,690 +1494,742 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        title: const Text('Update Transit'),
-        backgroundColor: const Color(0xFF1E2A44),
+        title: const Text(
+          'Update Transit',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.download),
-            tooltip: 'Download PDF',
-            onPressed: downloadPDF,
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            child: IconButton(
+              icon: const Icon(Icons.picture_as_pdf),
+              tooltip: 'Download PDF',
+              onPressed: downloadPDF,
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.white.withOpacity(0.2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
           ),
         ],
       ),
-      backgroundColor: const Color(0xFFF5F7FA),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Select GC Number',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: const Color(0xFF1E2A44),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SearchableDropdown<String>(
-                    label: 'GC Number',
-                    value: selectedGcNumber,
-                    items: gcNumbers
-                        .map<DropdownMenuItem<String>>(
-                          (gc) => DropdownMenuItem(
-                            value: gc,
-                            child: Text(gc),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          selectedGcNumber = val;
-                          isGcDetailsExpanded = true;
-                        });
-                        fetchGcDetails(val);
-                      }
-                    },
-                    isRequired: true,
-                  ),
-                  const SizedBox(height: 24),
-                  if (isLoadingGc)
-                    const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF1E2A44),
-                      ),
-                    )
-                  else if (gcDetails != null) ...[
-                    ExpansionTile(
-                      title: Text(
-                        'GC Details',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: const Color(0xFF1E2A44),
-                          fontWeight: FontWeight.bold,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // GC Selection Card
+              _buildSectionCard(
+                title: 'GC Selection',
+                icon: Icons.search,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildGcSelector(),
+                    if (isLoadingGc) ...[
+                      const SizedBox(height: 24),
+                      const Center(
+                        child: Column(
+                          children: [
+                            CircularProgressIndicator(color: primaryColor),
+                            SizedBox(height: 16),
+                            Text('Loading GC details...', style: TextStyle(color: Colors.grey)),
+                          ],
                         ),
                       ),
-                      initiallyExpanded: isGcDetailsExpanded,
-                      onExpansionChanged: (expanded) {
-                        setState(() {
-                          isGcDetailsExpanded = expanded;
-                        });
-                      },
-                      tilePadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
-                      ),
-                      childrenPadding: const EdgeInsets.all(12),
-                      backgroundColor: Colors.white,
-                      collapsedBackgroundColor: Colors.white,
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.shade200),
-                          ),
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildDetailRow(
-                                'Truck Number',
-                                gcDetails!['TruckNumber'],
-                              ),
-                              _buildDetailRow(
-                                'Driver Name',
-                                gcDetails!['DriverNameShow'],
-                              ),
-                              _buildDetailRow(
-                                'Palakkad Booking',
-                                gcDetails!['Branch'],
-                              ),
-                              _buildDetailRow(
-                                'Broker Name',
-                                gcDetails!['BrokerNameShow'],
-                              ),
-                              _buildDetailRow(
-                                'Challan Number',
-                                gcDetails!['LcNo'],
-                              ),
-                              _buildDetailRow(
-                                'Consignor Name',
-                                gcDetails!['ConsignorName'],
-                              ),
-                              _buildDetailRow(
-                                'Consignor GST',
-                                gcDetails!['ConsignorGst'],
-                              ),
-                              _buildDetailRow(
-                                'Consignee Name',
-                                gcDetails!['ConsigneeName'],
-                              ),
-                              _buildDetailRow(
-                                'Consignee GST',
-                                gcDetails!['ConsigneeGst'],
-                              ),
-                              _buildDetailRow('From', gcDetails!['TruckFrom']),
-                              _buildDetailRow('To', gcDetails!['TruckTo']),
-                              _buildDetailRow(
-                                'Delivery Address',
-                                gcDetails!['DeliveryAddress'],
-                              ),
-                              _buildDetailRow(
-                                'Bill Number',
-                                gcDetails!['CustInvNo'],
-                              ),
-                              _buildDetailRow(
-                                'Payment Details',
-                                gcDetails!['PaymentDetails'],
-                              ),
-                              _buildDetailRow(
-                                'Hire Amount',
-                                gcDetails!['HireAmount'],
-                              ),
-                              _buildDetailRow(
-                                'Advance Amount',
-                                gcDetails!['AdvanceAmount'],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
+                    ],
                   ],
-                  Text(
-                    'Transit Details',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: const Color(0xFF1E2A44),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: 8,
-                    itemBuilder: (context, i) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Builder(
-                        builder: (BuildContext innerContext) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Day ${i + 1}',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1E2A44),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    flex: 2,
-                                    child: GestureDetector(
-                                      onTap: i <= lastEditableTransitIndex
-                                          ? () => pickDate(i, innerContext)
-                                          : null,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 16,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          border: Border.all(
-                                            color: i <= lastEditableTransitIndex
-                                                ? const Color(0xFF1E2A44)
-                                                : Colors.grey.shade400,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          color: i <= lastEditableTransitIndex
-                                              ? Colors.white
-                                              : Colors.grey.shade200,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.calendar_today,
-                                              color: Color(0xFF1E2A44),
-                                              size: 20,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                formatDateIndian(
-                                                  transitDates[i],
-                                                ),
-                                                style: TextStyle(
-                                                  color:
-                                                      i <=
-                                                          lastEditableTransitIndex
-                                                      ? Colors.black
-                                                      : Colors.grey.shade600,
-                                                  fontSize: 16,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    flex: 3,
-                                    child: TextFormField(
-                                      controller: placeControllers[i],
-                                      enabled: i <= lastEditableTransitIndex,
-                                      decoration: InputDecoration(
-                                        labelText: 'Place',
-                                        prefixIcon: const Icon(
-                                          Icons.place,
-                                          color: Color(0xFF1E2A44),
-                                        ),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          borderSide: const BorderSide(
-                                            color: Color(0xFF1E2A44),
-                                          ),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          borderSide: const BorderSide(
-                                            color: Color(0xFF1E2A44),
-                                          ),
-                                        ),
-                                        filled: true,
-                                        fillColor: i <= lastEditableTransitIndex
-                                            ? Colors.white
-                                            : Colors.grey.shade200,
-                                      ),
-                                      style: const TextStyle(
-                                        color: Colors.black,
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          if (value.trim() ==
-                                              gcDetails?['TruckTo']?.trim()) {
-                                            lastEditableTransitIndex = i;
-                                            for (int j = i + 1; j < 8; j++) {
-                                              transitDates[j] = null;
-                                              placeControllers[j].clear();
-                                            }
-                                          } else if (lastEditableTransitIndex ==
-                                                  i &&
-                                              value.trim() !=
-                                                  gcDetails?['TruckTo']
-                                                      ?.trim()) {
-                                            lastEditableTransitIndex = 7;
-                                          }
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Report Remarks',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: const Color(0xFF1E2A44),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: reportRemarksController,
-                    maxLines: 3,
-                    readOnly: !isReportRemarksEditable,
-                    decoration: InputDecoration(
-                      hintText: 'Enter remarks...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF1E2A44)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF1E2A44)),
-                      ),
-                      filled: true,
-                      fillColor: isReportRemarksEditable
-                          ? Colors.white
-                          : Colors.grey.shade200,
-                    ),
-                    style: const TextStyle(color: Colors.black),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Unloaded Details',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: const Color(0xFF1E2A44),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Builder(
-                    builder: (BuildContext innerContext) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: isUnloadedDateEditable
-                                      ? () => pickUnloadedDate(innerContext)
-                                      : null,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 16,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: isUnloadedDateEditable
-                                            ? const Color(0xFF1E2A44)
-                                            : Colors.grey.shade400,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                      color: isUnloadedDateEditable
-                                          ? Colors.white
-                                          : Colors.grey.shade200,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.calendar_today,
-                                          color: Color(0xFF1E2A44),
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            formatDateIndian(unloadedDate),
-                                            style: TextStyle(
-                                              color: isUnloadedDateEditable
-                                                  ? Colors.black
-                                                  : Colors.grey.shade600,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: isUnloadedTimeEditable
-                                      ? () => pickUnloadedTime(innerContext)
-                                      : null,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 16,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: isUnloadedTimeEditable
-                                            ? const Color(0xFF1E2A44)
-                                            : Colors.grey.shade400,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                      color: isUnloadedTimeEditable
-                                          ? Colors.white
-                                          : Colors.grey.shade200,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.access_time,
-                                          color: Color(0xFF1E2A44),
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            formatTime(unloadedTime),
-                                            style: TextStyle(
-                                              color: isUnloadedTimeEditable
-                                                  ? Colors.black
-                                                  : Colors.grey.shade600,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: unloadedRemarksController,
-                            maxLines: 3,
-                            readOnly: !isUnloadedRemarksEditable,
-                            decoration: InputDecoration(
-                              hintText: 'Unloaded remarks...',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFF1E2A44),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFF1E2A44),
-                                ),
-                              ),
-                              filled: true,
-                              fillColor: isUnloadedRemarksEditable
-                                  ? Colors.white
-                                  : Colors.grey.shade200,
-                            ),
-                            style: const TextStyle(color: Colors.black),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Receipt Details',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: const Color(0xFF1E2A44),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Builder(
-                    builder: (BuildContext innerContext) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: isReceiptDateEditable
-                                      ? () => pickReceiptDate(innerContext)
-                                      : null,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 16,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: isReceiptDateEditable
-                                            ? const Color(0xFF1E2A44)
-                                            : Colors.grey.shade400,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                      color: isReceiptDateEditable
-                                          ? Colors.white
-                                          : Colors.grey.shade200,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.calendar_today,
-                                          color: Color(0xFF1E2A44),
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            formatDateIndian(receiptDate),
-                                            style: TextStyle(
-                                              color: isReceiptDateEditable
-                                                  ? Colors.black
-                                                  : Colors.grey.shade600,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: isReceiptTimeEditable
-                                      ? () => pickReceiptTime(innerContext)
-                                      : null,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 16,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: isReceiptTimeEditable
-                                            ? const Color(0xFF1E2A44)
-                                            : Colors.grey.shade400,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                      color: isReceiptTimeEditable
-                                          ? Colors.white
-                                          : Colors.grey.shade200,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.access_time,
-                                          color: Color(0xFF1E2A44),
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            formatTime(receiptTime),
-                                            style: TextStyle(
-                                              color: isReceiptTimeEditable
-                                                  ? Colors.black
-                                                  : Colors.grey.shade600,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: receiptRemarksController,
-                            maxLines: 3,
-                            readOnly: !isReceiptRemarksEditable,
-                            decoration: InputDecoration(
-                              hintText: 'Receipt remarks...',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFF1E2A44),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFF1E2A44),
-                                ),
-                              ),
-                              filled: true,
-                              fillColor: isReceiptRemarksEditable
-                                  ? Colors.white
-                                  : Colors.grey.shade200,
-                            ),
-                            style: const TextStyle(color: Colors.black),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: isSaving ? null : saveTransit,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: const Color(0xFF1E2A44),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                      ),
-                      child: isSaving
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              'Save',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+
+              const SizedBox(height: 20),
+
+              // GC Details Card
+              if (gcDetails != null) ...[
+                _buildGcDetailsCard(),
+                const SizedBox(height: 20),
+              ],
+
+              // Transit Details Card
+              _buildSectionCard(
+                title: 'Transit Journey',
+                icon: Icons.route,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildTransitDays(),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Remarks Section
+              _buildSectionCard(
+                title: 'Report Remarks',
+                icon: Icons.note_alt,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildRemarksField(
+                      controller: reportRemarksController,
+                      hintText: 'Enter report remarks...',
+                      enabled: isReportRemarksEditable,
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Unloaded Details Card
+              _buildSectionCard(
+                title: 'Unloaded Details',
+                icon: Icons.local_shipping,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildUnloadedDetails(),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Receipt Details Card
+              _buildSectionCard(
+                title: 'Receipt Details',
+                icon: Icons.receipt_long,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildReceiptDetails(),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // Save Button
+              _buildSaveButton(),
+            ],
           ),
         ),
       ),
     );
   }
 
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required Widget child,
+  }) {
+    return Card(
+      elevation: 2,
+      shadowColor: primaryColor.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: primaryColor, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor,
+                  ),
+                ),
+              ],
+            ),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGcSelector() {
+    return InkWell(
+      onTap: gcNumbers.isEmpty ? null : () async {
+        final selected = await _showSearchPicker(
+          context: context,
+          title: 'GC Number',
+          items: gcNumbers,
+          current: selectedGcNumber ?? '',
+        );
+        if (selected != null) {
+          setState(() {
+            selectedGcNumber = selected;
+            isGcDetailsExpanded = true;
+            gcDetails = null;
+          });
+          fetchGcDetails(selected);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: primaryColor.withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(12),
+          color: backgroundColor,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.description,
+              color: primaryColor.withOpacity(0.7),
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'GC Number',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    (selectedGcNumber?.isEmpty ?? true) ? 'Tap to select GC Number' : selectedGcNumber!,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: (selectedGcNumber?.isEmpty ?? true) ? Colors.grey[500] : primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.keyboard_arrow_down,
+              color: primaryColor.withOpacity(0.7),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGcDetailsCard() {
+    return Card(
+      elevation: 2,
+      shadowColor: primaryColor.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: isGcDetailsExpanded,
+          onExpansionChanged: (expanded) {
+            setState(() {
+              isGcDetailsExpanded = expanded;
+            });
+          },
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.info_outline, color: accentColor, size: 20),
+          ),
+          title: const Text(
+            'GC Details',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: primaryColor,
+            ),
+          ),
+          subtitle: Text(
+            'GC Number: ${gcDetails!['GcNumber'] ?? 'N/A'}',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+          children: [
+            Container(
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.withOpacity(0.2)),
+              ),
+              child: Column(
+                children: [
+                  _buildDetailGrid(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailGrid() {
+    final details = [
+      {'label': 'Truck Number', 'value': gcDetails!['TruckNumber']},
+      {'label': 'Driver Name', 'value': gcDetails!['DriverNameShow']},
+      {'label': 'Branch', 'value': gcDetails!['Branch']},
+      {'label': 'Broker Name', 'value': gcDetails!['BrokerNameShow']},
+      {'label': 'Challan Number', 'value': gcDetails!['LcNo']},
+      {'label': 'Consignor Name', 'value': gcDetails!['ConsignorName']},
+      {'label': 'Consignor GST', 'value': gcDetails!['ConsignorGst']},
+      {'label': 'Consignee Name', 'value': gcDetails!['ConsigneeName']},
+      {'label': 'Consignee GST', 'value': gcDetails!['ConsigneeGst']},
+      {'label': 'From', 'value': gcDetails!['TruckFrom']},
+      {'label': 'To', 'value': gcDetails!['TruckTo']},
+      {'label': 'Delivery Address', 'value': gcDetails!['DeliveryAddress']},
+      {'label': 'Bill Number', 'value': gcDetails!['CustInvNo']},
+      {'label': 'Payment Details', 'value': gcDetails!['PaymentDetails']},
+      {'label': 'Hire Amount', 'value': gcDetails!['HireAmount']},
+      {'label': 'Advance Amount', 'value': gcDetails!['AdvanceAmount']},
+    ];
+
+    return Column(
+      children: details.map((detail) => _buildDetailRow(detail['label']!, detail['value'])).toList(),
+    );
+  }
+
   Widget _buildDetailRow(String label, dynamic value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 2,
+          SizedBox(
+            width: 120,
             child: Text(
               label,
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1E2A44),
-                fontSize: 14,
+                color: primaryColor,
+                fontSize: 13,
               ),
             ),
           ),
+          const SizedBox(width: 16),
           Expanded(
-            flex: 3,
             child: Text(
               value?.toString() ?? 'N/A',
-              style: const TextStyle(fontSize: 14, color: Colors.black87),
+              style: const TextStyle(
+                fontSize: 13,
+                color: Colors.black87,
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTransitDays() {
+    // Disable editing if receipt date is present
+    final isReceiptPresent = receiptDate != null;
+    
+    return Column(
+      children: List.generate(8, (i) {
+        final isEditable = i <= lastEditableTransitIndex && !isReceiptPresent;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isEditable ? cardColor : Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isEditable ? primaryColor.withOpacity(0.3) : Colors.grey.shade300,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: isEditable ? primaryColor : Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${i + 1}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Day ${i + 1}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isEditable ? primaryColor : Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDateSelector(
+                    date: transitDates[i],
+                    onTap: isEditable ? () => pickDate(i, context) : null,
+                    enabled: isEditable,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildPlaceField(i, isEditable),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildDateSelector({
+    required DateTime? date,
+    required VoidCallback? onTap,
+    required bool enabled,
+  }) {
+    return Container(
+      constraints: const BoxConstraints(
+        minWidth: 120,  // Minimum width to fit the date
+        maxWidth: 140,  // Maximum width to prevent taking too much space
+      ),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 48, // Fixed height to match other form fields
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: enabled ? backgroundColor : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: enabled ? primaryColor.withOpacity(0.3) : Colors.grey.shade300,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.calendar_today,
+                color: enabled ? primaryColor : Colors.grey.shade500,
+                size: 16,
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  formatDateIndian(date),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: enabled ? Colors.black87 : Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.visible,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceField(int index, bool enabled) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: enabled ? primaryColor.withOpacity(0.3) : Colors.grey.shade300,
+        ),
+      ),
+      child: TextFormField(
+        controller: placeControllers[index],
+        enabled: enabled,
+        style: TextStyle(
+          color: enabled ? Colors.black87 : Colors.grey.shade600,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
+        decoration: InputDecoration(
+          labelText: 'Place',
+          labelStyle: TextStyle(
+            color: enabled ? primaryColor.withOpacity(0.7) : Colors.grey.shade500,
+            fontSize: 12,
+          ),
+          isDense: true, // Reduces the height of the input field
+          contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.only(right: 4.0, left: 8.0), // Reduced padding around icon
+            child: Icon(
+              Icons.place,
+              color: enabled ? primaryColor.withOpacity(0.7) : Colors.grey.shade500,
+              size: 18,
+            ),
+          ),
+          prefixIconConstraints: const BoxConstraints(minWidth: 20, maxHeight: 20), // Tighter constraints for icon
+          border: InputBorder.none,
+          filled: true,
+          fillColor: enabled ? backgroundColor : Colors.grey.shade100,
+        ),
+        onChanged: (value) {
+          setState(() {
+            if (value.trim() == gcDetails?['TruckTo']?.trim()) {
+              lastEditableTransitIndex = index;
+              for (int j = index + 1; j < 8; j++) {
+                transitDates[j] = null;
+                placeControllers[j].clear();
+              }
+            } else if (lastEditableTransitIndex == index &&
+                value.trim() != gcDetails?['TruckTo']?.trim()) {
+              lastEditableTransitIndex = 7;
+            }
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildRemarksField({
+    required TextEditingController controller,
+    required String hintText,
+    required bool enabled,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: enabled ? primaryColor.withOpacity(0.3) : Colors.grey.shade300,
+        ),
+      ),
+      child: TextFormField(
+        controller: controller,
+        maxLines: 4,
+        readOnly: !enabled,
+        style: TextStyle(
+          color: enabled ? Colors.black87 : Colors.grey.shade600,
+          fontSize: 14,
+        ),
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: TextStyle(color: Colors.grey.shade500),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.all(16),
+          filled: true,
+          fillColor: enabled ? backgroundColor : Colors.grey.shade100,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUnloadedDetails() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildDateSelector(
+                date: unloadedDate,
+                onTap: isUnloadedDateEditable ? () => pickUnloadedDate(context) : null,
+                enabled: isUnloadedDateEditable,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildTimeSelector(
+                time: unloadedTime,
+                onTap: isUnloadedTimeEditable ? () => pickUnloadedTime(context) : null,
+                enabled: isUnloadedTimeEditable,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildRemarksField(
+          controller: unloadedRemarksController,
+          hintText: 'Enter unloaded remarks...',
+          enabled: isUnloadedRemarksEditable,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReceiptDetails() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildDateSelector(
+                date: receiptDate,
+                onTap: isReceiptDateEditable ? () => pickReceiptDate(context) : null,
+                enabled: isReceiptDateEditable,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildTimeSelector(
+                time: receiptTime,
+                onTap: isReceiptTimeEditable ? () => pickReceiptTime(context) : null,
+                enabled: isReceiptTimeEditable,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildRemarksField(
+          controller: receiptRemarksController,
+          hintText: 'Enter receipt remarks...',
+          enabled: isReceiptRemarksEditable,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimeSelector({
+    required TimeOfDay? time,
+    required VoidCallback? onTap,
+    required bool enabled,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: enabled ? backgroundColor : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: enabled ? primaryColor.withOpacity(0.3) : Colors.grey.shade300,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.access_time,
+              color: enabled ? primaryColor : Colors.grey.shade500,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                formatTime(time),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: enabled ? Colors.black87 : Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return Container(
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isSaving
+              ? [Colors.grey.shade400, Colors.grey.shade500]
+              : [primaryColor, secondaryColor],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        onPressed: isSaving ? null : saveTransit,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: isSaving
+            ? const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Saving...',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        )
+            : const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.save, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Save Transit Details',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
