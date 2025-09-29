@@ -7,6 +7,9 @@ import 'package:printing/printing.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:logistic/controller/gc_form_controller.dart';
 
+
+
+
 class GCPdfGenerator {
   static Future<Uint8List> generatePDF(GCFormController controller) async {
     final pdf = pw.Document();
@@ -840,41 +843,78 @@ class GCPdfGenerator {
     }
   }
 
-  static Future<void> savePdfToDevice(GCFormController controller) async {
+  static Future<String> savePdfToDevice(GCFormController controller) async {
     try {
       final pdfData = await generatePDF(controller);
       final directory = await getApplicationDocumentsDirectory();
-      final gcNumber = controller.gcNumberCtrl.text.isNotEmpty
-          ? controller.gcNumberCtrl.text
-          : 'file';
-      final file = File('${directory.path}/GC_$gcNumber.pdf');
+      
+      // Ensure we have a valid GC number or generate a timestamp-based one
+      String gcNumber = controller.gcNumberCtrl.text.trim();
+      if (gcNumber.isEmpty) {
+        gcNumber = 'GC_${DateTime.now().millisecondsSinceEpoch}';
+      } else if (!gcNumber.toUpperCase().startsWith('GC_')) {
+        gcNumber = 'GC_$gcNumber';
+      }
+      
+      // Ensure the filename ends with .pdf
+      if (!gcNumber.toLowerCase().endsWith('.pdf')) {
+        gcNumber = '$gcNumber.pdf';
+      }
+      
+      final file = File('${directory.path}/$gcNumber');
       await file.writeAsBytes(pdfData);
       print('PDF saved to: ${file.path}');
+      return file.path;
     } catch (e) {
       print('Error saving PDF: $e');
+      rethrow;
     }
   }
 
   static Future<void> sharePdf(GCFormController controller) async {
     try {
       final pdfData = await generatePDF(controller);
-      final gcNumber = controller.gcNumberCtrl.text.isNotEmpty
-          ? controller.gcNumberCtrl.text
-          : 'share';
-      await Printing.sharePdf(bytes: pdfData, filename: 'GC_$gcNumber.pdf');
+      
+      // Generate consistent filename
+      String gcNumber = controller.gcNumberCtrl.text.trim();
+      if (gcNumber.isEmpty) {
+        gcNumber = 'GC_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      } else {
+        if (!gcNumber.toUpperCase().startsWith('GC_')) {
+          gcNumber = 'GC_$gcNumber';
+        }
+        if (!gcNumber.toLowerCase().endsWith('.pdf')) {
+          gcNumber = '$gcNumber.pdf';
+        }
+      }
+      
+      await Printing.sharePdf(
+        bytes: pdfData, 
+        filename: gcNumber,
+      );
     } catch (e) {
       print('Error sharing PDF: $e');
+      rethrow;
     }
   }
 
   static Future<void> printPdf(GCFormController controller) async {
     try {
       final pdfData = await generatePDF(controller);
+      
+      // Generate consistent document name for printing
+      String docName = 'GC_${controller.gcNumberCtrl.text.trim()}.pdf';
+      if (docName == 'GC_.pdf') {
+        docName = 'GC_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      }
+      
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdfData,
+        name: docName,
       );
     } catch (e) {
       print('Error printing PDF: $e');
+      rethrow;
     }
   }
 }
@@ -891,31 +931,56 @@ class PDFPreviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Get the GC number from the controller
+    final gcNumber = GCFormController().gcNumberCtrl.text.trim();
+    
+    // Generate the display name with proper GC_ prefix and .pdf extension
+    String displayName = 'document.pdf';
+    if (filename.isNotEmpty) {
+      displayName = filename.split('/').last;
+    } else if (gcNumber.isNotEmpty) {
+      displayName = 'GC_$gcNumber';
+      if (!displayName.toLowerCase().endsWith('.pdf')) {
+        displayName = '$displayName.pdf';
+      }
+    }
+    
     return Scaffold(
       appBar: AppBar(
-        title: Text('PDF Preview - $filename'),
+        title: Text('PDF Preview - $displayName'),
         actions: [
           IconButton(
             icon: const Icon(Icons.share),
             onPressed: () async {
-              await Printing.sharePdf(bytes: pdfData, filename: filename);
+              await Printing.sharePdf(
+                bytes: pdfData, 
+                filename: displayName,
+              );
             },
           ),
           IconButton(
             icon: const Icon(Icons.print),
             onPressed: () async => await Printing.layoutPdf(
               onLayout: (PdfPageFormat format) async => pdfData,
+              name: displayName,
             ),
           ),
         ],
       ),
       body: PdfPreview(
         build: (format) => pdfData,
+        onShared: (context) {
+          Printing.sharePdf(
+            bytes: pdfData,
+            filename: displayName,
+          );
+        },
         allowPrinting: true,
         allowSharing: true,
         canChangeOrientation: false,
         canChangePageFormat: false,
         canDebug: false,
+        pdfFileName: displayName,
       ),
     );
   }

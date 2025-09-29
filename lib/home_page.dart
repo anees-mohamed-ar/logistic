@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:async';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:logistic/widgets/main_layout.dart';
 import 'package:logistic/controller/id_controller.dart';
@@ -385,6 +386,13 @@ class _HomePageState extends State<HomePage> {
     ];
 
     final managementActions = isAdmin ? [
+      _ActionData(
+        icon: Icons.assignment_outlined,
+        title: 'GC Assignment',
+        subtitle: 'Assign GC ranges',
+        color: const Color(0xFF8E24AA),
+        onTap: () => Get.toNamed(AppRoutes.gcAssignment),
+      ),
       _ActionData(
         icon: Icons.local_shipping_outlined,
         title: 'Truck Management',

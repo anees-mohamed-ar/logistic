@@ -980,69 +980,69 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 'Goods Details',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
-              const SizedBox(height: 16),
+              // const SizedBox(height: 16),
 
-              // Select Weight dropdown (now searchable)
-              Obx(() {
-                // Show error state if there's an error
-                if (controller.weightRatesError.isNotEmpty) {
-                  return _buildDropdownField(
-                    context: context,
-                    label: 'Select Weight',
-                    value: 'Error loading weights',
-                    items: const ['Error loading weights'],
-                    onChanged: (_) {}, // No-op function
-                    validator: null,
-                    compact: true,
-                    error: controller.weightRatesError.value,
-                    onRetry: () => controller.fetchWeightRates(),
-                  );
-                }
+              // // Select Weight dropdown (now searchable)
+              // Obx(() {
+              //   // Show error state if there's an error
+              //   if (controller.weightRatesError.isNotEmpty) {
+              //     return _buildDropdownField(
+              //       context: context,
+              //       label: 'Select Weight',
+              //       value: 'Error loading weights',
+              //       items: const ['Error loading weights'],
+              //       onChanged: (_) {}, // No-op function
+              //       validator: null,
+              //       compact: true,
+              //       error: controller.weightRatesError.value,
+              //       onRetry: () => controller.fetchWeightRates(),
+              //     );
+              //   }
 
-                // Show loading state
-                if (controller.isLoadingRates.value) {
-                  return TextFormField(
-                    decoration: InputDecoration(
-                      labelText: 'Select Weight',
-                      suffixIcon: const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    readOnly: true,
-                    controller: TextEditingController(text: 'Loading weight rates...'),
-                  );
-                }
+              //   // Show loading state
+              //   if (controller.isLoadingRates.value) {
+              //     return TextFormField(
+              //       decoration: InputDecoration(
+              //         labelText: 'Select Weight',
+              //         suffixIcon: const Padding(
+              //           padding: EdgeInsets.all(8.0),
+              //           child: CircularProgressIndicator(strokeWidth: 2),
+              //         ),
+              //         border: OutlineInputBorder(
+              //           borderRadius: BorderRadius.circular(8),
+              //         ),
+              //       ),
+              //       readOnly: true,
+              //       controller: TextEditingController(text: 'Loading weight rates...'),
+              //     );
+              //   }
                 
-                // Get the current selected weight string from the controller's selectedWeight
-                final selectedWeight = controller.selectedWeight.value;
-                final selectedWeightString = selectedWeight?.weight ?? 'Select Weight';
+                // // Get the current selected weight string from the controller's selectedWeight
+                // final selectedWeight = controller.selectedWeight.value;
+                // final selectedWeightString = selectedWeight?.weight ?? 'Select Weight';
                 
-                return _buildDropdownField(
-                  context: context,
-                  label: 'Select Weight',
-                  value: selectedWeightString,
-                  items: ['Select Weight', ...weightOptions],
-                  onChanged: (selectedString) {
-                    if (selectedString != null && selectedString != 'Select Weight') {
-                      final selectedWeightObject = controller.weightRates.firstWhere(
-                            (w) => w.weight == selectedString,
-                        orElse: () => throw Exception('WeightRate not found for $selectedString'),
-                      );
-                      controller.onWeightSelected(selectedWeightObject);
-                    } else {
-                      controller.onWeightSelected(null);
-                    }
-                  },
-                  validator: (value) =>
-                  value == null || value.isEmpty || value == 'Select Weight' ? 'Required' : null,
-                  compact: true,
-                  searchable: true,
-                );
-              }),
+              //   return _buildDropdownField(
+              //     context: context,
+              //     label: 'Select Weight',
+              //     value: selectedWeightString,
+              //     items: ['Select Weight', ...weightOptions],
+              //     onChanged: (selectedString) {
+              //       if (selectedString != null && selectedString != 'Select Weight') {
+              //         final selectedWeightObject = controller.weightRates.firstWhere(
+              //               (w) => w.weight == selectedString,
+              //           orElse: () => throw Exception('WeightRate not found for $selectedString'),
+              //         );
+              //         controller.onWeightSelected(selectedWeightObject);
+              //       } else {
+              //         controller.onWeightSelected(null);
+              //       }
+              //     },
+              //     validator: (value) =>
+              //     value == null || value.isEmpty || value == 'Select Weight' ? 'Required' : null,
+              //     compact: true,
+              //     searchable: true,
+              //   );
+              // }),
 
               const SizedBox(height: 16),
 
@@ -1111,59 +1111,59 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   onChanged: (_) {},
                 ),
               ],
-              const SizedBox(height: 16),
-              // KM and Rate in the same row
-              Row(
-                children: [
-                  Expanded(
-                    child: Obx(
-                          () => TextFormField(
-                        controller: controller.kmCtrl,
-                        decoration: _inputDecoration(
-                          'KM',
-                          Icons.speed,
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        readOnly: !controller.isKmEditable.value,
-                        onChanged: (value) {
-                          // The listener in GCFormController handles calculateRate
-                        },
-                        validator: (value) {
-                          if (value == null || value.isEmpty) return 'Required';
-                          final km = double.tryParse(value);
-                          if (km == null || km <= 0) return 'Invalid KM';
-                          return null;
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Rate in its own row
-              TextFormField(
-                controller: controller.rateCtrl,
-                readOnly: true, // Assuming Rate is always auto-calculated and read-only here
-                decoration: _inputDecoration(
-                  'Rate per KM',
-                  Icons.attach_money,
-                ),
-                validator: null,
-              ),
-              const SizedBox(height: 16),
-              // Total in its own row
-              Obx(() => TextFormField(
-                readOnly: true,
-                controller: TextEditingController(
-                  text: controller.calculatedGoodsTotal.value.isNotEmpty
-                      ? '₹${controller.calculatedGoodsTotal.value}'
-                      : '',
-                ),
-                decoration: _inputDecoration(
-                  'Total',
-                  Icons.calculate,
-                ),
-              )),
+              // // const SizedBox(height: 16),
+              // // // KM and Rate in the same row
+              // // Row(
+              // //   children: [
+              // //     Expanded(
+              // //       child: Obx(
+              // //             () => TextFormField(
+              // //           controller: controller.kmCtrl,
+              // //           decoration: _inputDecoration(
+              // //             'KM',
+              // //             Icons.speed,
+              // //           ),
+              // //           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              // //           readOnly: !controller.isKmEditable.value,
+              // //           onChanged: (value) {
+              // //             // The listener in GCFormController handles calculateRate
+              // //           },
+              // //           validator: (value) {
+              // //             if (value == null || value.isEmpty) return 'Required';
+              // //             final km = double.tryParse(value);
+              // //             if (km == null || km <= 0) return 'Invalid KM';
+              // //             return null;
+              // //           },
+              // //         ),
+              // //       ),
+              // //     ),
+              // //   ],
+              // // ),
+              // const SizedBox(height: 16),
+              // // Rate in its own row
+              // TextFormField(
+              //   controller: controller.rateCtrl,
+              //   readOnly: true, // Assuming Rate is always auto-calculated and read-only here
+              //   decoration: _inputDecoration(
+              //     'Rate per KM',
+              //     Icons.attach_money,
+              //   ),
+              //   validator: null,
+              // ),
+              // const SizedBox(height: 16),
+              // // Total in its own row
+              // Obx(() => TextFormField(
+              //   readOnly: true,
+              //   controller: TextEditingController(
+              //     text: controller.calculatedGoodsTotal.value.isNotEmpty
+              //         ? '₹${controller.calculatedGoodsTotal.value}'
+              //         : '',
+              //   ),
+              //   decoration: _inputDecoration(
+              //     'Total',
+              //     Icons.calculate,
+              //   ),
+              // )),
               const SizedBox(height: 16),
               
               // Invoice Details Section

@@ -11,12 +11,13 @@ import 'package:logistic/gc_form_screen.dart';
 import 'package:logistic/gc_report_page.dart';
 import 'package:logistic/gc_list_page.dart';
 import 'package:logistic/views/gst/gst_form_page.dart';
-import 'package:logistic/views/km/km_list_page.dart';
 import 'package:logistic/views/km/km_form_page.dart';
+import 'package:logistic/views/km/km_list_page.dart';
 import 'package:logistic/views/location/location_list_page.dart';
 import 'package:logistic/views/location/location_form_page.dart';
 import 'package:logistic/views/customer/customer_list_page.dart';
 import 'package:logistic/views/customer/customer_form_page.dart';
+import 'package:logistic/views/supplier/supplier_form_page.dart';
 import 'package:logistic/views/supplier/supplier_list_page.dart';
 import 'package:logistic/views/supplier/supplier_form_page.dart';
 import 'package:logistic/views/gst/gst_list_page.dart';
@@ -29,6 +30,7 @@ import 'package:logistic/views/truck/truck_list_page.dart';
 import 'package:logistic/views/truck/truck_form_page.dart';
 import 'package:logistic/bindings/truck_binding.dart';
 import 'package:logistic/register_screen.dart';
+import 'package:logistic/gc_assignment_page.dart';
 
 class AppRoutes {
   // Route names
@@ -60,6 +62,7 @@ class AppRoutes {
   static const String weightRateEdit = '/weight_rate_edit';
   static const String truckList = '/truck_list';
   static const String truckForm = '/truck_form';
+  static const String gcAssignment = '/gc_assignment';
 
   static final routes = [
     GetPage(
@@ -119,7 +122,7 @@ class AppRoutes {
     ),
     GetPage(
       name: kmList, 
-      page: () =>  KMListPage(),
+      page: () => KMListPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
@@ -201,6 +204,11 @@ class AppRoutes {
             ? GstFormPage(gst: gst)
             : const GstFormPage();
       },
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: gcAssignment,
+      page: () => const GCAssignmentPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
