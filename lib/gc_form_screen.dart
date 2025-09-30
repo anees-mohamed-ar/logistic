@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:logistic/controller/gc_form_controller.dart';
+import 'package:logistic/controller/id_controller.dart';
 import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:logistic/widgets/gc_pdf.dart';
 // Note: WeightRate is now defined in gc_form_controller.dart,
 // so 'show WeightRate' import is redundant if not also needed from this file's context
@@ -28,11 +30,53 @@ class _GCFormScreenState extends State<GCFormScreen> {
         ? Get.find<GCFormController>()
         : Get.put(GCFormController());
     
-    // Only clear the form if we're not in edit mode
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Check access when the screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final idController = Get.find<IdController>();
+      final userId = idController.userId.value;
+      
+      if (userId.isEmpty) {
+        Fluttertoast.showToast(
+          msg: 'User ID not found. Please login again.',
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+        );
+        Get.back();
+        return;
+      }
+      
+      // Only check access and fetch GC number if not in edit mode
       if (!controller.isEditMode.value) {
         controller.clearForm();
+        
+        // Check access first
+        final hasAccess = await controller.checkGCAccess(userId);
+        if (!hasAccess) {
+          Fluttertoast.showToast(
+            msg: controller.accessMessage.value,
+            toastLength: Toast.LENGTH_LONG,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: Colors.red,
+            textColor: Colors.white,
+          );
+          Get.back();
+          return;
+        }
+        
+        // If access is granted, fetch and set the next GC number
+        try {
+          final nextGC = await controller.fetchNextGCNumber(userId);
+          if (nextGC != null) {
+            controller.gcNumberCtrl.text = nextGC;
+          }
+        } catch (e) {
+          print('Error setting next GC number: $e');
+          // Don't block the form if there's an error fetching the GC number
+        }
       }
+      
       controller.currentTab.value = 0;
     });
   }

@@ -98,7 +98,45 @@ class _GCListPageState extends State<GCListPage> {
       appBar: _buildAppBar(),
       backgroundColor: const Color(0xFFF7F9FC),
       body: _buildBody(),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _checkAndNavigateToGCForm,
+        backgroundColor: const Color(0xFF1E2A44),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('Add GC'),
+      ),
     );
+  }
+
+  Future<void> _checkAndNavigateToGCForm() async {
+    final idController = Get.find<IdController>();
+    final userId = idController.userId.value;
+    
+    if (userId.isEmpty) {
+      Fluttertoast.showToast(
+        msg: 'User ID not found. Please login again.',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    final gcFormController = Get.put(GCFormController());
+    final hasAccess = await gcFormController.checkGCAccess(userId);
+    
+    if (hasAccess) {
+      Get.to(() => const GCFormScreen());
+    } else {
+      Fluttertoast.showToast(
+        msg: gcFormController.accessMessage.value,
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+    }
   }
 
   PreferredSizeWidget _buildAppBar() {

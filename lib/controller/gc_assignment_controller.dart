@@ -28,6 +28,11 @@ class GCAssignmentController extends GetxController {
   final hasActiveRanges = false.obs;
   final checkingRangeStatus = false.obs;
 
+  // User usage data
+  final userUsageData = <Map<String, dynamic>>[].obs;
+  final loadingUsage = false.obs;
+  final usageError = RxnString();
+
   @override
   void onInit() {
     super.onInit();
@@ -77,17 +82,38 @@ class GCAssignmentController extends GetxController {
     } else {
       filteredUsers.assignAll(
         users.where((user) =>
-          (user['userName'] ?? '').toString().toLowerCase().contains(query.toLowerCase()) ||
-          (user['userEmail'] ?? '').toString().toLowerCase().contains(query.toLowerCase())
+        (user['userName'] ?? '').toString().toLowerCase().contains(query.toLowerCase()) ||
+            (user['userEmail'] ?? '').toString().toLowerCase().contains(query.toLowerCase())
         ).toList(),
       );
     }
   }
 
-  // Check if selected user has active ranges
+  // Check if selected user has active or queued ranges
   Future<void> checkUserActiveRanges(int userId) async {
     try {
       checkingRangeStatus.value = true;
+      
+      // First check if user has any queued ranges
+      await fetchUserUsage(userId);
+      
+      // Check if user has any queued ranges
+      final hasQueuedRanges = userUsageData.any((range) => range['status'] == 'queued');
+      
+      if (hasQueuedRanges) {
+        hasActiveRanges.value = true;
+        statusCtrl.text = 'queued';
+        Fluttertoast.showToast(
+          msg: 'User has queued GC ranges. New assignment will also be queued.',
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.orange,
+          textColor: Colors.white,
+        );
+        return;
+      }
+      
+      // If no queued ranges, check for active ranges
       final url = Uri.parse('${ApiConfig.baseUrl}/gc-management/check-active-ranges/$userId');
       final response = await http.get(url).timeout(const Duration(seconds: 8));
 
@@ -99,7 +125,7 @@ class GCAssignmentController extends GetxController {
         // Show appropriate message
         if (hasActive) {
           Fluttertoast.showToast(
-            msg: 'User already has active GC ranges. Assignment will be queued.',
+            msg: 'User has active GC ranges. Assignment will be queued.',
             toastLength: Toast.LENGTH_LONG,
             gravity: ToastGravity.BOTTOM,
             backgroundColor: Colors.orange,
@@ -108,7 +134,7 @@ class GCAssignmentController extends GetxController {
           statusCtrl.text = 'queued';
         } else {
           Fluttertoast.showToast(
-            msg: 'User has no active ranges. Assignment will be active.',
+            msg: 'No active or queued ranges found. Assignment will be active.',
             toastLength: Toast.LENGTH_LONG,
             gravity: ToastGravity.BOTTOM,
             backgroundColor: Colors.green,
@@ -142,6 +168,41 @@ class GCAssignmentController extends GetxController {
       );
     } finally {
       checkingRangeStatus.value = false;
+    }
+  }
+
+  // Fetch user usage data
+  Future<void> fetchUserUsage(int userId) async {
+    try {
+      loadingUsage.value = true;
+      usageError.value = null;
+      final url = Uri.parse('${ApiConfig.baseUrl}/gc-management/usage/$userId');
+      final response = await http.get(url).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['success'] == true && responseData['data'] != null) {
+          final List<dynamic> allData = responseData['data'];
+
+          // Filter only active and queued ranges
+          final activeAndQueued = allData.where((item) =>
+          item['status'] == 'active' || item['status'] == 'queued'
+          ).toList();
+
+          userUsageData.assignAll(activeAndQueued.cast<Map<String, dynamic>>());
+        } else {
+          userUsageData.clear();
+        }
+      } else {
+        usageError.value = 'Failed to load usage data';
+        userUsageData.clear();
+      }
+    } catch (e) {
+      print('Error fetching user usage: $e');
+      usageError.value = 'Error loading usage data';
+      userUsageData.clear();
+    } finally {
+      loadingUsage.value = false;
     }
   }
 
@@ -230,6 +291,8 @@ class GCAssignmentController extends GetxController {
     statusCtrl.clear();
     selectedUser.value = null;
     hasActiveRanges.value = false;
+    userUsageData.clear();
+    usageError.value = null;
   }
 
   // Validate form fields

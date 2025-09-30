@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:logistic/api_config.dart';
+import 'package:logistic/controller/id_controller.dart';
 import 'package:logistic/models/km_location.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'dart:convert';
@@ -52,6 +53,11 @@ class GCFormController extends GetxController {
   final tabScrollController = ScrollController();
   final isLoading = false.obs;
   bool _tabScrollListenerAttached = false;
+  
+  // Access control
+  final hasAccess = false.obs;
+  final accessMessage = ''.obs;
+  final isLoadingAccess = false.obs;
 
   // Shipment Tab Controllers
   final gcNumberCtrl = TextEditingController();
@@ -374,86 +380,15 @@ class GCFormController extends GetxController {
 
   // API Call Methods
 
-  // Generate GC number based on branch code
-  Future<String> generateGcNumber() async {
-    if (selectedBranchCode.value.isEmpty || selectedBranch.value == 'Select Branch') {
-      return '';
-    }
-
-    try {
-      // Get all GC numbers for the company
-      final url = Uri.parse('${ApiConfig.baseUrl}/gc/gcList/search');
-      final response = await http.get(url).timeout(const Duration(seconds: 8));
-      
-      if (response.statusCode == 200) {
-        final List<dynamic> gcList = jsonDecode(response.body);
-        final branchPrefix = selectedBranchCode.value;
-        
-        // Filter GC numbers for the current branch and extract numeric parts
-        final branchGcNumbers = gcList
-            .where((gc) => 
-                gc['GcNumber'] != null && 
-                gc['GcNumber'].toString().startsWith(branchPrefix) &&
-                gc['GcNumber'].toString().length > branchPrefix.length)
-            .map((gc) {
-              final gcNumber = gc['GcNumber'].toString();
-              final numericPart = gcNumber.substring(branchPrefix.length);
-              return int.tryParse(numericPart) ?? 0;
-            })
-            .where((number) => number > 0) // Filter out invalid numbers
-            .toList();
-        
-        // Find the highest number and increment
-        final nextNumber = branchGcNumbers.isNotEmpty 
-            ? (branchGcNumbers.reduce((a, b) => a > b ? a : b) + 1)
-            : 1; // Start from 1 if no existing GCs for this branch
-            
-        // Format with leading zeros (5 digits total)
-        return '${branchPrefix}${nextNumber.toString().padLeft(5, '0')}';
-      }
-      
-      // Fallback if API call fails
-      return '${selectedBranchCode.value}00001';
-    } catch (e) {
-      print('Error generating GC number: $e');
-      // Fallback in case of any error
-      return '${selectedBranchCode.value}00001';
-    }
-  }
-
   // Handle branch selection
-  void onBranchSelected(String? branch) async {
-    if (branch == null || branch == 'Select Branch') {
+  void onBranchSelected(String? branch) {
+    if (branch == null || branch.isEmpty || branch == 'Select Branch') {
       selectedBranch.value = 'Select Branch';
       selectedBranchCode.value = '';
-      gcNumberCtrl.clear();
       return;
     }
-    
-    // Only proceed if branch has changed
-    if (selectedBranch.value != branch) {
-      selectedBranch.value = branch;
-      selectedBranchCode.value = branchCodeMap[branch] ?? '';
-      
-      // Generate and set GC number
-      if (selectedBranchCode.value.isNotEmpty) {
-        try {
-          isLoading.value = true;
-          final newGcNumber = await generateGcNumber();
-          if (newGcNumber.isNotEmpty) {
-            gcNumberCtrl.text = newGcNumber;
-          } else {
-            // Fallback: Generate a default number if API call fails
-            gcNumberCtrl.text = '${selectedBranchCode.value}00001';
-          }
-        } catch (e) {
-          print('Error generating GC number: $e');
-          gcNumberCtrl.text = '${selectedBranchCode.value}00001';
-        } finally {
-          isLoading.value = false;
-        }
-      }
-    }
+    selectedBranch.value = branch;
+    selectedBranchCode.value = branchCodeMap[branch] ?? '';
   }
 
   Future<void> fetchBranches() async {
@@ -485,20 +420,8 @@ class GCFormController extends GetxController {
           
           // Remove duplicates and sort
           branches.value = branches.toSet().toList()..sort((a, b) => a == 'Select Branch' ? -1 : a.compareTo(b));
-
-          // Reset selection if current selection is not in the updated list
-          if (!branches.contains(selectedBranch.value)) {
-            selectedBranch.value = 'Select Branch';
-            selectedBranchCode.value = '';
-            // Clear GC number if branch was changed
-            gcNumberCtrl.clear();
-          }
-        } else {
-          branchesError.value = 'Unexpected response format';
         }
-      } else {
-        branchesError.value = 'Failed to load branches (${response.statusCode})';
-      }
+      } // Added missing closing brace for status code check
     } catch (e) {
       branchesError.value = 'Failed to load branches. Tap to retry.';
     } finally {
@@ -1012,6 +935,82 @@ class GCFormController extends GetxController {
 
   
 
+  // Fetch the next GC number for the user
+  Future<String?> fetchNextGCNumber(String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/gc-management/next-gc-number?userId=$userId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          return data['data']['nextGC']['nextGC'].toString();
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching next GC number: $e');
+      return null;
+    }
+  }
+
+  // Check if user has access to GC form
+  Future<bool> checkGCAccess(String userId) async {
+    try {
+      isLoadingAccess.value = true;
+      
+      // First check active ranges
+      final activeRangesResponse = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/gc-management/check-active-ranges/$userId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (activeRangesResponse.statusCode == 200) {
+        final activeRangesData = jsonDecode(activeRangesResponse.body);
+        if (activeRangesData['hasActiveRanges'] == true) {
+          hasAccess.value = true;
+          accessMessage.value = 'Active GC range found';
+          isLoadingAccess.value = false;
+          return true;
+        }
+      }
+
+      // If no active ranges, check for queued ranges
+      final usageResponse = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/gc-management/usage/$userId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (usageResponse.statusCode == 200) {
+        final usageData = jsonDecode(usageResponse.body);
+        if (usageData['success'] == true) {
+          final ranges = List<Map<String, dynamic>>.from(usageData['data'] ?? []);
+          final hasQueuedRange = ranges.any((range) => range['status'] == 'queued');
+          
+          if (hasQueuedRange) {
+            hasAccess.value = true;
+            accessMessage.value = 'Queued GC range found';
+            isLoadingAccess.value = false;
+            return true;
+          }
+        }
+      }
+
+      // If we get here, no valid ranges were found
+      hasAccess.value = false;
+      accessMessage.value = 'No active or queued GC ranges found. Please contact admin.';
+      return false;
+    } catch (e) {
+      hasAccess.value = false;
+      accessMessage.value = 'Error checking GC access: $e';
+      return false;
+    } finally {
+      isLoadingAccess.value = false;
+    }
+  }
+
   // Clear all form fields and reset state
   void clearForm() {
     // Reset form validation state
@@ -1167,7 +1166,13 @@ class GCFormController extends GetxController {
         );
       } else {
         // Create new GC
-        url = Uri.parse('${ApiConfig.baseUrl}/gc/add');
+        final idController = Get.find<IdController>();
+        final userId = idController.userId.value;
+        if (userId.isEmpty) {
+          throw Exception('User ID not found. Please login again.');
+        }
+        
+        url = Uri.parse('${ApiConfig.baseUrl}/gc/add?userId=$userId');
         response = await http.post(
           url,
           headers: {'Content-Type': 'application/json'},
