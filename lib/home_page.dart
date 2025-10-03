@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:async';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:logistic/controller/gc_form_controller.dart';
 import 'package:logistic/widgets/main_layout.dart';
 import 'package:logistic/controller/id_controller.dart';
 import 'routes.dart';
+import 'package:logistic/widgets/gc_usage_widget.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -15,6 +17,76 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   bool _showAllActions = false;
+
+  Future<void> _checkGCAccessAndNavigate({bool toForm = false}) async {
+    final idController = Get.find<IdController>();
+    final userId = idController.userId.value;
+    
+    if (userId.isEmpty) {
+      Get.snackbar(
+        'Error',
+        'User ID not found. Please login again.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    // Show loading indicator
+    Get.dialog(
+      const Center(child: CircularProgressIndicator()),
+      barrierDismissible: false,
+    );
+    
+    try {
+      // Get the existing controller or create a new one if it doesn't exist
+      final gcFormController = Get.put(GCFormController(), permanent: true);
+      final hasAccess = await gcFormController.checkGCAccess(userId);
+      
+      // Close loading dialog
+      if (Get.isDialogOpen ?? false) Get.back();
+      
+      if (hasAccess) {
+        // Navigate to appropriate screen based on the action
+        if (toForm) {
+          // Clear the form before navigating to it
+          gcFormController.clearForm();
+          // Navigate to GC form for new note
+          Get.toNamed(AppRoutes.gcForm);
+        } else {
+          // Navigate to GC list
+          Get.toNamed(AppRoutes.gcList);
+        }
+      } else {
+        // Show error message if no access
+        Get.snackbar(
+          'Access Denied',
+          gcFormController.accessMessage.value,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 5),
+          snackPosition: SnackPosition.BOTTOM,
+          margin: const EdgeInsets.all(16),
+          borderRadius: 8,
+        );
+      }
+    } catch (e) {
+      // Close loading dialog if still open
+      if (Get.isDialogOpen ?? false) Get.back();
+      
+      // Show error message
+      Get.snackbar(
+        'Error',
+        'Failed to check GC access: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(16),
+        borderRadius: 8,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +123,11 @@ class _HomePageState extends State<HomePage> {
                   .slideX(duration: 600.ms, begin: -0.2)
                   .fadeIn(duration: 800.ms),
               const SizedBox(height: 32),
+
+              if (!isAdmin) ...[
+                const SizedBox(height: 32),
+                const GCUsageWidget(),
+              ],
 
               // Quick Actions Section
               _buildQuickActionsSection(context, isSmallScreen, isAdmin),
@@ -359,7 +436,7 @@ class _HomePageState extends State<HomePage> {
         title: 'New GC Note',
         subtitle: 'Create new goods',
         color: const Color(0xFF4A90E2),
-        onTap: () => Get.toNamed(AppRoutes.gcForm),
+        onTap: () => _checkGCAccessAndNavigate(toForm: true),
       ),
       _ActionData(
         icon: Icons.list_alt_outlined,

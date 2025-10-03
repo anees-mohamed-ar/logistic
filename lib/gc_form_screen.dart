@@ -25,10 +25,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
     super.initState();
     searchCtrl = TextEditingController();
     
-    // Initialize the controller
-    final controller = Get.isRegistered<GCFormController>()
-        ? Get.find<GCFormController>()
-        : Get.put(GCFormController());
+    // Get the existing controller or create a new one if it doesn't exist
+    final controller = Get.put(GCFormController(), permanent: true);
     
     // Check access when the screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -71,9 +69,12 @@ class _GCFormScreenState extends State<GCFormScreen> {
           if (nextGC != null) {
             controller.gcNumberCtrl.text = nextGC;
           }
+          
+          // Check GC usage and show warning if needed
+          await controller.checkGCUsageAndWarn(userId);
         } catch (e) {
-          print('Error setting next GC number: $e');
-          // Don't block the form if there's an error fetching the GC number
+          print('Error in form initialization: $e');
+          // Don't block the form if there's an error
         }
       }
       
@@ -84,8 +85,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
   @override
   void dispose() {
     searchCtrl.dispose();
-    // Don't dispose the controller here as it's managed by GetX
-    // The controller will be removed when the route is popped
+    // Don't dispose the controller here as it's managed by GetX with permanent: true
+    // The controller will be managed by GetX and can be reused
     super.dispose();
   }
 

@@ -1089,6 +1089,82 @@ class GCFormController extends GetxController {
     return DateFormat('dd-MMM-yyyy').format(date);
   }
 
+  // Check GC usage and show warning if 5 or fewer GCs remaining
+  Future<void> checkGCUsageAndWarn(String userId) async {
+    if (userId.isEmpty) {
+      debugPrint('checkGCUsageAndWarn: User ID is empty');
+      return;
+    }
+    
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}/gc-management/gc-usage?userId=$userId');
+      debugPrint('Fetching GC usage from: $url');
+      
+      final response = await http.get(url);
+      debugPrint('GC usage response status: ${response.statusCode}');
+      debugPrint('GC usage response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        debugPrint('Parsed GC usage data: $data');
+        
+        if (data['success'] == true && data['data'] is List) {
+          final usageList = data['data'] as List;
+          debugPrint('Found ${usageList.length} GC usage entries');
+          
+          // Debug print all entries
+          for (var i = 0; i < usageList.length; i++) {
+            debugPrint('GC Usage Entry $i: ${usageList[i]}');
+          }
+          
+          // Find the active GC range
+          final activeRange = usageList.cast<Map<String, dynamic>>().firstWhere(
+            (item) {
+              final status = item['status']?.toString().toLowerCase();
+              debugPrint('Checking item with status: $status');
+              return status == 'active';
+            },
+            orElse: () => <String, dynamic>{},
+          );
+          
+          debugPrint('Active range found: ${activeRange.isNotEmpty}');
+          if (activeRange.isNotEmpty) {
+            final remaining = (activeRange['remainingGCs'] ?? 0) as int;
+            debugPrint('Remaining GCs: $remaining');
+            final hasQueuedRange = usageList.any((item) => item['status'] == 'queued');
+            
+            // Only show warning if 5 or fewer GCs remaining AND no queued range available
+            if (remaining <= 5 && !hasQueuedRange) {
+              final message = 'Warning: Only $remaining GCs remaining in your current range (${activeRange['fromGC']}-${activeRange['toGC']}).\n\n'
+                  '⚠️ No queued GC range available. Please contact admin to assign a new range.\n\n'
+                  'Please request a new range soon!';
+                  
+              // Show as dialog
+              if (Get.isDialogOpen != true) {
+                Get.dialog(
+                  AlertDialog(
+                    title: const Text('Low GC Balance', style: TextStyle(color: Colors.orange)),
+                    content: Text(message),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Get.back(),
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+                  barrierDismissible: false,
+                );
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Fail silently - this is just a warning feature
+      debugPrint('Error checking GC usage: $e');
+    }
+  }
+
   Future<void> submitFormToBackend() async {
     if (!formKey.currentState!.validate()) return;
     
@@ -1182,7 +1258,7 @@ class GCFormController extends GetxController {
       
       isLoading.value = false;
       
-      if (response.statusCode == 200) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
         final message = isEditMode.value ? 'GC updated successfully!' : 'GC created successfully!';
         
         Fluttertoast.showToast(
