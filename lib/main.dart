@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:logistic/update_transit_page.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:logistic/splash_screen.dart'; 
+
 import 'routes.dart';
-import 'gc_list_page.dart';
-import 'login_screen.dart';
-import 'home_page.dart';
-import 'gc_form_screen.dart';
-import 'gc_report_page.dart';
 import 'controller/id_controller.dart';
 import 'controller/location_controller.dart';
 import 'controller/customer_controller.dart';
 import 'controller/weight_to_rate_controller.dart';
+import 'controller/login_controller.dart';
 
-void main() {
+void main() async { // Make main async
+  WidgetsFlutterBinding.ensureInitialized(); // Ensure bindings are initialized
+  await GetStorage.init(); // Initialize GetStorage
+
   Get.put(IdController());
   Get.put(LocationController());
   Get.put(CustomerController());
   Get.put(WeightToRateController());
+  Get.put(LoginController()); // Ensure LoginController is available globally
+
   runApp(const LogisticsGCApp());
 }
 
@@ -71,7 +74,7 @@ class LogisticsGCApp extends StatelessWidget {
           bodyMedium: TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
         ),
       ),
-      initialRoute: AppRoutes.login,
+      initialRoute: AppRoutes.splash, // Set initial route to splash screen
       getPages: AppRoutes.routes,
       debugShowCheckedModeBanner: false,
     );

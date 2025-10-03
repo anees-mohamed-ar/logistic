@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:get_storage/get_storage.dart';
 
 import 'package:logistic/api_config.dart';
 import 'package:logistic/routes.dart';
@@ -17,9 +18,21 @@ class LoginController extends GetxController {
   var isPasswordVisible = false.obs;
   var isLoading = false.obs;
 
-  // Observable variables to store user data (accessible globally via GetX)
   var userId = ''.obs;
   var companyId = ''.obs;
+
+  final _box = GetStorage();
+
+  @override
+  void onInit() {
+    super.onInit();
+    // You could also check for saved IP here
+    final savedIp = _box.read('backend_ip');
+    if (savedIp != null) {
+      ipController.text = savedIp;
+      ApiConfig.baseUrl = savedIp;
+    }
+  }
 
   void togglePasswordVisibility() {
     isPasswordVisible.value = !isPasswordVisible.value;
@@ -27,17 +40,11 @@ class LoginController extends GetxController {
 
   String? validateIp(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Please enter the backend IP';
+      return 'Please enter the backend server URL';
     }
-    // Simple IPv4 validation
-    // final ipRegex = RegExp(r'^(\d{1,3}\.){3}\d{1,3}$');
-    // if (!ipRegex.hasMatch(value)) {
-    //   return 'Enter a valid IP address';
-    // }
     return null;
   }
 
-  // Email validation method
   String? validateEmail(String? value) {
     if (value == null || value.isEmpty) {
       return 'Please enter your email';
@@ -48,102 +55,83 @@ class LoginController extends GetxController {
     return null;
   }
 
-  // Password validation method
   String? validatePassword(String? value) {
     if (value == null || value.isEmpty) {
       return 'Please enter your password';
     }
-
     return null;
   }
 
-  void handleSocialLogin(String provider) {
-    // TODO: Implement social login logic based on the provider argument
-    // For example, you can use Get.snackbar for demonstration:
-    Get.snackbar('Social Login', 'Pressed: $provider');
+  Future<void> handleLogin() async {
+    if (formKey.currentState?.validate() ?? false) {
+      isLoading.value = true;
+      final ip = ipController.text.trim();
+      ApiConfig.baseUrl = ip;
+      _box.write('backend_ip', ip); // Save the IP
+
+      try {
+        final response = await http.get(
+          Uri.parse(
+              '${ApiConfig.baseUrl}/profile/search?userEmail=${emailController.text.trim()}&password=${passwordController.text.trim()}'),
+        ).timeout(const Duration(seconds: 10));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final userData = data[0];
+
+          final idController = Get.find<IdController>();
+          idController.setAllUserData(userData);
+
+          await _box.write('userData', userData);
+
+          Fluttertoast.showToast(msg: "Login Successful!");
+          Get.offNamed(AppRoutes.home);
+
+        } else {
+          final errorData = jsonDecode(response.body);
+          Fluttertoast.showToast(
+              msg: errorData['error'] ?? 'Invalid credentials',
+              backgroundColor: Colors.red);
+        }
+      } catch (e) {
+        Fluttertoast.showToast(
+            msg: 'Failed to connect: ${e.toString()}',
+            backgroundColor: Colors.red);
+      } finally {
+        isLoading.value = false;
+      }
+    }
   }
 
-  Future<void> handleLogin() async {
-    if (formKey.currentState == null || !formKey.currentState!.validate()) {
-      return;
-    }
-    ApiConfig.baseUrl = ipController.text.trim();
-    isLoading.value = true;
+  Future<void> logout() async {
+    await _box.remove('userData');
+    // Also clear the controllers
+    // Get.find<IdController>().clearUserData();
+    Get.offAllNamed(AppRoutes.login);
+  }
 
-    try {
-      final response = await http
-          .get(
-            Uri.parse(
-              '${ApiConfig.baseUrl}/profile/search?userEmail=${emailController.text.trim()}&password=${passwordController.text.trim()}',
-            ),
-          )
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              throw Exception('Request timed out');
-            },
-          );
+  bool isLoggedIn() {
+    return _box.hasData('userData');
+  }
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final userData = data[0];
-
-        // Store all user data in IdController
+  void tryAutoLogin() {
+    if (isLoggedIn()) {
+      final userData = _box.read('userData');
+      if (userData != null) {
         final idController = Get.find<IdController>();
         idController.setAllUserData(userData);
-
-        // Also store in local variables for backward compatibility
-        userId.value = userData['userId'].toString();
-        companyId.value = userData['companyId'].toString();
-
-        // Stop loading immediately before navigation
-        isLoading.value = false;
-
-        // Show success toast message
-        Fluttertoast.showToast(
-          msg: "Login Successful!",
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: const Color(0xFF4A90E2),
-          textColor: Colors.white,
-          fontSize: 16.0,
-        );
-
-        // Navigate to home screen
         Get.offNamed(AppRoutes.home);
-      } else {
-        isLoading.value = false;
-        // Handle API errors with toast
-        final errorData = jsonDecode(response.body);
-        Fluttertoast.showToast(
-          msg: errorData['error'] ?? 'Invalid credentials',
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: Colors.red,
-          textColor: Colors.white,
-          fontSize: 16.0,
-        );
       }
-    } catch (e) {
-      isLoading.value = false;
-      Fluttertoast.showToast(
-        msg: 'Failed to connect: ${e.toString()}',
-        toastLength: Toast.LENGTH_LONG,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.red,
-        textColor: Colors.white,
-        fontSize: 16.0,
-      );
+    } else {
+      Get.offNamed(AppRoutes.login);
     }
   }
 
   @override
   void onClose() {
-    // Intentionally do not dispose controllers here.
-    // GetX may rebuild LoginScreen after navigation (e.g., from Register),
-    // and disposing these controllers can lead to 'used after disposed' errors
-    // if the same instance is reused by Get.
-    // Rely on app shutdown or GetX cleanup to release them.
+    // emailController.dispose(); // Controllers are managed by GetX, no need to dispose manually in most cases
+    // passwordController.dispose();
+    // ipController.dispose();
     super.onClose();
   }
 }
