@@ -47,13 +47,16 @@ class WeightRate {
 }
 
 class GCFormController extends GetxController {
+  // NEW: Get an instance of IdController to trigger refreshes
+  final IdController _idController = Get.find<IdController>();
+
   // General Form State
   final formKey = GlobalKey<FormState>();
   final currentTab = 0.obs;
   final tabScrollController = ScrollController();
   final isLoading = false.obs;
   bool _tabScrollListenerAttached = false;
-  
+
   // Access control
   final hasAccess = false.obs;
   final accessMessage = ''.obs;
@@ -105,7 +108,7 @@ class GCFormController extends GetxController {
   final driverNameCtrl = TextEditingController();
   final driverPhoneCtrl = TextEditingController();
   final consignorNameCtrl = TextEditingController();
-  
+
   // Goods Tab Controllers
   final weightCtrl = TextEditingController();
   final natureOfGoodsCtrl = TextEditingController();
@@ -172,8 +175,6 @@ class GCFormController extends GetxController {
       controller.dispose();
     }
   }
-  // Removed gstCtrl, replaced by selectedGstPayer
-  // final gstCtrl = TextEditingController();
 
   // Charges Tab Observables
   final RxString balanceAmount = '0.00'.obs; // Reactive balance amount
@@ -213,7 +214,7 @@ class GCFormController extends GetxController {
   void onClose() {
     // Reset tab scroll listener flag
     _tabScrollListenerAttached = false;
-    
+
     // Remove listeners
     try {
       kmCtrl.removeListener(calculateRate);
@@ -273,7 +274,7 @@ class GCFormController extends GetxController {
   void attachTabScrollListener(BuildContext context) {
     if (_tabScrollListenerAttached) return;
     _tabScrollListenerAttached = true;
-    
+
     // Store context safely and check if mounted before using
     ever<int>(currentTab, (index) {
       try {
@@ -335,12 +336,14 @@ class GCFormController extends GetxController {
       BuildContext context,
       Rxn<DateTime> targetDate, {
         TextEditingController? textController,
+        bool restrictToToday = false, // New parameter to control date restriction
       }) async {
+    final now = DateTime.now();
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: now,
       firstDate: DateTime(2000),
-      lastDate: DateTime(2030),
+      lastDate: restrictToToday ? DateTime(now.year, now.month, now.day) : DateTime(2030), // Only restrict if specified
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: const ColorScheme.light(
@@ -403,25 +406,25 @@ class GCFormController extends GetxController {
           // Clear existing data
           branches.clear();
           branchCodeMap.clear();
-          
+
           // Add default option
           branches.add('Select Branch');
-          
+
           // Process each branch
           for (var branch in decoded) {
             final name = (branch['branchName'] ?? branch['BranchName'] ?? '').toString();
             final code = (branch['branchCode'] ?? branch['BranchCode'] ?? '').toString();
-            
+
             if (name.isNotEmpty && code.isNotEmpty) {
               branches.add(name);
               branchCodeMap[name] = code;
             }
           }
-          
+
           // Remove duplicates and sort
           branches.value = branches.toSet().toList()..sort((a, b) => a == 'Select Branch' ? -1 : a.compareTo(b));
         }
-      } // Added missing closing brace for status code check
+      }
     } catch (e) {
       branchesError.value = 'Failed to load branches. Tap to retry.';
     } finally {
@@ -435,7 +438,7 @@ class GCFormController extends GetxController {
       trucksError.value = null;
       final url = Uri.parse('${ApiConfig.baseUrl}/truckmaster/search');
       final response = await http.get(url).timeout(const Duration(seconds: 8));
-      
+
       if (response.statusCode == 200) {
         final dynamic decoded = jsonDecode(response.body);
         if (decoded is List) {
@@ -444,16 +447,16 @@ class GCFormController extends GetxController {
               .where((s) => s.isNotEmpty)
               .toSet()
               .toList();
-              
+
           truckNumbers
             ..clear()
             ..addAll(['Select Truck', ...list]);
-            
+
           // Also update the trucks list for backward compatibility
           trucks
             ..clear()
             ..addAll(['Select Truck', ...list]);
-            
+
           if (!truckNumbers.contains(selectedTruck.value)) {
             selectedTruck.value = 'Select Truck';
           }
@@ -530,21 +533,14 @@ class GCFormController extends GetxController {
 
         // Clear and update the drivers list with the new data
         drivers.assignAll(decoded.cast<Map<String, dynamic>>());
-        
+
         // Force UI update by triggering a change in the observable list
         drivers.refresh();
-        
+
         if (driverNames.isEmpty) {
           driversError.value = 'No drivers found';
         }
 
-        if (driverNames.isEmpty) {
-          Fluttertoast.showToast(
-            msg: 'No drivers found',
-            toastLength: Toast.LENGTH_SHORT,
-            gravity: ToastGravity.BOTTOM,
-          );
-        }
       } else {
         final errorMsg = 'Failed to load drivers: Tap to retry.';
         driversError.value = errorMsg;
@@ -673,12 +669,9 @@ class GCFormController extends GetxController {
         if (weightRates.isEmpty) {
           weightRatesError.value = 'No weight rates found';
         }
-        // If we're editing and an actual weight is present but nothing selected yet,
-        // try to auto-select a matching weight rate now that data is available
         if (isEditMode.value && selectedWeight.value == null) {
           final wStr = actualWeightCtrl.text.trim();
           if (wStr.isNotEmpty) {
-            // Add a small delay to ensure the UI has updated with the weight value
             Future.delayed(const Duration(milliseconds: 100), () {
               selectWeightForActualWeight(wStr);
             });
@@ -697,7 +690,7 @@ class GCFormController extends GetxController {
   Future<void> fetchKMLocations() async {
     try {
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/km/search'), // Using ApiConfig.baseUrl
+        Uri.parse('${ApiConfig.baseUrl}/km/search'),
       ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
@@ -723,7 +716,6 @@ class GCFormController extends GetxController {
     }
   }
 
-  // KM data handling
   void _handleLocationChange() {
     final from = fromCtrl.text.trim();
     final to = toCtrl.text.trim();
@@ -733,12 +725,11 @@ class GCFormController extends GetxController {
     } else {
       kmCtrl.clear();
       isKmEditable.value = true;
-      calculateRate(); // Recalculate if KM is cleared or becomes editable
+      calculateRate();
     }
   }
 
   void updateKM(String from, String to) {
-    // Try to find exact match
     final match = kmLocations.firstWhereOrNull(
             (loc) => loc.from.toLowerCase() == from.toLowerCase() &&
             loc.to.toLowerCase() == to.toLowerCase()
@@ -748,31 +739,27 @@ class GCFormController extends GetxController {
       kmCtrl.text = match.km;
       isKmEditable.value = false;
     } else {
-      kmCtrl.clear(); // Clear KM if no match found
+      kmCtrl.clear();
       isKmEditable.value = true;
     }
-    calculateRate(); // Always recalculate rate after KM is updated
+    calculateRate();
   }
 
-
-  // Calculate rate based on KM and selected weight
   void calculateRate() {
     final km = double.tryParse(kmCtrl.text) ?? 0.0;
 
-    // If KM is invalid or zero, clear only the total (keep any typed rate)
     if (km <= 0) {
       freightChargeCtrl.clear();
       calculatedGoodsTotal.value = '';
       return;
     }
 
-    // Case 1: We have a selected weight rate -> derive rate from weight/km tier
     if (selectedWeight.value != null) {
       final baseRate = km <= 250
           ? selectedWeight.value!.below250
           : selectedWeight.value!.above250;
 
-      rateCtrl.text = baseRate.toStringAsFixed(2); // rate per KM
+      rateCtrl.text = baseRate.toStringAsFixed(2);
 
       final totalFreight = baseRate * km;
       freightChargeCtrl.text = totalFreight.toStringAsFixed(2);
@@ -780,8 +767,6 @@ class GCFormController extends GetxController {
       return;
     }
 
-    // Case 2: No selected weight rate (e.g., editing existing GC)
-    // If a rate is already present, use it to compute the total
     final existingRate = double.tryParse(rateCtrl.text);
     if (existingRate != null && existingRate > 0) {
       final totalFreight = existingRate * km;
@@ -790,28 +775,23 @@ class GCFormController extends GetxController {
       return;
     }
 
-    // Otherwise, nothing to compute yet
     freightChargeCtrl.clear();
     calculatedGoodsTotal.value = '';
   }
 
-  // Update selected weight and calculate rate
   void onWeightSelected(WeightRate? weight) {
     selectedWeight.value = weight;
-    // Also update the actualWeightCtrl.text with the weight value so it gets sent to backend
     if (weight != null) {
       actualWeightCtrl.text = weight.weight;
     } else {
       actualWeightCtrl.clear();
     }
-    calculateRate(); // Recalculate rate and total when weight changes
+    calculateRate();
   }
 
-  // Attempts to pick a WeightRate for a given actual weight string and trigger recalculation
   void selectWeightForActualWeight(String weightStr) {
     final rate = pickWeightRateForActualWeight(weightStr);
     selectedWeight.value = rate;
-    // Also update the actualWeightCtrl.text with the weight value so it gets sent to backend
     if (rate != null) {
       actualWeightCtrl.text = rate.weight;
     } else {
@@ -820,8 +800,6 @@ class GCFormController extends GetxController {
     calculateRate();
   }
 
-  // Parses available weight rate labels and tries multiple strategies (including unit conversion)
-  // to match the given actual weight string
   WeightRate? pickWeightRateForActualWeight(String weightStr) {
     final cleanedInput = weightStr.trim().toLowerCase();
     final actualRaw = double.tryParse(cleanedInput.replaceAll(RegExp(r'[^0-9\.]'), ''));
@@ -834,20 +812,16 @@ class GCFormController extends GetxController {
       final labelRaw = wr.weight;
       final label = labelRaw.trim().toLowerCase();
 
-      // 1) Exact, case-insensitive text match
       if (label == cleanedInput) {
         exactTextMatch = wr;
         break;
       }
 
-      // 2) Contains match either way (handles labels like "19MT" vs input "19" or vice versa)
       if (label.contains(cleanedInput) || cleanedInput.contains(label)) {
         containsTextMatch ??= wr;
       }
 
-      // 3) Numeric-normalized matching (supports kg and ton inputs)
       if (actualRaw != null) {
-        // Try multiple interpretations: as-is, kg->tons, tons->kg
         final candidates = <double>{
           actualRaw,
           actualRaw / 1000.0,
@@ -864,7 +838,6 @@ class GCFormController extends GetxController {
           }
         }
 
-        // Also support common bracket-like labels (e.g., "0-250", ">250")
         final dash = RegExp(r'^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$');
         final plus = RegExp(r'^(\d+(?:\.\d+)?)\s*\+$');
         final above = RegExp(r'^(?:above|>)\s*(\d+(?:\.\d+)?)$');
@@ -917,10 +890,9 @@ class GCFormController extends GetxController {
       }
     }
 
-    return exactTextMatch ?? numericMatch ?? containsTextMatch; // best available
+    return exactTextMatch ?? numericMatch ?? containsTextMatch;
   }
 
-  // Calculate balance amount
   void _updateBalanceAmount() {
     try {
       final hireAmount = double.tryParse(hireAmountCtrl.text) ?? 0;
@@ -932,10 +904,6 @@ class GCFormController extends GetxController {
     }
   }
 
-
-  
-
-  // Fetch the next GC number for the user
   Future<String?> fetchNextGCNumber(String userId) async {
     try {
       final response = await http.get(
@@ -956,12 +924,10 @@ class GCFormController extends GetxController {
     }
   }
 
-  // Check if user has access to GC form
   Future<bool> checkGCAccess(String userId) async {
     try {
       isLoadingAccess.value = true;
-      
-      // First check active ranges
+
       final activeRangesResponse = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/gc-management/check-active-ranges/$userId'),
         headers: {'Content-Type': 'application/json'},
@@ -977,7 +943,6 @@ class GCFormController extends GetxController {
         }
       }
 
-      // If no active ranges, check for queued ranges
       final usageResponse = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/gc-management/usage/$userId'),
         headers: {'Content-Type': 'application/json'},
@@ -988,7 +953,7 @@ class GCFormController extends GetxController {
         if (usageData['success'] == true) {
           final ranges = List<Map<String, dynamic>>.from(usageData['data'] ?? []);
           final hasQueuedRange = ranges.any((range) => range['status'] == 'queued');
-          
+
           if (hasQueuedRange) {
             hasAccess.value = true;
             accessMessage.value = 'Queued GC range found';
@@ -998,7 +963,6 @@ class GCFormController extends GetxController {
         }
       }
 
-      // If we get here, no valid ranges were found
       hasAccess.value = false;
       accessMessage.value = 'No active or queued GC ranges found. Please contact admin.';
       return false;
@@ -1011,12 +975,9 @@ class GCFormController extends GetxController {
     }
   }
 
-  // Clear all form fields and reset state
   void clearForm() {
-    // Reset form validation state
     formKey.currentState?.reset();
-    
-    // Clear all text controllers
+
     gcNumberCtrl.clear();
     gcDateCtrl.clear();
     eDaysCtrl.clear();
@@ -1053,15 +1014,13 @@ class GCFormController extends GetxController {
     freightChargeCtrl.clear();
     billingAddressCtrl.clear();
     deliveryInstructionsCtrl.clear();
-    
-    // Reset reactive values
+
     gcDate.value = null;
     deliveryDate.value = null;
     ewayBillDate.value = null;
     ewayExpired.value = null;
     balanceAmount.value = '0.00';
-    
-    // Reset dropdowns to default values
+
     selectedTruck.value = 'Select Truck';
     selectedBroker.value = 'Select Broker';
     selectedDriver.value = '';
@@ -1071,75 +1030,55 @@ class GCFormController extends GetxController {
     selectedService.value = 'Express';
     selectedGstPayer.value = 'Consignor';
     selectedPackageMethod.value = 'Boxes';
-    
-    // Reset weight selection
+
     selectedWeight.value = null;
-    
-    // Clear edit mode
+
     isEditMode.value = false;
     editingGcNumber.value = '';
     editingCompanyId.value = '';
-    
-    // Clear calculated values
+
     calculatedGoodsTotal.value = '';
   }
 
-  // Helper method to format dates
   String formatDate(DateTime date) {
     return DateFormat('dd-MMM-yyyy').format(date);
   }
 
-  // Check GC usage and show warning if 5 or fewer GCs remaining
   Future<void> checkGCUsageAndWarn(String userId) async {
     if (userId.isEmpty) {
       debugPrint('checkGCUsageAndWarn: User ID is empty');
       return;
     }
-    
+
     try {
       final url = Uri.parse('${ApiConfig.baseUrl}/gc-management/gc-usage?userId=$userId');
       debugPrint('Fetching GC usage from: $url');
-      
+
       final response = await http.get(url);
       debugPrint('GC usage response status: ${response.statusCode}');
       debugPrint('GC usage response body: ${response.body}');
-      
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         debugPrint('Parsed GC usage data: $data');
-        
+
         if (data['success'] == true && data['data'] is List) {
           final usageList = data['data'] as List;
-          debugPrint('Found ${usageList.length} GC usage entries');
-          
-          // Debug print all entries
-          for (var i = 0; i < usageList.length; i++) {
-            debugPrint('GC Usage Entry $i: ${usageList[i]}');
-          }
-          
-          // Find the active GC range
+
           final activeRange = usageList.cast<Map<String, dynamic>>().firstWhere(
-            (item) {
-              final status = item['status']?.toString().toLowerCase();
-              debugPrint('Checking item with status: $status');
-              return status == 'active';
-            },
+                (item) => item['status']?.toString().toLowerCase() == 'active',
             orElse: () => <String, dynamic>{},
           );
-          
-          debugPrint('Active range found: ${activeRange.isNotEmpty}');
+
           if (activeRange.isNotEmpty) {
             final remaining = (activeRange['remainingGCs'] ?? 0) as int;
-            debugPrint('Remaining GCs: $remaining');
             final hasQueuedRange = usageList.any((item) => item['status'] == 'queued');
-            
-            // Only show warning if 5 or fewer GCs remaining AND no queued range available
+
             if (remaining <= 5 && !hasQueuedRange) {
               final message = 'Warning: Only $remaining GCs remaining in your current range (${activeRange['fromGC']}-${activeRange['toGC']}).\n\n'
                   '⚠️ No queued GC range available. Please contact admin to assign a new range.\n\n'
                   'Please request a new range soon!';
-                  
-              // Show as dialog
+
               if (Get.isDialogOpen != true) {
                 Get.dialog(
                   AlertDialog(
@@ -1160,23 +1099,22 @@ class GCFormController extends GetxController {
         }
       }
     } catch (e) {
-      // Fail silently - this is just a warning feature
       debugPrint('Error checking GC usage: $e');
     }
   }
 
   Future<void> submitFormToBackend() async {
     if (!formKey.currentState!.validate()) return;
-    
+
     isLoading.value = true;
-    
+
     final Map<String, dynamic> data = {
       'Branch': selectedBranch.value,
-      'BranchCode': selectedBranchCode.value, // Add if available
+      'BranchCode': selectedBranchCode.value,
       'GcNumber': gcNumberCtrl.text,
       'GcDate': gcDate.value?.toIso8601String(),
       'TruckNumber': selectedTruck.value,
-      'vechileNumber': selectedTruck.value, // Backend expects this field name
+      'vechileNumber': selectedTruck.value,
       'TruckType': truckTypeCtrl.text,
       'BrokerNameShow': selectedBroker.value,
       'BrokerName': selectedBroker.value,
@@ -1212,28 +1150,24 @@ class GCFormController extends GetxController {
       'Total': 0,
       'PoNumber': poNumberCtrl.text,
       'TripId': tripIdCtrl.text,
-      'DeliveryFromSpecial': deliveryInstructionsCtrl.text, // Add if available
+      'DeliveryFromSpecial': deliveryInstructionsCtrl.text,
       'DeliveryAddress': deliveryAddressCtrl.text,
-      'ServiceTax': selectedGstPayer.value, // Add if available
+      'ServiceTax': selectedGstPayer.value,
       'TotalRate': rateCtrl.text,
       'TotalWeight': actualWeightCtrl.text,
       'HireAmount': hireAmountCtrl.text,
       'AdvanceAmount': advanceAmountCtrl.text,
       'BalanceAmount': balanceAmount.value,
       'FreightCharge': freightChargeCtrl.text,
-      'Charges': 'FTL', // Hardcoded value for Charges field
-      'CompanyId': editingCompanyId.value.isNotEmpty ? editingCompanyId.value : '4', // Use stored company ID or default
+      'Charges': 'FTL',
+      'CompanyId': '6',
     };
 
     try {
       final Uri url;
       final http.Response response;
-      
+
       if (isEditMode.value && editingGcNumber.value.isNotEmpty) {
-        // Update existing GC
-        print('DEBUG: Updating GC - Eda value being sent to backend: ${data['Eda']}');
-        print('DEBUG: Updating GC - EBillExpDate value being sent to backend: ${data['EBillExpDate']}');
-        print('DEBUG: Updating GC - GoodContain (Nature of Goods) value being sent to backend: ${data['GoodContain']}');
         url = Uri.parse('${ApiConfig.baseUrl}/gc/updateGC/${editingGcNumber.value}');
         response = await http.put(
           url,
@@ -1241,13 +1175,11 @@ class GCFormController extends GetxController {
           body: jsonEncode(data),
         );
       } else {
-        // Create new GC
-        final idController = Get.find<IdController>();
-        final userId = idController.userId.value;
+        final userId = _idController.userId.value;
         if (userId.isEmpty) {
           throw Exception('User ID not found. Please login again.');
         }
-        
+
         url = Uri.parse('${ApiConfig.baseUrl}/gc/add?userId=$userId');
         response = await http.post(
           url,
@@ -1255,12 +1187,12 @@ class GCFormController extends GetxController {
           body: jsonEncode(data),
         );
       }
-      
+
       isLoading.value = false;
-      
+
       if (response.statusCode == 201 || response.statusCode == 200) {
         final message = isEditMode.value ? 'GC updated successfully!' : 'GC created successfully!';
-        
+
         Fluttertoast.showToast(
           msg: message,
           toastLength: Toast.LENGTH_SHORT,
@@ -1269,11 +1201,15 @@ class GCFormController extends GetxController {
           textColor: Colors.white,
           fontSize: 16.0,
         );
-        
-        // Clear the form after successful operation
+
+        // *** THIS IS THE CRITICAL CHANGE ***
+        // If a new GC was created, signal the GCUsageWidget to refresh.
+        if (!isEditMode.value) {
+          _idController.gcDataNeedsRefresh.value = true;
+        }
+
         clearForm();
-        
-        // Navigate back to GC list
+
         Get.until((route) => route.isFirst);
       } else {
         throw Exception('Server responded with status: ${response.statusCode}');

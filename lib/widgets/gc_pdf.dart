@@ -7,42 +7,69 @@ import 'package:printing/printing.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:logistic/controller/gc_form_controller.dart';
 
-
-
-
 class GCPdfGenerator {
   static Future<Uint8List> generatePDF(GCFormController controller) async {
     final pdf = pw.Document();
     final font = await PdfGoogleFonts.notoSansRegular();
     final boldFont = await PdfGoogleFonts.notoSansBold();
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.all(20),
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              _buildHeader(font, boldFont, controller),
-              pw.SizedBox(height: 5),
-              _buildMainContent(font, boldFont, controller),
-              pw.Spacer(),
-              _buildFooter(font, boldFont, controller),
-            ],
-          );
-        },
-      ),
-    );
+    // Create three copies with different headers
+    final copies = [
+      {'title': 'CONSIGNOR COPY', 'color': PdfColors.blue900},
+      {'title': 'CONSIGNEE COPY', 'color': PdfColors.green800},
+      {'title': 'DRIVER COPY', 'color': PdfColors.red800},
+    ];
+
+    for (var copy in copies) {
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4.landscape,
+          margin: const pw.EdgeInsets.all(20),
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                _buildHeader(font, boldFont, controller),
+                pw.SizedBox(height: 5),
+                _buildMainContent(font, boldFont, controller),
+                pw.Spacer(),
+                _buildFooter(font, boldFont, controller, copyTitle: copy['title'] as String),
+              ],
+            );
+          },
+        ),
+      );
+    }
 
     return pdf.save();
   }
 
+  static pw.Widget _buildCopyHeader(String title, PdfColor color, pw.Font boldFont) {
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.symmetric(vertical: 8),
+      decoration: pw.BoxDecoration(
+        color: color,
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+      ),
+      child: pw.Text(
+        title,
+        textAlign: pw.TextAlign.center,
+        style: pw.TextStyle(
+          font: boldFont,
+          fontSize: 14,
+          color: PdfColors.white,
+          fontWeight: pw.FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
   static pw.Widget _buildHeader(
-    pw.Font font,
-    pw.Font boldFont,
-    GCFormController controller,
-  ) {
+      pw.Font font,
+      pw.Font boldFont,
+      GCFormController controller,
+      ) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -232,34 +259,33 @@ class GCPdfGenerator {
                     ),
                     pw.Divider(height: 1, thickness: 1),
                     _buildFieldRow(
-                      'Date : ',
+                      'Date',
                       controller.gcDateCtrl.text,
                       font,
-                      height: 12,
                     ),
                     pw.Divider(height: 1, thickness: 1),
-                    _buildFieldRow('GSTIN : ', '33AAGPP5677A1ZS', font),
+                    _buildFieldRow('GSTIN', '33AAGPP5677A1ZS', font),
                     pw.Divider(height: 1, thickness: 1),
                     _buildFieldRow(
-                      'From : ',
+                      'From',
                       controller.fromCtrl.text,
                       font,
-                      height: 12,
+                      isAddress: true,
                     ),
                     pw.Divider(height: 1, thickness: 1),
-                    _buildFieldRow('PAN No : ', 'AAGPP5677A', font),
+                    _buildFieldRow('PAN No', 'AAGPP5677A', font),
                     pw.Divider(height: 1, thickness: 1),
                     _buildFieldRow(
-                      'To : ',
+                      'To',
                       controller.toCtrl.text,
                       font,
-                      height: 12,
+                      isAddress: true,
                     ),
                     pw.Divider(height: 1, thickness: 1),
-                    _buildFieldRow('SAC No.:', '996511', font),
+                    _buildFieldRow('SAC No ', '996511', font),
                     pw.Divider(height: 1, thickness: 1),
                     _buildFieldRow(
-                      'ETA : ',
+                      'ETA ',
                       controller.eDaysCtrl.text,
                       font,
                       height: 12,
@@ -275,22 +301,22 @@ class GCPdfGenerator {
   }
 
   static pw.Widget _buildMainContent(
-    pw.Font font,
-    pw.Font boldFont,
-    GCFormController controller,
-  ) {
+      pw.Font font,
+      pw.Font boldFont,
+      GCFormController controller,
+      ) {
     return pw.Column(
       children: [
         pw.Table(
           border: pw.TableBorder.all(width: 1),
           columnWidths: const {
-            0: pw.FlexColumnWidth(1), // Number of packages
-            1: pw.FlexColumnWidth(2.0), // Method of packages
-            2: pw.FlexColumnWidth(1), // Nature of goods
-            3: pw.FlexColumnWidth(2.0), // Actual Weight
-            4: pw.FlexColumnWidth(1.5), // Private Marks
-            5: pw.FlexColumnWidth(2.0), // Charges for
-            6: pw.FlexColumnWidth(2.0), // Value of
+            0: pw.FlexColumnWidth(1.3),
+            1: pw.FlexColumnWidth(1.7),
+            2: pw.FlexColumnWidth(1.3),
+            3: pw.FlexColumnWidth(1.7),
+            4: pw.FlexColumnWidth(1.5),
+            5: pw.FlexColumnWidth(2.0),
+            6: pw.FlexColumnWidth(2.0),
           },
           children: [
             pw.TableRow(
@@ -392,30 +418,6 @@ class GCPdfGenerator {
                 ]),
               ],
             ),
-            // Special Instructions Row
-            pw.TableRow(
-              children: [
-                _buildCell(
-                  'Special Instructions',
-                  boldFont,
-                  align: pw.TextAlign.left,
-                ),
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(4),
-                  child: pw.Text(
-                    controller.deliveryInstructionsCtrl.text,
-                    style: pw.TextStyle(font: font, fontSize: 9),
-                    textAlign: pw.TextAlign.left,
-                  ),
-                ),
-                // Fill remaining cells
-                _buildCell('', font),
-                _buildCell('', font),
-                _buildCell('', font),
-                _buildCell('', font),
-                _buildCell('', font),
-              ],
-            ),
             // Package Details Row
             pw.TableRow(
               children: [
@@ -488,10 +490,10 @@ class GCPdfGenerator {
   }
 
   static pw.Widget _buildChargesTable(
-    pw.Font font,
-    pw.Font boldFont,
-    GCFormController controller,
-  ) {
+      pw.Font font,
+      pw.Font boldFont,
+      GCFormController controller,
+      ) {
     return pw.Table(
       border: pw.TableBorder.all(width: 1),
       columnWidths: const {
@@ -521,6 +523,11 @@ class GCPdfGenerator {
                       controller.deliveryInstructionsCtrl.text,
                       style: pw.TextStyle(font: font, fontSize: 9),
                     ),
+                  ),
+                  pw.Spacer(),
+                  pw.Text(
+                    'GSTIN to paid by : Consignor / Consignee',
+                    style: pw.TextStyle(font: font, fontSize: 8),
                   ),
                 ],
               ),
@@ -558,35 +565,53 @@ class GCPdfGenerator {
               ),
             ),
             pw.Container(
-              height: 80,
+              height: 130,
               padding: const pw.EdgeInsets.all(3),
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
                 children: [
-                  pw.Text(
-                    'Frieght per Ton. C.M.',
-                    style: pw.TextStyle(font: font, fontSize: 8),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(top: 30.0, bottom: 2.0),
+                    child: pw.Text(
+                      'Frieght per Ton. C.M.',
+                      style: pw.TextStyle(font: font, fontSize: 8, height: 1.3),
+                    ),
                   ),
-                  pw.Text(
-                    'Surcharges (Goods/Tax)',
-                    style: pw.TextStyle(font: font, fontSize: 8),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 2.0),
+                    child: pw.Text(
+                      'Surcharges (Goods/Tax)',
+                      style: pw.TextStyle(font: font, fontSize: 8, height: 1.3),
+                    ),
                   ),
-                  pw.Text(
-                    'Hamali',
-                    style: pw.TextStyle(font: font, fontSize: 8),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 2.0),
+                    child: pw.Text(
+                      'Hamali',
+                      style: pw.TextStyle(font: font, fontSize: 8, height: 1.3),
+                    ),
                   ),
-                  pw.Text(
-                    'Risk Charges',
-                    style: pw.TextStyle(font: font, fontSize: 8),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 2.0),
+                    child: pw.Text(
+                      'Risk Charges',
+                      style: pw.TextStyle(font: font, fontSize: 8, height: 1.3),
+                    ),
                   ),
-                  pw.Text(
-                    'St. Charges',
-                    style: pw.TextStyle(font: font, fontSize: 8),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 2.0),
+                    child: pw.Text(
+                      'St. Charges',
+                      style: pw.TextStyle(font: font, fontSize: 8, height: 1.3),
+                    ),
                   ),
-                  pw.Text(
-                    'Total',
-                    style: pw.TextStyle(font: boldFont, fontSize: 9),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 2.0),
+                    child: pw.Text(
+                      'Total',
+                      style: pw.TextStyle(font: boldFont, fontSize: 9, height: 1.3),
+                    ),
                   ),
                 ],
               ),
@@ -647,10 +672,11 @@ class GCPdfGenerator {
   }
 
   static pw.Widget _buildFooter(
-    pw.Font font,
-    pw.Font boldFont,
-    GCFormController controller,
-  ) {
+      pw.Font font,
+      pw.Font boldFont,
+      GCFormController controller, {
+        required String copyTitle,
+      }) {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       crossAxisAlignment: pw.CrossAxisAlignment.end,
@@ -666,7 +692,7 @@ class GCPdfGenerator {
           ],
         ),
         pw.Text(
-          'Consignee Copy',
+          copyTitle,
           style: pw.TextStyle(
             font: boldFont,
             fontSize: 12,
@@ -688,13 +714,13 @@ class GCPdfGenerator {
   }
 
   static pw.Widget _buildAddressLabelCell(
-    String title,
-    pw.Font boldFont,
-    pw.Font font,
-  ) {
+      String title,
+      pw.Font boldFont,
+      pw.Font font,
+      ) {
     return pw.Container(
       padding: const pw.EdgeInsets.all(4),
-      height: 140, // Match the value cell height
+      height: 140,
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
@@ -727,14 +753,14 @@ class GCPdfGenerator {
   }
 
   static pw.Widget _buildAddressValueCell(
-    String name,
-    String address,
-    String gstin,
-    pw.Font font,
-  ) {
+      String name,
+      String address,
+      String gstin,
+      pw.Font font,
+      ) {
     return pw.Container(
       padding: const pw.EdgeInsets.all(4),
-      height: 140, // Increased total height more
+      height: 140,
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
@@ -751,7 +777,7 @@ class GCPdfGenerator {
               maxLines: 3,
             ),
           ),
-          pw.Spacer(), // This will push the GSTIN to the bottom
+          pw.Spacer(),
           pw.Container(
             height: 20,
             child: pw.Text(gstin, style: pw.TextStyle(font: font, fontSize: 8)),
@@ -762,10 +788,10 @@ class GCPdfGenerator {
   }
 
   static pw.Widget _buildCell(
-    String text,
-    pw.Font font, {
-    pw.TextAlign align = pw.TextAlign.left,
-  }) {
+      String text,
+      pw.Font font, {
+        pw.TextAlign align = pw.TextAlign.left,
+      }) {
     return pw.Container(
       padding: const pw.EdgeInsets.all(3),
       child: pw.Text(
@@ -787,23 +813,51 @@ class GCPdfGenerator {
   }
 
   static pw.Widget _buildFieldRow(
-    String label,
-    String value,
-    pw.Font font, {
-    double height = 15,
-  }) {
+      String label,
+      String value,
+      pw.Font font, {
+        double height = 15,
+        bool isAddress = false,
+        int maxLines = 1,
+      }) {
     return pw.Container(
-      height: height,
-      padding: const pw.EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+      height: isAddress ? 30 : height,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
-          pw.Expanded(
-            flex: 2,
-            child: pw.Text(label, style: pw.TextStyle(font: font, fontSize: 8)),
+          pw.Container(
+            width: 50,
+            child: pw.Text(
+              label,
+              style: pw.TextStyle(
+                font: font,
+                fontSize: 8,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+          ),
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(right: 4),
+            child: pw.Text(
+              ':',
+              style: pw.TextStyle(
+                font: font,
+                fontSize: 8,
+              ),
+            ),
           ),
           pw.Expanded(
-            flex: 3,
-            child: pw.Text(value, style: pw.TextStyle(font: font, fontSize: 8)),
+            child: pw.Text(
+              value,
+              style: pw.TextStyle(
+                font: font,
+                fontSize: isAddress ? 7 : 8,
+                lineSpacing: 1.1,
+              ),
+              maxLines: isAddress ? 2 : maxLines,
+              overflow: pw.TextOverflow.clip,
+            ),
           ),
         ],
       ),
@@ -825,9 +879,9 @@ class GCPdfGenerator {
   }
 
   static Future<void> showPdfPreview(
-    BuildContext context,
-    GCFormController controller,
-  ) async {
+      BuildContext context,
+      GCFormController controller,
+      ) async {
     final pdfData = await generatePDF(controller);
     final gcNumber = controller.gcNumberCtrl.text.isNotEmpty
         ? controller.gcNumberCtrl.text
@@ -847,20 +901,18 @@ class GCPdfGenerator {
     try {
       final pdfData = await generatePDF(controller);
       final directory = await getApplicationDocumentsDirectory();
-      
-      // Ensure we have a valid GC number or generate a timestamp-based one
+
       String gcNumber = controller.gcNumberCtrl.text.trim();
       if (gcNumber.isEmpty) {
         gcNumber = 'GC_${DateTime.now().millisecondsSinceEpoch}';
       } else if (!gcNumber.toUpperCase().startsWith('GC_')) {
         gcNumber = 'GC_$gcNumber';
       }
-      
-      // Ensure the filename ends with .pdf
+
       if (!gcNumber.toLowerCase().endsWith('.pdf')) {
         gcNumber = '$gcNumber.pdf';
       }
-      
+
       final file = File('${directory.path}/$gcNumber');
       await file.writeAsBytes(pdfData);
       print('PDF saved to: ${file.path}');
@@ -874,8 +926,7 @@ class GCPdfGenerator {
   static Future<void> sharePdf(GCFormController controller) async {
     try {
       final pdfData = await generatePDF(controller);
-      
-      // Generate consistent filename
+
       String gcNumber = controller.gcNumberCtrl.text.trim();
       if (gcNumber.isEmpty) {
         gcNumber = 'GC_${DateTime.now().millisecondsSinceEpoch}.pdf';
@@ -887,9 +938,9 @@ class GCPdfGenerator {
           gcNumber = '$gcNumber.pdf';
         }
       }
-      
+
       await Printing.sharePdf(
-        bytes: pdfData, 
+        bytes: pdfData,
         filename: gcNumber,
       );
     } catch (e) {
@@ -901,13 +952,12 @@ class GCPdfGenerator {
   static Future<void> printPdf(GCFormController controller) async {
     try {
       final pdfData = await generatePDF(controller);
-      
-      // Generate consistent document name for printing
+
       String docName = 'GC_${controller.gcNumberCtrl.text.trim()}.pdf';
       if (docName == 'GC_.pdf') {
         docName = 'GC_${DateTime.now().millisecondsSinceEpoch}.pdf';
       }
-      
+
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdfData,
         name: docName,
@@ -931,10 +981,8 @@ class PDFPreviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Get the GC number from the controller
     final gcNumber = GCFormController().gcNumberCtrl.text.trim();
-    
-    // Generate the display name with proper GC_ prefix and .pdf extension
+
     String displayName = 'document.pdf';
     if (filename.isNotEmpty) {
       displayName = filename.split('/').last;
@@ -944,7 +992,7 @@ class PDFPreviewScreen extends StatelessWidget {
         displayName = '$displayName.pdf';
       }
     }
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text('PDF Preview - $displayName'),
@@ -953,7 +1001,7 @@ class PDFPreviewScreen extends StatelessWidget {
             icon: const Icon(Icons.share),
             onPressed: () async {
               await Printing.sharePdf(
-                bytes: pdfData, 
+                bytes: pdfData,
                 filename: displayName,
               );
             },

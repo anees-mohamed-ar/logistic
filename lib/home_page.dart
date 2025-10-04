@@ -21,7 +21,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _checkGCAccessAndNavigate({bool toForm = false}) async {
     final idController = Get.find<IdController>();
     final userId = idController.userId.value;
-    
+
     if (userId.isEmpty) {
       Get.snackbar(
         'Error',
@@ -37,22 +37,30 @@ class _HomePageState extends State<HomePage> {
       const Center(child: CircularProgressIndicator()),
       barrierDismissible: false,
     );
-    
+
     try {
       // Get the existing controller or create a new one if it doesn't exist
       final gcFormController = Get.put(GCFormController(), permanent: true);
       final hasAccess = await gcFormController.checkGCAccess(userId);
-      
+
       // Close loading dialog
       if (Get.isDialogOpen ?? false) Get.back();
-      
+
       if (hasAccess) {
         // Navigate to appropriate screen based on the action
         if (toForm) {
           // Clear the form before navigating to it
           gcFormController.clearForm();
           // Navigate to GC form for new note
-          Get.toNamed(AppRoutes.gcForm);
+          final result = await Get.toNamed(AppRoutes.gcForm);
+
+          // Check if GC was successfully created (assuming your gcForm sends back a signal or we check here)
+          // For simplicity, we can trigger a refresh signal *after* the form is closed
+          // and assuming the GCFormController internally signals success.
+          // The most robust way is to ensure GCFormController sets gcDataNeedsRefresh upon successful creation.
+          // However, if gcFormController is not managing that directly, you could also
+          // re-check here if 'result' indicates a successful creation from the GCForm.
+          // For this setup, we rely on GCFormController to set the flag.
         } else {
           // Navigate to GC list
           Get.toNamed(AppRoutes.gcList);
@@ -73,7 +81,7 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       // Close loading dialog if still open
       if (Get.isDialogOpen ?? false) Get.back();
-      
+
       // Show error message
       Get.snackbar(
         'Error',

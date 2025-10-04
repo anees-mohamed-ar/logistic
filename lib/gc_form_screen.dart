@@ -488,6 +488,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     context,
                     controller.gcDate,
                     textController: controller.gcDateCtrl,
+                    restrictToToday: true, // Only allow dates up to today for GC date
                   ),
                   validator: null,
                 ),

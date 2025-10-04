@@ -11,6 +11,9 @@ class IdController extends GetxController {
   var phoneNumber = ''.obs;
   var userRole = ''.obs; // Added user role field
 
+  // NEW: RxBool to signal when GC usage data needs a refresh.
+  var gcDataNeedsRefresh = false.obs;
+
   void setUserId(String id) {
     userId.value = id;
   }
@@ -42,11 +45,11 @@ class IdController extends GetxController {
   void setPhoneNumber(String number) {
     phoneNumber.value = number;
   }
-  
+
   void setUserRole(String role) {
     userRole.value = role;
   }
-  
+
   // Clear all user data on logout
   void clearUserData() {
     userId.value = '';
@@ -58,6 +61,7 @@ class IdController extends GetxController {
     bloodGroup.value = '';
     phoneNumber.value = '';
     userRole.value = '';
+    gcDataNeedsRefresh.value = false; // Also reset the flag
   }
 
   void setAllUserData(Map<String, dynamic> userData) {
@@ -81,5 +85,6 @@ class IdController extends GetxController {
     companyName.value = '';
     bloodGroup.value = '';
     phoneNumber.value = '';
+    gcDataNeedsRefresh.value = false;
   }
 }

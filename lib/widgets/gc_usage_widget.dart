@@ -17,10 +17,29 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
   List<GCUsageData> _usageData = [];
   String? _errorMessage;
 
+  // Get the IdController instance
+  final IdController _idController = Get.find<IdController>();
+  // Worker to manage the `ever` listener subscription
+  late Worker _gcDataRefreshWorker;
+
   @override
   void initState() {
     super.initState();
     _fetchGCUsage();
+
+    // Listen for changes in _idController.gcDataNeedsRefresh
+    _gcDataRefreshWorker = ever(_idController.gcDataNeedsRefresh, (bool needsRefresh) {
+      if (needsRefresh) {
+        _fetchGCUsage(); // Re-fetch data
+        _idController.gcDataNeedsRefresh.value = false; // Reset the flag
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _gcDataRefreshWorker.dispose(); // Dispose the worker to prevent memory leaks
+    super.dispose();
   }
 
   Future<void> _fetchGCUsage() async {
@@ -30,8 +49,7 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
     });
 
     try {
-      final idController = Get.find<IdController>();
-      final userId = idController.userId.value;
+      final userId = _idController.userId.value;
 
       if (userId.isEmpty) {
         setState(() {
@@ -61,7 +79,8 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
           });
         } else {
           setState(() {
-            _errorMessage = 'No usage data available';
+            // This handles cases where API returns success:true but data is empty or null
+            _usageData = [];
             _isLoading = false;
           });
         }
@@ -87,8 +106,89 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
       return _buildLoadingCard();
     }
 
-    if (_errorMessage != null || _usageData.isEmpty) {
-      return const SizedBox.shrink(); // Don't show anything if there's an error or no data
+    if (_errorMessage != null) {
+      return const SizedBox.shrink(); // Don't show anything if there's an error
+    }
+
+    if (_usageData.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+        padding: const EdgeInsets.all(20.0),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(12.0),
+          border: Border.all(color: Colors.blue.shade100, width: 1.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8.0),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.info_outline, color: Colors.blue, size: 24.0),
+                ),
+                const SizedBox(width: 16.0),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'No Active GC Ranges',
+                        style: TextStyle(
+                          color: Colors.blue.shade900,
+                          fontSize: 16.0,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8.0),
+                      Text(
+                        "You don't have any active GC ranges to create GCs. Please contact admin to get GC ranges assigned.",
+                        style: TextStyle(
+                          color: Colors.blue.shade800,
+                          fontSize: 14.0,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _fetchGCUsage,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('Refresh'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.blue.shade800,
+                    side: BorderSide(color: Colors.blue.shade300),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
     }
 
     return Column(
@@ -172,170 +272,170 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
     final statusText = usage.status == 'active' ? 'Active' : 'Queued';
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(
-        minWidth: 280,
-        maxWidth: 400,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: statusColor.withOpacity(0.3),
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: statusColor.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+        constraints: const BoxConstraints(
+          minWidth: 280,
+          maxWidth: 400,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-            // Header with status badge
-            Row(
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: statusColor.withOpacity(0.3),
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: statusColor.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Icon(
-                    usage.status == 'active'
-                        ? Icons.assignment_turned_in_outlined
-                        : Icons.schedule_outlined,
-                    color: statusColor,
-                    size: 14,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'GC: ${usage.fromGC}-${usage.toGC}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E2A44),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                // Header with status badge
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      Text(
-                        '${usage.status == 'active' ? 'Last used GC' : 'Current GC'}: ${usage.currentGC}',
+                      child: Icon(
+                        usage.status == 'active'
+                            ? Icons.assignment_turned_in_outlined
+                            : Icons.schedule_outlined,
+                        color: statusColor,
+                        size: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'GC: ${usage.fromGC}-${usage.toGC}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E2A44),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '${usage.status == 'active' ? 'Last used GC' : 'Current GC'}: ${usage.currentGC}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[600],
+                              height: 1.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        statusText,
                         style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey[600],
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: statusColor,
                           height: 1.2,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    statusText,
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                      color: statusColor,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Usage Stats
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildStatBox(
-                  'Total',
-                  usage.totalGCs.toString(),
-                  Icons.format_list_numbered,
-                  const Color(0xFF4A90E2),
-                ),
-                _buildStatBox(
-                  'Used',
-                  usage.usedGCs.toString(),
-                  Icons.check_circle_outline,
-                  const Color(0xFF34A853),
-                ),
-                _buildStatBox(
-                  'Remaining',
-                  usage.remainingGCs.toString(),
-                  Icons.pending_outlined,
-                  const Color(0xFFFBBC05),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Progress Bar
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        'Usage Progress',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[700],
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${usage.percentageUsed.toStringAsFixed(1)}%',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: statusColor,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: usage.percentageUsed / 100,
-                    backgroundColor: Colors.grey[200],
-                    valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-                    minHeight: 6,
-                  ),
+                const SizedBox(height: 8),
+
+                // Usage Stats
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildStatBox(
+                      'Total',
+                      usage.totalGCs.toString(),
+                      Icons.format_list_numbered,
+                      const Color(0xFF4A90E2),
+                    ),
+                    _buildStatBox(
+                      'Used',
+                      usage.usedGCs.toString(),
+                      Icons.check_circle_outline,
+                      const Color(0xFF34A853),
+                    ),
+                    _buildStatBox(
+                      'Remaining',
+                      usage.remainingGCs.toString(),
+                      Icons.pending_outlined,
+                      const Color(0xFFFBBC05),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Progress Bar
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Usage Progress',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[700],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${usage.percentageUsed.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: usage.percentageUsed / 100,
+                        backgroundColor: Colors.grey[200],
+                        valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                        minHeight: 6,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-      )
+          ),
+        )
     );
   }
 
