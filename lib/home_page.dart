@@ -7,6 +7,9 @@ import 'package:logistic/widgets/main_layout.dart';
 import 'package:logistic/controller/id_controller.dart';
 import 'routes.dart';
 import 'package:logistic/widgets/gc_usage_widget.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:logistic/api_config.dart'; // Assuming you have this file
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -15,8 +18,125 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   bool _showAllActions = false;
+
+  // State for summary data
+  List<Map<String, dynamic>> _gcList = [];
+  bool _isSummaryLoading = true;
+  String? _summaryError;
+  late AnimationController _animationController;
+  late Animation<double> _totalGCsAnim,
+      _totalHireAnim,
+      _totalAdvanceAnim,
+      _totalFreightAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSummaryData();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _setupAnimations();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _setupAnimations() {
+    // Initialize with default empty tweens
+    _totalGCsAnim = Tween<double>(begin: 0, end: 0).animate(
+        CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic));
+    _totalHireAnim = Tween<double>(begin: 0, end: 0).animate(
+        CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic));
+    _totalAdvanceAnim = Tween<double>(begin: 0, end: 0).animate(
+        CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic));
+    _totalFreightAnim = Tween<double>(begin: 0, end: 0).animate(
+        CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic));
+  }
+
+  void _updateAnimations() {
+    final totalGCs = _gcList.length.toDouble();
+    final totalHireAmount =
+    _gcList.fold(0.0, (sum, gc) => sum + _parseDouble(gc['HireAmount']));
+    final totalAdvanceAmount =
+    _gcList.fold(0.0, (sum, gc) => sum + _parseDouble(gc['AdvanceAmount']));
+    final totalFreightCharge =
+    _gcList.fold(0.0, (sum, gc) => sum + _parseDouble(gc['FreightCharge']));
+
+    setState(() {
+      _totalGCsAnim = Tween<double>(begin: 0, end: totalGCs).animate(
+          CurvedAnimation(
+              parent: _animationController, curve: Curves.easeOutCubic));
+      _totalHireAnim = Tween<double>(begin: 0, end: totalHireAmount).animate(
+          CurvedAnimation(
+              parent: _animationController, curve: Curves.easeOutCubic));
+      _totalAdvanceAnim =
+          Tween<double>(begin: 0, end: totalAdvanceAmount).animate(
+              CurvedAnimation(
+                  parent: _animationController, curve: Curves.easeOutCubic));
+      _totalFreightAnim =
+          Tween<double>(begin: 0, end: totalFreightCharge).animate(
+              CurvedAnimation(
+                  parent: _animationController, curve: Curves.easeOutCubic));
+    });
+    _animationController.forward(from: 0);
+  }
+
+  Future<void> _fetchSummaryData() async {
+    if (!mounted) return;
+    setState(() {
+      _isSummaryLoading = true;
+      _summaryError = null;
+    });
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}/gc/search');
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _gcList = data.cast<Map<String, dynamic>>();
+          _isSummaryLoading = false;
+        });
+        _updateAnimations();
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _summaryError = 'Failed to load summary data';
+          _isSummaryLoading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _summaryError = 'An error occurred: $e';
+        _isSummaryLoading = false;
+      });
+    }
+  }
+
+  double _parseDouble(dynamic value) {
+    if (value == null) return 0.0;
+    try {
+      return double.parse(value.toString());
+    } catch (_) {
+      return 0.0;
+    }
+  }
+
+  String _formatCurrency(double amount) {
+    // Basic currency formatting for Indian Rupee
+    if (amount >= 100000) {
+      return '₹${(amount / 100000).toStringAsFixed(2)}L';
+    }
+    return '₹${amount.toStringAsFixed(0)}';
+  }
 
   Future<void> _checkGCAccessAndNavigate({bool toForm = false}) async {
     final idController = Get.find<IdController>();
@@ -54,13 +174,10 @@ class _HomePageState extends State<HomePage> {
           // Navigate to GC form for new note
           final result = await Get.toNamed(AppRoutes.gcForm);
 
-          // Check if GC was successfully created (assuming your gcForm sends back a signal or we check here)
-          // For simplicity, we can trigger a refresh signal *after* the form is closed
-          // and assuming the GCFormController internally signals success.
-          // The most robust way is to ensure GCFormController sets gcDataNeedsRefresh upon successful creation.
-          // However, if gcFormController is not managing that directly, you could also
-          // re-check here if 'result' indicates a successful creation from the GCForm.
-          // For this setup, we rely on GCFormController to set the flag.
+          // After returning from form, refresh the summary data
+          if (result == 'success') {
+            _fetchSummaryData();
+          }
         } else {
           // Navigate to GC list
           Get.toNamed(AppRoutes.gcList);
@@ -127,10 +244,13 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 32),
 
               // Summary Cards
-              _buildSummaryCards(isSmallScreen).animate()
+              if (isAdmin) ...[
+                _buildSummaryCards(isSmallScreen)
+                  .animate()
                   .slideX(duration: 600.ms, begin: -0.2)
                   .fadeIn(duration: 800.ms),
-              const SizedBox(height: 32),
+              const SizedBox(height: 32)
+              ],
 
               if (!isAdmin) ...[
                 const SizedBox(height: 32),
@@ -242,53 +362,41 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildSummaryCards(bool isSmallScreen) {
+    if (_isSummaryLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_summaryError != null) {
+      return Center(
+          child: Text(_summaryError!, style: const TextStyle(color: Colors.red)));
+    }
+
     final cards = [
       _buildSummaryCard(
         'Total GCs',
-        '120',
+        _totalGCsAnim,
         Icons.assignment_outlined,
         const Color(0xFF4A90E2),
-        '+12%',
-        true,
+        isCount: true,
       ),
       _buildSummaryCard(
-        'In Transit',
-        '32',
+        'Total Hire',
+        _totalHireAnim,
         Icons.local_shipping_outlined,
         const Color(0xFFFBBC05),
-        '+5%',
-        true,
       ),
       _buildSummaryCard(
-        'Delivered',
-        '70',
-        Icons.check_circle_outline,
+        'Total Advance',
+        _totalAdvanceAnim,
+        Icons.payments_outlined,
         const Color(0xFF34A853),
-        '+8%',
-        true,
       ),
       _buildSummaryCard(
-        'Pending',
-        '18',
-        Icons.access_time_outlined,
+        'Total Freight',
+        _totalFreightAnim,
+        Icons.receipt_long_outlined,
         const Color(0xFFEA4335),
-        '-2%',
-        false,
       ),
     ];
-
-    if (!isSmallScreen) {
-      cards.add(
-        _buildSummaryCard(
-          'Revenue',
-          '₹2.5L',
-          Icons.trending_up_outlined,
-          const Color(0xFF388E3C),
-          '+15%',
-          true,
-        ),
-      );
-    }
 
     if (isSmallScreen) {
       return SizedBox(
@@ -303,10 +411,11 @@ class _HomePageState extends State<HomePage> {
     } else {
       return Row(
         children: cards
-            .map((card) => Expanded(child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-          child: card,
-        )))
+            .map((card) => Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: card,
+            )))
             .toList(),
       );
     }
@@ -314,12 +423,11 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildSummaryCard(
       String title,
-      String value,
+      Animation<double> animation,
       IconData icon,
-      Color color,
-      String change,
-      bool isPositive,
-      ) {
+      Color color, {
+        bool isCount = false,
+      }) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -337,54 +445,31 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6), // Reduced from 8 to 6
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, color: color, size: 18), // Reduced from 20 to 18
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isPositive ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isPositive ? Icons.trending_up : Icons.trending_down,
-                        size: 12,
-                        color: isPositive ? Colors.green : Colors.red,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        change,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: isPositive ? Colors.green : Colors.red,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            Container(
+              padding: const EdgeInsets.all(6), // Reduced from 8 to 6
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child:
+              Icon(icon, color: color, size: 18), // Reduced from 20 to 18
             ),
             const SizedBox(height: 16),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 22, // Reduced from 24 to 22
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E2A44),
-                height: 1.1, // Added to reduce line height
-              ),
+            AnimatedBuilder(
+              animation: animation,
+              builder: (context, child) {
+                return Text(
+                  isCount
+                      ? animation.value.toInt().toString()
+                      : _formatCurrency(animation.value),
+                  style: const TextStyle(
+                    fontSize: 22, // Reduced from 24 to 22
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E2A44),
+                    height: 1.1, // Added to reduce line height
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 4),
             Text(
@@ -402,7 +487,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildQuickActionsSection(BuildContext context, bool isSmallScreen, bool isAdmin) {
+  Widget _buildQuickActionsSection(
+      BuildContext context, bool isSmallScreen, bool isAdmin) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -423,7 +509,8 @@ class _HomePageState extends State<HomePage> {
                   _showAllActions = !_showAllActions;
                 });
               },
-              icon: Icon(_showAllActions ? Icons.view_list : Icons.grid_view, size: 16),
+              icon: Icon(_showAllActions ? Icons.view_list : Icons.grid_view,
+                  size: 16),
               label: Text(_showAllActions ? 'Show Less' : 'View All'),
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFF4A90E2),
@@ -437,7 +524,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildActionGrid(BuildContext context, bool isSmallScreen, bool isAdmin) {
+  Widget _buildActionGrid(
+      BuildContext context, bool isSmallScreen, bool isAdmin) {
     final primaryActions = [
       _ActionData(
         icon: Icons.note_add_outlined,
@@ -470,7 +558,8 @@ class _HomePageState extends State<HomePage> {
         ),
     ];
 
-    final managementActions = isAdmin ? [
+    final managementActions = isAdmin
+        ? [
       _ActionData(
         icon: Icons.assignment_outlined,
         title: 'GC Assignment',
@@ -562,7 +651,8 @@ class _HomePageState extends State<HomePage> {
         color: const Color(0xFF757575),
         onTap: () {},
       ),
-    ] : [
+    ]
+        : [
       _ActionData(
         icon: Icons.settings_outlined,
         title: 'Settings',
@@ -573,9 +663,8 @@ class _HomePageState extends State<HomePage> {
     ];
 
     // Show limited actions initially
-    final actionsToShow = _showAllActions
-        ? [...primaryActions, ...managementActions]
-        : primaryActions;
+    final actionsToShow =
+    _showAllActions ? [...primaryActions, ...managementActions] : primaryActions;
 
     return Column(
       children: [
@@ -587,7 +676,9 @@ class _HomePageState extends State<HomePage> {
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
           childAspectRatio: isSmallScreen ? 1.1 : 1.2,
-          children: actionsToShow.map((action) => _buildEnhancedActionCard(context, action)).toList(),
+          children: actionsToShow
+              .map((action) => _buildEnhancedActionCard(context, action))
+              .toList(),
         ),
 
         // Show management section label when expanded and admin
@@ -751,7 +842,8 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             const SizedBox(height: 16),
-            ...notifications.map((notification) => _buildNotificationItem(notification)),
+            ...notifications
+                .map((notification) => _buildNotificationItem(notification)),
           ],
         ),
       ),
@@ -848,10 +940,14 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildStatItem('Active Routes', '24', Icons.route, const Color(0xFF4A90E2)),
-            _buildStatItem('Drivers Available', '18', Icons.person, const Color(0xFF34A853)),
-            _buildStatItem('Fuel Efficiency', '12.5 km/L', Icons.local_gas_station, const Color(0xFFFF9800)),
-            _buildStatItem('On-Time Delivery', '94.2%', Icons.schedule, const Color(0xFF9C27B0)),
+            _buildStatItem(
+                'Active Routes', '24', Icons.route, const Color(0xFF4A90E2)),
+            _buildStatItem('Drivers Available', '18', Icons.person,
+                const Color(0xFF34A853)),
+            _buildStatItem('Fuel Efficiency', '12.5 km/L',
+                Icons.local_gas_station, const Color(0xFFFF9800)),
+            _buildStatItem('On-Time Delivery', '94.2%', Icons.schedule,
+                const Color(0xFF9C27B0)),
           ],
         ),
       ),
@@ -1021,7 +1117,8 @@ class _HomePageState extends State<HomePage> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: activity.color.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
@@ -1041,7 +1138,8 @@ class _HomePageState extends State<HomePage> {
                         child: LinearProgressIndicator(
                           value: activity.progress,
                           backgroundColor: Colors.grey[200],
-                          valueColor: AlwaysStoppedAnimation<Color>(activity.color),
+                          valueColor:
+                          AlwaysStoppedAnimation<Color>(activity.color),
                         ),
                       ),
                   ],

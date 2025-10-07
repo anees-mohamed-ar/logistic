@@ -56,6 +56,7 @@ class GCPdfGenerator {
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
+            // LEFT SECTION: Logo and Company Info
             pw.Expanded(
               flex: 3,
               child: pw.Row(
@@ -97,7 +98,7 @@ class GCPdfGenerator {
                         pw.Row(
                           children: [
                             pw.Text(
-                              'Head Office',
+                              'Head Office : ',
                               style: pw.TextStyle(font: font, fontSize: 8),
                             ),
                             pw.Container(
@@ -137,34 +138,37 @@ class GCPdfGenerator {
                             _buildCheckboxWithLabel('BHARUCH', font),
                           ],
                         ),
-                        pw.SizedBox(height: 2),
+                        pw.SizedBox(height: 5),
                         pw.Row(
                           children: [
-                            pw.Text(
-                              "OWNER'S RISK",
-                              style: pw.TextStyle(font: boldFont, fontSize: 8),
-                            ),
-                            pw.SizedBox(width: 10),
+                            pw.SizedBox(width: 60),
                             _buildCheckboxWithLabel('KRISHNAPATNAM', font),
                             pw.SizedBox(width: 8),
                             _buildCheckboxWithLabel('SRI KALAHASTI', font),
                           ],
                         ),
+
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-            pw.Expanded(
-              flex: 1,
+
+            pw.SizedBox(width: 10),
+
+            // CENTER SECTION: Jurisdiction text
+            pw.Container(
+              width: 100,
               child: pw.Column(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
                 children: [
                   pw.Text(
                     'Subject to Chennai Jurisdiction',
                     style: pw.TextStyle(font: font, fontSize: 8),
                     textAlign: pw.TextAlign.center,
                   ),
+                  pw.SizedBox(height: 2),
                   pw.Text(
                     'Consignment Note',
                     style: pw.TextStyle(font: font, fontSize: 8),
@@ -173,106 +177,293 @@ class GCPdfGenerator {
                 ],
               ),
             ),
-            pw.Expanded(
-              flex: 2,
-              child: pw.Container(
-                decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Table(
-                      border: pw.TableBorder(bottom: pw.BorderSide(width: 1)),
-                      columnWidths: const {
-                        0: pw.FlexColumnWidth(2),
-                        1: pw.FlexColumnWidth(3),
-                      },
+
+            pw.SizedBox(width: 10),
+
+            // RIGHT SECTION: The bordered table - EXACTLY like image
+            pw.Container(
+              width: 250,
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(width: 1),
+              ),
+              child: pw.Column(
+                children: [
+                  // Row 1 & 2 Combined: Truck No spans 2 rows (left) | No + GC value (top right) | Date (bottom right)
+                  pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      // Left: Truck No label and value spanning both rows
+                      pw.Expanded(
+                        child: pw.Container(
+                          height: 42, // Combined height of both rows
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border(
+                              right: pw.BorderSide(width: 1),
+                              bottom: pw.BorderSide(width: 1),
+                            ),
+                          ),
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            mainAxisAlignment: pw.MainAxisAlignment.center,
+                            children: [
+                              pw.Text(
+                                'Truck No. :',
+                                style: pw.TextStyle(font: font, fontSize: 7.5),
+                              ),
+                              pw.SizedBox(height: 2),
+                              pw.Text(
+                                controller.truckNumberCtrl.text,
+                                style: pw.TextStyle(font: boldFont, fontSize: 8),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Right: Stacked rows for No./GC and Date
+                      pw.Column(
+                        children: [
+                          // Top: No label + GC value
+                          pw.Container(
+                            width: 160,
+                            height: 28,
+                            decoration: pw.BoxDecoration(
+                              border: pw.Border(bottom: pw.BorderSide(width: 1)),
+                            ),
+                            child: pw.Row(
+                              children: [
+                                pw.Container(
+                                  width: 30,
+                                  padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  decoration: pw.BoxDecoration(
+                                    border: pw.Border(right: pw.BorderSide(width: 1)),
+                                  ),
+                                  child: pw.Center(
+                                    child: pw.Text(
+                                      'No.',
+                                      style: pw.TextStyle(font: font, fontSize: 7.5),
+                                    ),
+                                  ),
+                                ),
+                                pw.Expanded(
+                                  child: pw.Container(
+                                    padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                    child: pw.Center(
+                                      child: pw.Row(
+                                        mainAxisAlignment: pw.MainAxisAlignment.center,
+                                        children: [
+                                          pw.Text(
+                                            ': ',
+                                            style: pw.TextStyle(font: font, fontSize: 7.5),
+                                          ),
+                                          pw.Text(
+                                            controller.gcNumberCtrl.text,
+                                            style: pw.TextStyle(font: boldFont, fontSize: 10),
+                                          ),
+                                          pw.Text(
+                                            ' / ',
+                                            style: pw.TextStyle(font: font, fontSize: 8),
+                                          ),
+                                          pw.Text(
+                                            '25-26',
+                                            style: pw.TextStyle(font: font, fontSize: 8),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // FIX: Bottom: Date with value from controller
+                          pw.Container(
+                            width: 160,
+                            height: 14,
+                            decoration: pw.BoxDecoration(
+                              border: pw.Border(bottom: pw.BorderSide(width: 1)),
+                            ),
+                            padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            child: pw.Row(
+                              children: [
+                                pw.Text(
+                                  'Date   :   ',
+                                  style: pw.TextStyle(font: font, fontSize: 7.5),
+                                ),
+                                pw.Text(
+                                  controller.gcDateCtrl.text,
+                                  style: pw.TextStyle(font: boldFont, fontSize: 8),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  // Row 3: GSTIN label + value (left) | From label + value (right)
+                  pw.Container(
+                    height: 28,
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border(bottom: pw.BorderSide(width: 1)),
+                    ),
+                    child: pw.Row(
                       children: [
-                        pw.TableRow(
-                          children: [
-                            pw.Container(
-                              padding: const pw.EdgeInsets.all(2),
-                              child: pw.Row(
-                                children: [
-                                  pw.Text(
-                                    'Truck No : ',
-                                    style: pw.TextStyle(
-                                      font: font,
-                                      fontSize: 8,
-                                    ),
-                                  ),
-                                  pw.Text(
-                                    controller.truckNumberCtrl.text,
-                                    style: pw.TextStyle(
-                                      font: boldFont,
-                                      fontSize: 8,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                        pw.Expanded(
+                          child: pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            decoration: pw.BoxDecoration(
+                              border: pw.Border(right: pw.BorderSide(width: 1)),
                             ),
-                            pw.Container(
-                              padding: const pw.EdgeInsets.all(2),
-                              child: pw.Row(
-                                mainAxisAlignment: pw.MainAxisAlignment.end,
-                                children: [
-                                  pw.Text(
-                                    'GC No : ',
-                                    style: pw.TextStyle(
-                                      font: font,
-                                      fontSize: 8,
-                                    ),
-                                  ),
-                                  pw.Text(
-                                    '${controller.gcNumberCtrl.text}  / 25-26',
-                                    style: pw.TextStyle(
-                                      font: boldFont,
-                                      fontSize: 9,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            child: pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              mainAxisAlignment: pw.MainAxisAlignment.center,
+                              children: [
+                                pw.Text(
+                                  'GSTIN :',
+                                  style: pw.TextStyle(font: font, fontSize: 7.5),
+                                ),
+                                pw.SizedBox(height: 2),
+                                pw.Text(
+                                  '33AAGPP5677A1ZS',
+                                  style: pw.TextStyle(font: boldFont, fontSize: 7.5),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
+                        ),
+                        pw.Container(
+                          width: 130,
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            mainAxisAlignment: pw.MainAxisAlignment.center,
+                            children: [
+                              pw.Text(
+                                'From',
+                                style: pw.TextStyle(font: font, fontSize: 7.5),
+                              ),
+                              pw.SizedBox(height: 2),
+                              pw.Text(
+                                controller.fromCtrl.text,
+                                style: pw.TextStyle(font: boldFont, fontSize: 7),
+                                maxLines: 1,
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                    pw.Divider(height: 1, thickness: 1),
-                    _buildFieldRow(
-                      'Date',
-                      controller.gcDateCtrl.text,
-                      font,
-                    ),
-                    pw.Divider(height: 1, thickness: 1),
-                    _buildFieldRow('GSTIN', '33AAGPP5677A1ZS', font),
-                    pw.Divider(height: 1, thickness: 1),
-                    _buildFieldRow('PAN No', 'AAGPP5677A', font),
-                    pw.Divider(height: 1, thickness: 1),
-                    _buildFieldRow('SAC No ', '996511', font),
-                    pw.Divider(height: 1, thickness: 1),
-                    _buildFieldRow(
-                      'From',
-                      controller.fromCtrl.text,
-                      font,
-                      isAddress: true,
-                    ),
+                  ),
 
-                    pw.Divider(height: 1, thickness: 1),
-                    _buildFieldRow(
-                      'To',
-                      controller.toCtrl.text,
-                      font,
-                      isAddress: true,
+                  // Row 4: PAN No label + value (left) | To label + value (right)
+                  pw.Container(
+                    height: 28,
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border(bottom: pw.BorderSide(width: 1)),
                     ),
+                    child: pw.Row(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Expanded(
+                          child: pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            decoration: pw.BoxDecoration(
+                              border: pw.Border(right: pw.BorderSide(width: 1)),
+                            ),
+                            child: pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              mainAxisAlignment: pw.MainAxisAlignment.center,
+                              children: [
+                                pw.Text(
+                                  'PAN No.: ',
+                                  style: pw.TextStyle(font: font, fontSize: 7.5),
+                                ),
+                                pw.SizedBox(height: 2),
+                                pw.Text(
+                                  'AAGPP5677A',
+                                  style: pw.TextStyle(font: boldFont, fontSize: 7.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        pw.Container(
+                          width: 130,
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            mainAxisAlignment: pw.MainAxisAlignment.center,
+                            children: [
+                              pw.Text(
+                                'To',
+                                style: pw.TextStyle(font: font, fontSize: 7.5),
+                              ),
+                              pw.SizedBox(height: 2),
+                              pw.Text(
+                                controller.toCtrl.text,
+                                style: pw.TextStyle(font: boldFont, fontSize: 7),
+                                maxLines: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                    pw.Divider(height: 1, thickness: 1),
-                    _buildFieldRow(
-                      'ETA ',
-                      controller.eDaysCtrl.text,
-                      font,
-                      height: 12,
+                  // Row 5: SAC No label + value (left) | ETA label + value (right)
+                  pw.Container(
+                    height: 28,
+                    child: pw.Row(
+                      children: [
+                        pw.Expanded(
+                          child: pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            decoration: pw.BoxDecoration(
+                              border: pw.Border(right: pw.BorderSide(width: 1)),
+                            ),
+                            child: pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              mainAxisAlignment: pw.MainAxisAlignment.center,
+                              children: [
+                                pw.Text(
+                                  'SAC No.: ',
+                                  style: pw.TextStyle(font: font, fontSize: 7.5),
+                                ),
+                                pw.SizedBox(height: 2),
+                                pw.Text(
+                                  '996511',
+                                  style: pw.TextStyle(font: boldFont, fontSize: 7.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        pw.Container(
+                          width: 130,
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            mainAxisAlignment: pw.MainAxisAlignment.center,
+                            children: [
+                              pw.Text(
+                                'ETA',
+                                style: pw.TextStyle(font: font, fontSize: 7.5),
+                              ),
+                              pw.SizedBox(height: 2),
+                              pw.Text(
+                                controller.eDaysCtrl.text,
+                                style: pw.TextStyle(font: boldFont, fontSize: 7.5),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -289,6 +480,18 @@ class GCPdfGenerator {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
+        pw.Text(
+          "OWNER'S RISK",
+          style: pw.TextStyle(font: boldFont, fontSize: 10,color: PdfColors.red),
+        ),
+        pw.SizedBox(height: 5),
+        // FIX: Added the missing line from the image
+        pw.Text(
+          'Received goods as detailed below for transportation subject to condition overleaf',
+          style: pw.TextStyle(font: font, fontSize: 8),
+        ),
+        pw.SizedBox(height: 5),
+
         // Table 1: Consignor, Consignee
         pw.Container(
           decoration: pw.BoxDecoration(
@@ -550,15 +753,17 @@ class GCPdfGenerator {
                               child: pw.Column(
                                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                                 children: [
+
                                   pw.Text(
-                                    'Date',
+
+                                    'Date :${controller.gcDateCtrl.text}',
                                     style: pw.TextStyle(font: boldFont, fontSize: 7),
                                   ),
-                                  pw.SizedBox(height: 1),
-                                  pw.Text(
-                                    controller.gcDateCtrl.text,
-                                    style: pw.TextStyle(font: font, fontSize: 6.5),
-                                  ),
+                                  // pw.SizedBox(height: 1),
+                                  // pw.Text(
+                                  //   controller.gcDateCtrl.text,
+                                  //   style: pw.TextStyle(font: font, fontSize: 6.5),
+                                  // ),
                                 ],
                               ),
                             ),
@@ -776,8 +981,6 @@ class GCPdfGenerator {
                     ),
 
                     // Row 3: Delivery Instructions
-
-                    // Row 3: Delivery Instructions
                     pw.Container(
                       height: 50,
                       decoration: pw.BoxDecoration(
@@ -788,7 +991,7 @@ class GCPdfGenerator {
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         mainAxisAlignment: pw.MainAxisAlignment.start,
                         children: [
-                          pw.Center( // Center the title
+                          pw.Center(
                             child: pw.Text(
                               'Delivery from & Special Instructions',
                               style: pw.TextStyle(font: boldFont, fontSize: 7.5),
@@ -798,12 +1001,12 @@ class GCPdfGenerator {
                           pw.Text(
                             controller.deliveryInstructionsCtrl.text,
                             style: pw.TextStyle(font: font, fontSize: 7),
-                            maxLines: 2, // Allowing up to 2 lines might be better for wrapping
+                            maxLines: 2,
                             overflow: pw.TextOverflow.clip,
                           ),
                           pw.Spacer(),
-                          pw.Divider(height: 1), // Add a divider line
-                          pw.SizedBox(height: 1),  // Add a small space after the divider
+                          pw.Divider(height: 1),
+                          pw.SizedBox(height: 1),
                           pw.Text(
                             'GSTIN to be paid by : Consignor / Consignee',
                             style: pw.TextStyle(font: font, fontSize: 7.5),
@@ -1043,55 +1246,6 @@ class GCPdfGenerator {
     );
   }
 
-  static pw.Widget _buildFieldRow(
-      String label,
-      String value,
-      pw.Font font, {
-        double height = 15,
-        bool isAddress = false,
-        int maxLines = 1,
-      }) {
-    return pw.Container(
-      height: isAddress ? 30 : height,
-      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.center,
-        children: [
-          pw.Container(
-            width: 50,
-            child: pw.Text(
-              label,
-              style: pw.TextStyle(
-                font: font,
-                fontSize: 8,
-                fontWeight: pw.FontWeight.bold,
-              ),
-            ),
-          ),
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(right: 4),
-            child: pw.Text(
-              ':',
-              style: pw.TextStyle(font: font, fontSize: 8),
-            ),
-          ),
-          pw.Expanded(
-            child: pw.Text(
-              value,
-              style: pw.TextStyle(
-                font: font,
-                fontSize: isAddress ? 7 : 8,
-                lineSpacing: 1.1,
-              ),
-              maxLines: isAddress ? 2 : maxLines,
-              overflow: pw.TextOverflow.clip,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   static pw.Widget _buildCheckboxWithLabel(String label, pw.Font font) {
     return pw.Row(
       children: [
@@ -1110,6 +1264,7 @@ class GCPdfGenerator {
       BuildContext context,
       GCFormController controller,
       ) async {
+    print('Date from form :${controller.gcDateCtrl.text}');
     final pdfData = await generatePDF(controller);
     final gcNumber = controller.gcNumberCtrl.text.isNotEmpty
         ? controller.gcNumberCtrl.text
