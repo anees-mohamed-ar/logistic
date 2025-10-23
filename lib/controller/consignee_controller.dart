@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:get_storage/get_storage.dart';
@@ -8,7 +9,15 @@ import '../api_config.dart';
 class ConsigneeController extends GetxController {
   final isLoading = false.obs;
   final consignees = <Consignee>[].obs;
+  final filteredConsignees = <Consignee>[].obs;
+  final searchController = TextEditingController();
   final storage = GetStorage();
+  
+  @override
+  void onClose() {
+    searchController.dispose();
+    super.onClose();
+  }
 
   @override
   void onInit() {
@@ -30,6 +39,7 @@ class ConsigneeController extends GetxController {
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         consignees.value = data.map((json) => Consignee.fromJson(json)).toList();
+        filterConsignees(''); // Initialize filtered list with all consignees
       } else {
         Get.snackbar('Error', 'Failed to load consignees');
       }
@@ -37,6 +47,23 @@ class ConsigneeController extends GetxController {
       Get.snackbar('Error', 'An error occurred: $e');
     } finally {
       isLoading(false);
+    }
+  }
+  
+  void filterConsignees(String query) {
+    if (query.isEmpty) {
+      filteredConsignees.assignAll(consignees);
+    } else {
+      final searchQuery = query.toLowerCase();
+      filteredConsignees.assignAll(consignees.where((consignee) {
+        return consignee.consigneeName.toLowerCase().contains(searchQuery) ||
+               consignee.phoneNumber.toLowerCase().contains(searchQuery) ||
+               consignee.mobileNumber.toLowerCase().contains(searchQuery) ||
+               consignee.email.toLowerCase().contains(searchQuery) ||
+               consignee.address.toLowerCase().contains(searchQuery) ||
+               consignee.gst.toLowerCase().contains(searchQuery) ||
+               consignee.panNumber.toLowerCase().contains(searchQuery);
+      }).toList());
     }
   }
 

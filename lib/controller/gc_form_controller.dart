@@ -586,6 +586,7 @@ class GCFormController extends GetxController {
             consignorInfo[name] = {
               'gst': (e['gst'] ?? '').toString(),
               'address': (e['address'] ?? '').toString(),
+              'location': (e['location'] ?? '').toString(),
             };
           }
           consignors
@@ -628,6 +629,7 @@ class GCFormController extends GetxController {
             consigneeInfo[name] = {
               'gst': (e['gst'] ?? '').toString(),
               'address': (e['address'] ?? '').toString(),
+              'location': (e['location'] ?? '').toString(),
             };
           }
           consignees

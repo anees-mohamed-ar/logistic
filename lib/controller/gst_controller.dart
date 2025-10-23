@@ -6,6 +6,7 @@ import 'package:logistic/api_config.dart';
 
 class GstController extends GetxController {
   final gstList = <GstModel>[].obs;
+  final filteredGstList = <GstModel>[].obs;
   final isLoading = false.obs;
   final error = ''.obs;
   
@@ -15,6 +16,8 @@ class GstController extends GetxController {
   void onInit() {
     super.onInit();
     fetchGstList();
+    // Initialize filtered list with all items
+    ever(gstList, (_) => filterGstEntries(''));
   }
 
   Future<void> fetchGstList() async {
@@ -29,6 +32,7 @@ class GstController extends GetxController {
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         gstList.assignAll(data.map((item) => GstModel.fromJson(item)).toList());
+        filterGstEntries('');
       } else {
         throw Exception('Failed to load GST list: ${response.statusCode}');
       }
@@ -37,6 +41,20 @@ class GstController extends GetxController {
       Get.snackbar('Error', 'Failed to fetch GST list');
     } finally {
       isLoading(false);
+    }
+  }
+
+  void filterGstEntries(String query) {
+    if (query.isEmpty) {
+      filteredGstList.assignAll(gstList);
+    } else {
+      final queryLower = query.toLowerCase();
+      filteredGstList.assignAll(gstList.where((gst) {
+        return gst.hsn.toLowerCase().contains(queryLower) ||
+               gst.cgst.toString().contains(query) ||
+               gst.sgst.toString().contains(query) ||
+               gst.igst.toString().contains(query);
+      }).toList());
     }
   }
 

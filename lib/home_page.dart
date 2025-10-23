@@ -649,7 +649,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         title: 'Settings',
         subtitle: 'App configuration',
         color: const Color(0xFF757575),
-        onTap: () {},
+        onTap: () => Get.toNamed(AppRoutes.settings),
       ),
     ]
         : [
@@ -658,7 +658,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         title: 'Settings',
         subtitle: 'App configuration',
         color: const Color(0xFF757575),
-        onTap: () {},
+        onTap: () => Get.toNamed(AppRoutes.settings),
       ),
     ];
 

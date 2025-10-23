@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -12,6 +13,10 @@ class GCPdfGenerator {
     final pdf = pw.Document();
     final font = await PdfGoogleFonts.notoSansRegular();
     final boldFont = await PdfGoogleFonts.notoSansBold();
+
+    // Load logo image
+    final logoData = await rootBundle.load('logo.jpg');
+    final logoImage = pw.MemoryImage(logoData.buffer.asUint8List());
 
     // Create three copies with different headers
     final copies = [
@@ -29,7 +34,19 @@ class GCPdfGenerator {
             return pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                _buildHeader(font, boldFont, controller),
+                // Title at the top
+                pw.Center(
+                  child: pw.Text(
+                    'Consignment Note',
+                    style: pw.TextStyle(
+                      font: boldFont,
+                      fontSize: 16,
+                      color: PdfColors.black,
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 5),
+                _buildHeader(font, boldFont, controller, logoImage),
                 pw.SizedBox(height: 5),
                 _buildMainContent(font, boldFont, controller),
                 pw.Spacer(),
@@ -48,6 +65,7 @@ class GCPdfGenerator {
       pw.Font font,
       pw.Font boldFont,
       GCFormController controller,
+      pw.ImageProvider logoImage,
       ) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -65,19 +83,16 @@ class GCPdfGenerator {
                   pw.Container(
                     width: 45,
                     height: 45,
-                    decoration: pw.BoxDecoration(
-                      shape: pw.BoxShape.circle,
-                      border: pw.Border.all(width: 1.5),
-                      color: PdfColors.blue900,
-                    ),
-                    child: pw.Center(
-                      child: pw.Text(
-                        'श्री',
-                        style: pw.TextStyle(
-                          font: boldFont,
-                          fontSize: 18,
-                          color: PdfColors.white,
-                        ),
+                    // decoration: pw.BoxDecoration(
+                    //   shape: pw.BoxShape.circle,
+                    //   border: pw.Border.all(width: 1.5),
+                    // ),
+                    child: pw.ClipOval(
+                      child: pw.Image(
+                        logoImage,
+                        fit: pw.BoxFit.cover,
+                        width: 45,
+                        height: 45,
                       ),
                     ),
                   ),
@@ -99,7 +114,7 @@ class GCPdfGenerator {
                           children: [
                             pw.Text(
                               'Head Office : ',
-                              style: pw.TextStyle(font: font, fontSize: 8),
+                              style: pw.TextStyle(font: font, fontSize: 9),
                             ),
                             pw.Container(
                               width: 8,
@@ -114,21 +129,21 @@ class GCPdfGenerator {
                             pw.Expanded(
                               child: pw.Text(
                                 'CHENNAI - 402, Paneer Nagar, 3rd Floor, Mogappair, Chennai - 600 037.',
-                                style: pw.TextStyle(font: font, fontSize: 8),
+                                style: pw.TextStyle(font: font, fontSize: 9),
                               ),
                             ),
                           ],
                         ),
                         pw.Text(
-                          'Phone : 044 - 45575675',
-                          style: pw.TextStyle(font: font, fontSize: 8),
+                          'Phone          : 044 - 45575675',
+                          style: pw.TextStyle(font: font, fontSize: 9),
                         ),
                         pw.SizedBox(height: 3),
                         pw.Row(
                           children: [
                             pw.Text(
                               'Branch Office :',
-                              style: pw.TextStyle(font: font, fontSize: 8),
+                              style: pw.TextStyle(font: font, fontSize: 9),
                             ),
                             pw.SizedBox(width: 5),
                             _buildCheckboxWithLabel('MUMBAI', font),
@@ -147,7 +162,6 @@ class GCPdfGenerator {
                             _buildCheckboxWithLabel('SRI KALAHASTI', font),
                           ],
                         ),
-
                       ],
                     ),
                   ),
@@ -157,154 +171,85 @@ class GCPdfGenerator {
 
             pw.SizedBox(width: 10),
 
-            // CENTER SECTION: Jurisdiction text
+            // CENTER SECTION: Empty space (Jurisdiction moved to footer)
             pw.Container(
-              width: 100,
-              child: pw.Column(
-                mainAxisAlignment: pw.MainAxisAlignment.center,
-                children: [
-                  pw.Text(
-                    'Subject to Chennai Jurisdiction',
-                    style: pw.TextStyle(font: font, fontSize: 8),
-                    textAlign: pw.TextAlign.center,
-                  ),
-                  pw.SizedBox(height: 2),
-                  pw.Text(
-                    'Consignment Note',
-                    style: pw.TextStyle(font: font, fontSize: 8),
-                    textAlign: pw.TextAlign.center,
-                  ),
-                ],
-              ),
+              width: 70,
             ),
 
             pw.SizedBox(width: 10),
 
-            // RIGHT SECTION: The bordered table - EXACTLY like image
+            // RIGHT SECTION: The bordered table
             pw.Container(
-              width: 250,
+              width: 280,
               decoration: pw.BoxDecoration(
                 border: pw.Border.all(width: 1),
               ),
               child: pw.Column(
                 children: [
-                  // Row 1 & 2 Combined: Truck No spans 2 rows (left) | No + GC value (top right) | Date (bottom right)
-                  pw.Row(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      // Left: Truck No label and value spanning both rows
-                      pw.Expanded(
-                        child: pw.Container(
-                          height: 42, // Combined height of both rows
-                          padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          decoration: pw.BoxDecoration(
-                            border: pw.Border(
-                              right: pw.BorderSide(width: 1),
-                              bottom: pw.BorderSide(width: 1),
+                  // Row 1: GC No (left) | Date (right)
+                  pw.Container(
+                    height: 18,
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border(bottom: pw.BorderSide(width: 1)),
+                    ),
+                    child: pw.Row(
+                      children: [
+                        pw.Expanded(
+                          child: pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            decoration: pw.BoxDecoration(
+                              border: pw.Border(right: pw.BorderSide(width: 1)),
+                            ),
+                            child: pw.Row(
+                              children: [
+                                pw.Text(
+                                  'GC No.',
+                                  style: pw.TextStyle(font: font, fontSize: 8.5),
+                                ),
+                                pw.SizedBox(width: 4),
+                                pw.Text(
+                                  ': ',
+                                  style: pw.TextStyle(font: font, fontSize: 8.5),
+                                ),
+                                pw.Text(
+                                  controller.gcNumberCtrl.text,
+                                  style: pw.TextStyle(font: boldFont, fontSize: 11),
+                                ),
+                                pw.Text(
+                                  ' / ',
+                                  style: pw.TextStyle(font: font, fontSize: 9),
+                                ),
+                                pw.Text(
+                                  '25-26',
+                                  style: pw.TextStyle(font: font, fontSize: 9),
+                                ),
+                              ],
                             ),
                           ),
-                          child: pw.Column(
-                            crossAxisAlignment: pw.CrossAxisAlignment.start,
-                            mainAxisAlignment: pw.MainAxisAlignment.center,
+                        ),
+                        pw.Container(
+                          width: 130,
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: pw.Row(
                             children: [
                               pw.Text(
-                                'Truck No. :',
-                                style: pw.TextStyle(font: font, fontSize: 7.5),
+                                'Date   :   ',
+                                style: pw.TextStyle(font: font, fontSize: 8.5),
                               ),
-                              pw.SizedBox(height: 2),
                               pw.Text(
-                                controller.truckNumberCtrl.text,
-                                style: pw.TextStyle(font: boldFont, fontSize: 8),
+                                controller.gcDateCtrl.text,
+                                style: pw.TextStyle(font: boldFont, fontSize: 9),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                      // Right: Stacked rows for No./GC and Date
-                      pw.Column(
-                        children: [
-                          // Top: No label + GC value
-                          pw.Container(
-                            width: 160,
-                            height: 28,
-                            decoration: pw.BoxDecoration(
-                              border: pw.Border(bottom: pw.BorderSide(width: 1)),
-                            ),
-                            child: pw.Row(
-                              children: [
-                                pw.Container(
-                                  width: 30,
-                                  padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                  decoration: pw.BoxDecoration(
-                                    border: pw.Border(right: pw.BorderSide(width: 1)),
-                                  ),
-                                  child: pw.Center(
-                                    child: pw.Text(
-                                      'No.',
-                                      style: pw.TextStyle(font: font, fontSize: 7.5),
-                                    ),
-                                  ),
-                                ),
-                                pw.Expanded(
-                                  child: pw.Container(
-                                    padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                    child: pw.Center(
-                                      child: pw.Row(
-                                        mainAxisAlignment: pw.MainAxisAlignment.center,
-                                        children: [
-                                          pw.Text(
-                                            ': ',
-                                            style: pw.TextStyle(font: font, fontSize: 7.5),
-                                          ),
-                                          pw.Text(
-                                            controller.gcNumberCtrl.text,
-                                            style: pw.TextStyle(font: boldFont, fontSize: 10),
-                                          ),
-                                          pw.Text(
-                                            ' / ',
-                                            style: pw.TextStyle(font: font, fontSize: 8),
-                                          ),
-                                          pw.Text(
-                                            '25-26',
-                                            style: pw.TextStyle(font: font, fontSize: 8),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // FIX: Bottom: Date with value from controller
-                          pw.Container(
-                            width: 160,
-                            height: 14,
-                            decoration: pw.BoxDecoration(
-                              border: pw.Border(bottom: pw.BorderSide(width: 1)),
-                            ),
-                            padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                            child: pw.Row(
-                              children: [
-                                pw.Text(
-                                  'Date   :   ',
-                                  style: pw.TextStyle(font: font, fontSize: 7.5),
-                                ),
-                                pw.Text(
-                                  controller.gcDateCtrl.text,
-                                  style: pw.TextStyle(font: boldFont, fontSize: 8),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
 
-                  // Row 3: GSTIN label + value (left) | From label + value (right)
+                  // Row 2: GSTIN (left) | From (right)
                   pw.Container(
-                    height: 28,
+                    height: 36,
                     decoration: pw.BoxDecoration(
                       border: pw.Border(bottom: pw.BorderSide(width: 1)),
                     ),
@@ -322,12 +267,12 @@ class GCPdfGenerator {
                               children: [
                                 pw.Text(
                                   'GSTIN :',
-                                  style: pw.TextStyle(font: font, fontSize: 7.5),
+                                  style: pw.TextStyle(font: font, fontSize: 8.5),
                                 ),
                                 pw.SizedBox(height: 2),
                                 pw.Text(
                                   '33AAGPP5677A1ZS',
-                                  style: pw.TextStyle(font: boldFont, fontSize: 7.5),
+                                  style: pw.TextStyle(font: boldFont, fontSize: 8.5),
                                 ),
                               ],
                             ),
@@ -342,12 +287,12 @@ class GCPdfGenerator {
                             children: [
                               pw.Text(
                                 'From',
-                                style: pw.TextStyle(font: font, fontSize: 7.5),
+                                style: pw.TextStyle(font: font, fontSize: 8.5),
                               ),
                               pw.SizedBox(height: 2),
                               pw.Text(
                                 controller.fromCtrl.text,
-                                style: pw.TextStyle(font: boldFont, fontSize: 7),
+                                style: pw.TextStyle(font: boldFont, fontSize: 8),
                                 maxLines: 1,
                               ),
                             ],
@@ -357,14 +302,13 @@ class GCPdfGenerator {
                     ),
                   ),
 
-                  // Row 4: PAN No label + value (left) | To label + value (right)
+                  // Row 3: PAN No (left) | To (right)
                   pw.Container(
-                    height: 28,
+                    height: 30,
                     decoration: pw.BoxDecoration(
                       border: pw.Border(bottom: pw.BorderSide(width: 1)),
                     ),
                     child: pw.Row(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         pw.Expanded(
                           child: pw.Container(
@@ -378,12 +322,12 @@ class GCPdfGenerator {
                               children: [
                                 pw.Text(
                                   'PAN No.: ',
-                                  style: pw.TextStyle(font: font, fontSize: 7.5),
+                                  style: pw.TextStyle(font: font, fontSize: 8.5),
                                 ),
                                 pw.SizedBox(height: 2),
                                 pw.Text(
                                   'AAGPP5677A',
-                                  style: pw.TextStyle(font: boldFont, fontSize: 7.5),
+                                  style: pw.TextStyle(font: boldFont, fontSize: 8.5),
                                 ),
                               ],
                             ),
@@ -398,12 +342,12 @@ class GCPdfGenerator {
                             children: [
                               pw.Text(
                                 'To',
-                                style: pw.TextStyle(font: font, fontSize: 7.5),
+                                style: pw.TextStyle(font: font, fontSize: 8.5),
                               ),
                               pw.SizedBox(height: 2),
                               pw.Text(
                                 controller.toCtrl.text,
-                                style: pw.TextStyle(font: boldFont, fontSize: 7),
+                                style: pw.TextStyle(font: boldFont, fontSize: 8),
                                 maxLines: 1,
                               ),
                             ],
@@ -413,9 +357,12 @@ class GCPdfGenerator {
                     ),
                   ),
 
-                  // Row 5: SAC No label + value (left) | ETA label + value (right)
+                  // Row 4: SAC No (left) | ETA (right)
                   pw.Container(
-                    height: 28,
+                    height: 44,
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border(bottom: pw.BorderSide(width: 1)),
+                    ),
                     child: pw.Row(
                       children: [
                         pw.Expanded(
@@ -430,12 +377,12 @@ class GCPdfGenerator {
                               children: [
                                 pw.Text(
                                   'SAC No.: ',
-                                  style: pw.TextStyle(font: font, fontSize: 7.5),
+                                  style: pw.TextStyle(font: font, fontSize: 8.5),
                                 ),
                                 pw.SizedBox(height: 2),
                                 pw.Text(
                                   '996511',
-                                  style: pw.TextStyle(font: boldFont, fontSize: 7.5),
+                                  style: pw.TextStyle(font: boldFont, fontSize: 8.5),
                                 ),
                               ],
                             ),
@@ -450,15 +397,39 @@ class GCPdfGenerator {
                             children: [
                               pw.Text(
                                 'ETA',
-                                style: pw.TextStyle(font: font, fontSize: 7.5),
+                                style: pw.TextStyle(font: font, fontSize: 8.5),
                               ),
                               pw.SizedBox(height: 2),
                               pw.Text(
-                                controller.eDaysCtrl.text,
-                                style: pw.TextStyle(font: boldFont, fontSize: 7.5),
+                                'Days : ${controller.eDaysCtrl.text}',
+                                style: pw.TextStyle(font: boldFont, fontSize: 8.5),
+                              ),
+                              pw.SizedBox(height: 2),
+                              pw.Text(
+                                'Date : ${controller.deliveryDateCtrl.text.isNotEmpty ? controller.deliveryDateCtrl.text : '-'}',
+                                style: pw.TextStyle(font: boldFont, fontSize: 8.5),
                               ),
                             ],
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Row 5: Truck No (full width, label and value in one line)
+                  pw.Container(
+                    height: 18,
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: pw.Row(
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        pw.Text(
+                          'Truck No. : ',
+                          style: pw.TextStyle(font: font, fontSize: 8.5),
+                        ),
+                        pw.Text(
+                          controller.truckNumberCtrl.text,
+                          style: pw.TextStyle(font: boldFont, fontSize: 9),
                         ),
                       ],
                     ),
@@ -480,718 +451,773 @@ class GCPdfGenerator {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text(
-          "OWNER'S RISK",
-          style: pw.TextStyle(font: boldFont, fontSize: 10,color: PdfColors.red),
-        ),
-        pw.SizedBox(height: 5),
-        // FIX: Added the missing line from the image
-        pw.Text(
-          'Received goods as detailed below for transportation subject to condition overleaf',
-          style: pw.TextStyle(font: font, fontSize: 8),
-        ),
-        pw.SizedBox(height: 5),
+      pw.Text(
+      "OWNER'S RISK",
+      style: pw.TextStyle(font: boldFont, fontSize: 11, color: PdfColors.red),
+    ),
+    pw.SizedBox(height: 5),
+    pw.Text(
+    'Received goods as detailed below for transportation subject to condition overleaf',
+    style: pw.TextStyle(font: font, fontSize: 9),
+    ),
+    pw.SizedBox(height: 5),
 
-        // Table 1: Consignor, Consignee
-        pw.Container(
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(width: 1),
+    // Table 1: Consignor, Consignee, Delivery Address (3 columns)
+    pw.Container(
+    decoration: pw.BoxDecoration(
+    border: pw.Border.all(width: 1),
+    ),
+    child: pw.Row(
+    children: [
+    // Consignor
+    pw.Expanded(
+    child: pw.Container(
+    height: 77,
+    padding: const pw.EdgeInsets.all(4),
+    decoration: pw.BoxDecoration(
+    border: pw.Border(right: pw.BorderSide(width: 1)),
+    ),
+    child: pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+    pw.RichText(
+      text: pw.TextSpan(
+        children: [
+          pw.TextSpan(
+            text: 'Consignor :  ',
+            style: pw.TextStyle(font: boldFont, fontSize: 10),
           ),
-          child: pw.Row(
-            children: [
-              // Consignor
-              pw.Expanded(
-                child: pw.Container(
-                  height: 75,
-                  padding: const pw.EdgeInsets.all(4),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border(right: pw.BorderSide(width: 1)),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'Consignor',
-                        style: pw.TextStyle(font: boldFont, fontSize: 9),
-                      ),
-                      pw.SizedBox(height: 2),
-                      pw.Text(
-                        controller.consignorNameCtrl.text,
-                        style: pw.TextStyle(font: font, fontSize: 8),
-                      ),
-                      pw.SizedBox(height: 3),
-                      pw.Text(
-                        'Address',
-                        style: pw.TextStyle(font: boldFont, fontSize: 8),
-                      ),
-                      pw.SizedBox(height: 1),
-                      pw.Text(
-                        controller.consignorAddressCtrl.text,
-                        style: pw.TextStyle(font: font, fontSize: 7),
-                        maxLines: 2,
-                      ),
-                      pw.Spacer(),
-                      pw.Text(
-                        'GSTIN. No  ${controller.consignorGstCtrl.text}',
-                        style: pw.TextStyle(font: boldFont, fontSize: 7),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // Consignee
-              pw.Expanded(
-                child: pw.Container(
-                  height: 75,
-                  padding: const pw.EdgeInsets.all(4),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'Consignee',
-                        style: pw.TextStyle(font: boldFont, fontSize: 9),
-                      ),
-                      pw.SizedBox(height: 2),
-                      pw.Text(
-                        controller.consigneeNameCtrl.text,
-                        style: pw.TextStyle(font: font, fontSize: 8),
-                      ),
-                      pw.SizedBox(height: 3),
-                      pw.Text(
-                        'Address',
-                        style: pw.TextStyle(font: boldFont, fontSize: 8),
-                      ),
-                      pw.SizedBox(height: 1),
-                      pw.Text(
-                        controller.consigneeAddressCtrl.text,
-                        style: pw.TextStyle(font: font, fontSize: 7),
-                        maxLines: 2,
-                      ),
-                      pw.Spacer(),
-                      pw.Text(
-                        'GSTIN. No  ${controller.consigneeGstCtrl.text}',
-                        style: pw.TextStyle(font: boldFont, fontSize: 7),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+          pw.TextSpan(text: controller.consignorNameCtrl.text, style: pw.TextStyle(font: font, fontSize: 9)),
+        ],
+      ),
+    ),
+    // // pw.SizedBox(height: 2),
+    // pw.Text(
+    // controller.consignorNameCtrl.text,
+    // style: pw.TextStyle(font: font, fontSize: 9),
+    // ),
+    pw.SizedBox(height: 3),
+      pw.RichText(
+        text: pw.TextSpan(
+          children: [
+            pw.TextSpan(
+              text: 'Address :  ',
+              style: pw.TextStyle(font: boldFont, fontSize: 10),
+            ),
+            pw.TextSpan(text: controller.consignorAddressCtrl.text, style: pw.TextStyle(font: font, fontSize: 9)),
+          ],
+        ),
+      ),
+    // pw.SizedBox(height: 1),
+    // pw.Text(
+    // controller.consignorAddressCtrl.text,
+    // style: pw.TextStyle(font: font, fontSize: 7),
+    // maxLines: 2,
+    // ),
+    pw.Spacer(),
+      pw.RichText(
+        text: pw.TextSpan(
+          children: [
+            pw.TextSpan(
+              text: 'GSTIN NO :  ',
+              style: pw.TextStyle(font: boldFont, fontSize: 10),
+            ),
+            pw.TextSpan(text: controller.consignorGstCtrl.text, style: pw.TextStyle(font: font, fontSize: 9)),
+          ],
+        ),
+      ),
+    ],
+    ),
+    ),
+    ),
+    // Consignee
+    pw.Expanded(
+    child: pw.Container(
+    height: 75,
+    padding: const pw.EdgeInsets.all(4),
+    decoration: pw.BoxDecoration(
+    border: pw.Border(right: pw.BorderSide(width: 1)),
+    ),
+    child: pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.RichText(
+        text: pw.TextSpan(
+          children: [
+            pw.TextSpan(
+              text: 'Consignee :  ',
+              style: pw.TextStyle(font: boldFont, fontSize: 10),
+            ),
+            pw.TextSpan(text: controller.consigneeNameCtrl.text, style: pw.TextStyle(font: font, fontSize: 9)),
+          ],
+        ),
+      ),
+    // pw.SizedBox(height: 2),
+    // pw.Text(
+    // controller.consigneeNameCtrl.text,
+    // style: pw.TextStyle(font: font, fontSize: 8),
+    // ),
+      pw.RichText(
+        text: pw.TextSpan(
+          children: [
+            pw.TextSpan(
+              text: 'Address :  ',
+              style: pw.TextStyle(font: boldFont, fontSize: 10),
+            ),
+            pw.TextSpan(text: controller.consigneeAddressCtrl.text, style: pw.TextStyle(font: font, fontSize: 9)),
+          ],
+        ),
+      ),
+    // pw.SizedBox(height: 1),
+    // pw.Text(
+    // controller.consigneeAddressCtrl.text,
+    // style: pw.TextStyle(font: font, fontSize: 7),
+    // maxLines: 2,
+    // ),
+    pw.Spacer(),
+      pw.RichText(
+        text: pw.TextSpan(
+          children: [
+            pw.TextSpan(
+              text: 'GSTIN NO :  ',
+              style: pw.TextStyle(font: boldFont, fontSize: 10),
+            ),
+            pw.TextSpan(text: controller.consigneeGstCtrl.text, style: pw.TextStyle(font: font, fontSize: 9)),
+          ],
+        ),
+      ),
+    ],
+    ),
+    ),
+    ),
+    // Delivery Address (New Column)
+    pw.Expanded(
+    child: pw.Container(
+    height: 75,
+    padding: const pw.EdgeInsets.all(4),
+    child: pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+    pw.Text(
+    'Delivery Address',
+    style: pw.TextStyle(font: boldFont, fontSize: 9),
+    ),
+    pw.SizedBox(height: 2),
+    pw.Text(
+    controller.billingAddressCtrl.text, // You can create a separate controller for delivery address if needed
+    style: pw.TextStyle(font: font, fontSize: 7),
+    maxLines: 6,
+    ),
+    ],
+    ),
+    ),
+    ),
+    ],
+    ),
+    ),
+
+    // Table 2: Package details and Invoice/E-way section side by side
+    pw.Container(
+    decoration: pw.BoxDecoration(
+    border: pw.Border.all(width: 1),
+    ),
+    child: pw.Row(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+    // Left side: Package details
+    pw.Expanded(
+    flex: 5,
+    child: pw.Container(
+    decoration: pw.BoxDecoration(
+    border: pw.Border(right: pw.BorderSide(width: 1)),
+    ),
+    child: pw.Column(
+    children: [
+    // Headers
+    pw.Container(
+    height: 20,
+    decoration: pw.BoxDecoration(
+    border: pw.Border(bottom: pw.BorderSide(width: 1)),
+    ),
+    child: pw.Row(
+    children: [
+    pw.Expanded(
+    flex: 12,
+    child: pw.Container(
+    padding: const pw.EdgeInsets.all(2),
+    decoration: pw.BoxDecoration(
+    border: pw.Border(right: pw.BorderSide(width: 1)),
+    ),
+    child: pw.Center(
+    child: pw.Text(
+    'Number of packages',
+    style: pw.TextStyle(font: boldFont, fontSize: 7),
+    textAlign: pw.TextAlign.center,
+    ),
+    ),
+    ),
+    ),
+    pw.Expanded(
+    flex: 12,
+    child: pw.Container(
+    padding: const pw.EdgeInsets.all(2),
+    decoration: pw.BoxDecoration(
+    border: pw.Border(right: pw.BorderSide(width: 1)),
+    ),
+    child: pw.Center(
+    child: pw.Text(
+    'Method of packages',
+    style: pw.TextStyle(font: boldFont, fontSize: 7),
+    textAlign: pw.TextAlign.center,
+    ),
+    ),
+    ),
+    ),
+    pw.Expanded(
+    flex: 20,
+    child: pw.Container(
+    padding: const pw.EdgeInsets.all(2),
+    child: pw.Center(
+    child: pw.Text(
+    'Nature of goods said to Contain',
+    style: pw.TextStyle(font: boldFont, fontSize: 7),
+    textAlign: pw.TextAlign.center,
+    ),
+    ),
+    ),
+    ),
+    ],
+    ),
+    ),
+    // Values
+    pw.Container(
+    height: 60,
+    child: pw.Row(
+    children: [
+    pw.Expanded(
+    flex: 12,
+    child: pw.Container(
+    padding: const pw.EdgeInsets.all(2),
+    decoration: pw.BoxDecoration(
+    border: pw.Border(right: pw.BorderSide(width: 1)),
+    ),
+    child: pw.Center(
+    child: pw.Text(
+    controller.packagesCtrl.text,
+    style: pw.TextStyle(font: font, fontSize: 8),
+    ),
+    ),
+    ),
+    ),
+    pw.Expanded(
+    flex: 12,
+    child: pw.Container(
+    padding: const pw.EdgeInsets.all(2),
+    decoration: pw.BoxDecoration(
+    border: pw.Border(right: pw.BorderSide(width: 1)),
+    ),
+    child: pw.Center(
+    child: pw.Text(
+    controller.methodPackageCtrl.text,
+    style: pw.TextStyle(font: font, fontSize: 8),
+    ),
+    ),
+    ),
+    ),
+    pw.Expanded(
+    flex: 20,
+    child: pw.Container(
+    padding: const pw.EdgeInsets.all(2),
+    child: pw.Center(
+    child: pw.Text(
+    controller.natureGoodsCtrl.text,
+    style: pw.TextStyle(font: font, fontSize: 8),
+    ),
+    ),
+    ),
+    ),
+    ],
+    ),
+    ),
+    ],
+    ),
+    ),
+    ),
+
+    // Right side: Invoice and E-way section
+    pw.Expanded(
+    flex: 2,
+    child: pw.Column(
+    children: [
+    // Invoice section
+    pw.Container(
+    height: 40,
+    decoration: pw.BoxDecoration(
+    border: pw.Border(bottom: pw.BorderSide(width: 1)),
+    ),
+    child: pw.Row(
+    children: [
+    pw.Expanded(
+    child: pw.Container(
+    padding: const pw.EdgeInsets.all(3),
+    decoration: pw.BoxDecoration(
+    border: pw.Border(right: pw.BorderSide(width: 1)),
+    ),
+    child: pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+    pw.Text(
+    'Invoice No.:',
+    style: pw.TextStyle(font: boldFont, fontSize: 7),
+    ),
+    pw.SizedBox(height: 1),
+    pw.Text(
+    '1. ${controller.customInvoiceCtrl.text}',
+    style: pw.TextStyle(font: font, fontSize: 6.5),
+    ),
+    pw.Text(
+    '2.',
+    style: pw.TextStyle(font: font, fontSize: 6.5),
+    ),
+    ],
+    ),
+    ),
+    ),
+    pw.Expanded(
+    child: pw.Container(
+    padding: const pw.EdgeInsets.all(3),
+    child: pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+    pw.Text(
+    'Date :${controller.gcDateCtrl.text}',
+    style: pw.TextStyle(font: boldFont, fontSize: 7),
+    ),
+    ],
+    ),
+    ),
+    ),
+    ],
+    ),
+    ),
+    // E-way section
+    pw.Container(
+    height: 40,
+    child: pw.Row(
+    children: [
+    pw.Expanded(
+    child: pw.Container(
+    padding: const pw.EdgeInsets.all(3),
+    decoration: pw.BoxDecoration(
+    border: pw.Border(right: pw.BorderSide(width: 1)),
+    ),
+    child: pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+    pw.Text(
+    'E-way Billing',
+    style: pw.TextStyle(font: boldFont, fontSize: 7),
+    ),
+    pw.SizedBox(height: 1),
+    pw.Text(
+    '1. ${controller.ewayBillCtrl.text}',
+    style: pw.TextStyle(font: font, fontSize: 6.5),
+    ),
+    pw.Text(
+    '2.',
+    style: pw.TextStyle(font: font, fontSize: 6.5),
+    ),
+    ],
+    ),
+    ),
+    ),
+    pw.Expanded(
+    child: pw.Container(
+    padding: const pw.EdgeInsets.all(3),
+    child: pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+    pw.Text(
+    'Exp. Date',
+    style: pw.TextStyle(font: boldFont, fontSize: 7),
+    ),
+    pw.SizedBox(height: 1),
+    pw.Text(
+    controller.ewayExpiredCtrl.text,
+    style: pw.TextStyle(font: font, fontSize: 6.5),
+    ),
+    ],
+    ),
+    ),
+    ),
+    ],
+    ),
+    ),
+    ],
+    ),
+    ),
+    ],
+    ),
+    ),
+
+    // Combined section: Left side (stacked tables) and Right side (certificate/freight)
+    pw.Container(
+    decoration: pw.BoxDecoration(
+    border: pw.Border.all(width: 1),
+    ),
+    child: pw.Row(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+    // LEFT SIDE: Stacked tables
+    pw.Expanded(
+    flex: 5,
+    child: pw.Column(
+    children: [
+    // Row 1: Actual Weight and Private Marks
+    pw.Container(
+    height: 48,
+    decoration: pw.BoxDecoration(
+    border: pw.Border(
+    right: pw.BorderSide(width: 1),
+    bottom: pw.BorderSide(width: 1),
+    ),
+    ),
+    child: pw.Row(
+    children: [
+    // Actual Weight
+    pw.Expanded(
+    flex: 1,
+    child: pw.Container(
+    decoration: pw.BoxDecoration(
+    border: pw.Border(right: pw.BorderSide(width: 1)),
+    ),
+    child: pw.Column(
+    children: [
+    pw.Container(
+    height: 22,
+    decoration: pw.BoxDecoration(
+    border: pw.Border(bottom: pw.BorderSide(width: 1)),
+    ),
+    child: pw.Center(
+    child: pw.Text(
+    'Actual Weight\nKgs.',
+    style: pw.TextStyle(font: boldFont, fontSize: 7.5),
+    textAlign: pw.TextAlign.center,
+    ),
+    ),
+    ),
+    pw.Expanded(
+    child: pw.Center(
+    child: pw.Text(
+    controller.actualWeightCtrl.text,
+    style: pw.TextStyle(font: font, fontSize: 9),
+    ),
+    ),
+    ),
+    ],
+    ),
+    ),
+    ),
+    // Private Marks
+    pw.Expanded(
+    flex: 1,
+    child: pw.Column(
+    children: [
+    pw.Container(
+    height: 22,
+      decoration: pw.BoxDecoration(
+        border: pw.Border(bottom: pw.BorderSide(width: 1)),
+      ),
+      child: pw.Center(
+        child: pw.Text(
+          'Private Marks',
+          style: pw.TextStyle(font: boldFont, fontSize: 7.5),
+          textAlign: pw.TextAlign.center,
+        ),
+      ),
+    ),
+      pw.Expanded(
+        child: pw.Center(
+          child: pw.Text(
+            'O / R',
+            style: pw.TextStyle(font: font, fontSize: 9),
           ),
         ),
+      ),
+      ],
+    ),
+    ),
+    ],
+    ),
+    ),
 
-        // Table 2: Package details and Invoice/E-way section side by side
-        pw.Container(
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(width: 1),
+      // Row 2: Charges for and Value of
+      pw.Container(
+        height: 33,
+        decoration: pw.BoxDecoration(
+          border: pw.Border(
+            right: pw.BorderSide(width: 1),
+            bottom: pw.BorderSide(width: 1),
           ),
-          child: pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // Left side: Package details
-              pw.Expanded(
-                flex: 5,
-                child: pw.Container(
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border(right: pw.BorderSide(width: 1)),
-                  ),
-                  child: pw.Column(
-                    children: [
-                      // Headers
-                      pw.Container(
-                        height: 20,
-                        decoration: pw.BoxDecoration(
-                          border: pw.Border(bottom: pw.BorderSide(width: 1)),
-                        ),
-                        child: pw.Row(
-                          children: [
-                            pw.Expanded(
-                              flex: 12,
-                              child: pw.Container(
-                                padding: const pw.EdgeInsets.all(2),
-                                decoration: pw.BoxDecoration(
-                                  border: pw.Border(right: pw.BorderSide(width: 1)),
-                                ),
-                                child: pw.Center(
-                                  child: pw.Text(
-                                    'Number of packages',
-                                    style: pw.TextStyle(font: boldFont, fontSize: 7),
-                                    textAlign: pw.TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            pw.Expanded(
-                              flex: 12,
-                              child: pw.Container(
-                                padding: const pw.EdgeInsets.all(2),
-                                decoration: pw.BoxDecoration(
-                                  border: pw.Border(right: pw.BorderSide(width: 1)),
-                                ),
-                                child: pw.Center(
-                                  child: pw.Text(
-                                    'Method of packages',
-                                    style: pw.TextStyle(font: boldFont, fontSize: 7),
-                                    textAlign: pw.TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            pw.Expanded(
-                              flex: 20,
-                              child: pw.Container(
-                                padding: const pw.EdgeInsets.all(2),
-                                child: pw.Center(
-                                  child: pw.Text(
-                                    'Nature of goods said to Contain',
-                                    style: pw.TextStyle(font: boldFont, fontSize: 7),
-                                    textAlign: pw.TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Values
-                      pw.Container(
-                        height: 60,
-                        child: pw.Row(
-                          children: [
-                            pw.Expanded(
-                              flex: 12,
-                              child: pw.Container(
-                                padding: const pw.EdgeInsets.all(2),
-                                decoration: pw.BoxDecoration(
-                                  border: pw.Border(right: pw.BorderSide(width: 1)),
-                                ),
-                                child: pw.Center(
-                                  child: pw.Text(
-                                    controller.packagesCtrl.text,
-                                    style: pw.TextStyle(font: font, fontSize: 8),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            pw.Expanded(
-                              flex: 12,
-                              child: pw.Container(
-                                padding: const pw.EdgeInsets.all(2),
-                                decoration: pw.BoxDecoration(
-                                  border: pw.Border(right: pw.BorderSide(width: 1)),
-                                ),
-                                child: pw.Center(
-                                  child: pw.Text(
-                                    controller.methodPackageCtrl.text,
-                                    style: pw.TextStyle(font: font, fontSize: 8),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            pw.Expanded(
-                              flex: 20,
-                              child: pw.Container(
-                                padding: const pw.EdgeInsets.all(2),
-                                child: pw.Center(
-                                  child: pw.Text(
-                                    controller.natureGoodsCtrl.text,
-                                    style: pw.TextStyle(font: font, fontSize: 8),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+        ),
+        child: pw.Row(
+          children: [
+            pw.Expanded(
+              child: pw.Container(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border(right: pw.BorderSide(width: 1)),
                 ),
-              ),
-
-              // Right side: Invoice and E-way section
-              pw.Expanded(
-                flex: 2,
                 child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  mainAxisAlignment: pw.MainAxisAlignment.start,
                   children: [
-                    // Invoice section
+                    pw.Text('Charges for', style: pw.TextStyle(font: boldFont, fontSize: 8)),
+                    pw.SizedBox(height: 2),
                     pw.Container(
-                      height: 40,
-                      decoration: pw.BoxDecoration(
-                        border: pw.Border(bottom: pw.BorderSide(width: 1)),
-                      ),
-                      child: pw.Row(
-                        children: [
-                          pw.Expanded(
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.all(3),
-                              decoration: pw.BoxDecoration(
-                                border: pw.Border(right: pw.BorderSide(width: 1)),
-                              ),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                children: [
-                                  pw.Text(
-                                    'Invoice No.:',
-                                    style: pw.TextStyle(font: boldFont, fontSize: 7),
-                                  ),
-                                  pw.SizedBox(height: 1),
-                                  pw.Text(
-                                    '1. ${controller.customInvoiceCtrl.text}',
-                                    style: pw.TextStyle(font: font, fontSize: 6.5),
-                                  ),
-                                  pw.Text(
-                                    '2.',
-                                    style: pw.TextStyle(font: font, fontSize: 6.5),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          pw.Expanded(
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.all(3),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                children: [
-
-                                  pw.Text(
-
-                                    'Date :${controller.gcDateCtrl.text}',
-                                    style: pw.TextStyle(font: boldFont, fontSize: 7),
-                                  ),
-                                  // pw.SizedBox(height: 1),
-                                  // pw.Text(
-                                  //   controller.gcDateCtrl.text,
-                                  //   style: pw.TextStyle(font: font, fontSize: 6.5),
-                                  // ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // E-way section
-                    pw.Container(
-                      height: 40,
-                      child: pw.Row(
-                        children: [
-                          pw.Expanded(
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.all(3),
-                              decoration: pw.BoxDecoration(
-                                border: pw.Border(right: pw.BorderSide(width: 1)),
-                              ),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                children: [
-                                  pw.Text(
-                                    'E-way Billing',
-                                    style: pw.TextStyle(font: boldFont, fontSize: 7),
-                                  ),
-                                  pw.SizedBox(height: 1),
-                                  pw.Text(
-                                    '1. ${controller.ewayBillCtrl.text}',
-                                    style: pw.TextStyle(font: font, fontSize: 6.5),
-                                  ),
-                                  pw.Text(
-                                    '2.',
-                                    style: pw.TextStyle(font: font, fontSize: 6.5),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          pw.Expanded(
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.all(3),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                children: [
-                                  pw.Text(
-                                    'Exp. Date',
-                                    style: pw.TextStyle(font: boldFont, fontSize: 7),
-                                  ),
-                                  pw.SizedBox(height: 1),
-                                  pw.Text(
-                                    controller.ewayExpiredCtrl.text,
-                                    style: pw.TextStyle(font: font, fontSize: 6.5),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
+                      width: double.infinity,
+                      child: pw.Text(
+                        'FTL',
+                        style: pw.TextStyle(font: font, fontSize: 8),
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-
-        // Combined section: Left side (stacked tables) and Right side (certificate/freight)
-        pw.Container(
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(width: 1),
-          ),
-          child: pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // LEFT SIDE: Stacked tables
-              pw.Expanded(
-                flex: 5,
+            ),
+            pw.Expanded(
+              child: pw.Container(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
                 child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  mainAxisAlignment: pw.MainAxisAlignment.start,
                   children: [
-                    // Row 1: Actual Weight and Private Marks
+                    pw.Text('Value of', style: pw.TextStyle(font: boldFont, fontSize: 8)),
+                    pw.SizedBox(height: 2),
                     pw.Container(
-                      height: 48,
-                      decoration: pw.BoxDecoration(
-                        border: pw.Border(
-                          right: pw.BorderSide(width: 1),
-                          bottom: pw.BorderSide(width: 1),
+                      width: double.infinity,
+                      child: pw.Text(
+                        controller.invValueCtrl.text,
+                        style: pw.TextStyle(font: font, fontSize: 8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+
+      // Row 3: Delivery Instructions
+      pw.Container(
+        height: 50,
+        decoration: pw.BoxDecoration(
+          border: pw.Border(right: pw.BorderSide(width: 1)),
+        ),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          mainAxisAlignment: pw.MainAxisAlignment.start,
+          children: [
+            pw.Center(
+              child: pw.Text(
+                'Delivery from & Special Instructions',
+                style: pw.TextStyle(font: boldFont, fontSize: 7.5),
+              ),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              controller.deliveryInstructionsCtrl.text,
+              style: pw.TextStyle(font: font, fontSize: 7),
+              maxLines: 2,
+              overflow: pw.TextOverflow.clip,
+            ),
+            pw.Spacer(),
+            pw.Divider(height: 1),
+            pw.SizedBox(height: 1),
+            pw.Text(
+              'GSTIN to be paid by : Consignor / Consignee',
+              style: pw.TextStyle(font: font, fontSize: 7.5),
+            ),
+          ],
+        ),
+      ),
+    ],
+    ),
+    ),
+
+        // RIGHT SIDE: Certificate and Freight section
+        pw.Expanded(
+          flex: 9,
+          child: pw.Column(
+            children: [
+              // Header row
+              pw.Container(
+                height: 22,
+                decoration: pw.BoxDecoration(
+                  border: pw.Border(bottom: pw.BorderSide(width: 1)),
+                ),
+                child: pw.Row(
+                  children: [
+                    // Not responsible for leakage
+                    pw.Expanded(
+                      flex: 5,
+                      child: pw.Container(
+                        padding: const pw.EdgeInsets.all(2),
+                        decoration: pw.BoxDecoration(
+                          border: pw.Border(right: pw.BorderSide(width: 1)),
+                        ),
+                        child: pw.Center(
+                          child: pw.Text(
+                            'Not responsible for leakage or Breakage',
+                            style: pw.TextStyle(
+                              font: boldFont,
+                              fontSize: 8,
+                              color: PdfColors.red,
+                            ),
+                            textAlign: pw.TextAlign.center,
+                          ),
                         ),
                       ),
-                      child: pw.Row(
-                        children: [
-                          // Actual Weight
-                          pw.Expanded(
-                            flex: 1,
-                            child: pw.Container(
-                              decoration: pw.BoxDecoration(
-                                border: pw.Border(right: pw.BorderSide(width: 1)),
-                              ),
-                              child: pw.Column(
-                                children: [
-                                  pw.Container(
-                                    height: 22,
-                                    decoration: pw.BoxDecoration(
-                                      border: pw.Border(bottom: pw.BorderSide(width: 1)),
-                                    ),
-                                    child: pw.Center(
-                                      child: pw.Text(
-                                        'Actual Weight\nKgs.',
-                                        style: pw.TextStyle(font: boldFont, fontSize: 7.5),
-                                        textAlign: pw.TextAlign.center,
-                                      ),
-                                    ),
-                                  ),
-                                  pw.Expanded(
-                                    child: pw.Center(
-                                      child: pw.Text(
-                                        controller.actualWeightCtrl.text,
-                                        style: pw.TextStyle(font: font, fontSize: 9),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                    ),
+                    // Freight to pay
+                    pw.Expanded(
+                      flex: 5,
+                      child: pw.Container(
+                        padding: const pw.EdgeInsets.all(2),
+                        decoration: pw.BoxDecoration(
+                          border: pw.Border(right: pw.BorderSide(width: 1)),
+                        ),
+                        child: pw.Center(
+                          child: pw.Text(
+                            'FREIGHT TO PAY Rs.          P.',
+                            style: pw.TextStyle(font: boldFont, fontSize: 8),
                           ),
-                          // Private Marks
-                          pw.Expanded(
-                            flex: 1,
-                            child: pw.Column(
+                        ),
+                      ),
+                    ),
+                    // Payment section
+                    pw.Expanded(
+                      flex: 4,
+                      child: pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                        child: pw.Column(
+                          mainAxisAlignment: pw.MainAxisAlignment.center,
+                          children: [
+                            pw.Text('Payment', style: pw.TextStyle(font: boldFont, fontSize: 7.5)),
+                            pw.Text('Frieght Receipt', style: pw.TextStyle(font: boldFont, fontSize: 7)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Content row
+              pw.Container(
+                height: 110,
+                child: pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    // Certificate column
+                    pw.Expanded(
+                      flex: 5,
+                      child: pw.Container(
+                        padding: const pw.EdgeInsets.all(6),
+                        decoration: pw.BoxDecoration(
+                          border: pw.Border(right: pw.BorderSide(width: 1)),
+                        ),
+                        child: pw.Center(
+                          child: pw.Text(
+                            '"Certified that the credit of Input Tax Charged on Goods and Services used in Supplying of GTA Services has not been Taken in view of Notification Issued under Goods & Service Tax"',
+                            style: pw.TextStyle(font: font, fontSize: 7),
+                            textAlign: pw.TextAlign.justify,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Freight breakdown column
+                    pw.Expanded(
+                      flex: 5,
+                      child: pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        decoration: pw.BoxDecoration(
+                          border: pw.Border(right: pw.BorderSide(width: 1)),
+                        ),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+                          children: [
+                            pw.Row(
+                              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                               children: [
-                                pw.Container(
-                                  height: 22,
-                                  decoration: pw.BoxDecoration(
-                                    border: pw.Border(bottom: pw.BorderSide(width: 1)),
-                                  ),
-                                  child: pw.Center(
-                                    child: pw.Text(
-                                      'Private Marks',
-                                      style: pw.TextStyle(font: boldFont, fontSize: 7.5),
-                                      textAlign: pw.TextAlign.center,
-                                    ),
-                                  ),
-                                ),
-                                pw.Expanded(
-                                  child: pw.Center(
-                                    child: pw.Text(
-                                      'O / R',
-                                      style: pw.TextStyle(font: font, fontSize: 9),
-                                    ),
-                                  ),
-                                ),
+                                pw.Text('Frieght per Ton. C.M.', style: pw.TextStyle(font: font, fontSize: 8)),
+                                pw.Container(width: 35, height: 1, color: PdfColors.black),
                               ],
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Row 2: Charges for and Value of
-                    pw.Container(
-                      height: 33,
-                      decoration: pw.BoxDecoration(
-                        border: pw.Border(
-                          right: pw.BorderSide(width: 1),
-                          bottom: pw.BorderSide(width: 1),
+                            pw.Row(
+                              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                              children: [
+                                pw.Text('Surcharges (Goods/Tax)', style: pw.TextStyle(font: font, fontSize: 8)),
+                                pw.Container(width: 35, height: 1, color: PdfColors.black),
+                              ],
+                            ),
+                            pw.Row(
+                              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                              children: [
+                                pw.Text('Hamali', style: pw.TextStyle(font: font, fontSize: 8)),
+                                pw.Container(width: 35, height: 1, color: PdfColors.black),
+                              ],
+                            ),
+                            pw.Row(
+                              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                              children: [
+                                pw.Text('Risk Charges', style: pw.TextStyle(font: font, fontSize: 8)),
+                                pw.Container(width: 35, height: 1, color: PdfColors.black),
+                              ],
+                            ),
+                            pw.Row(
+                              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                              children: [
+                                pw.Text('St. Charges', style: pw.TextStyle(font: font, fontSize: 8)),
+                                pw.Container(width: 35, height: 1, color: PdfColors.black),
+                              ],
+                            ),
+                            pw.Container(height: 1, width: double.infinity, color: PdfColors.black),
+                            pw.Row(
+                              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                              children: [
+                                pw.Text('Total', style: pw.TextStyle(font: boldFont, fontSize: 8)),
+                                pw.Container(width: 35, height: 1, color: PdfColors.black),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      child: pw.Row(
-                        children: [
-                          pw.Expanded(
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-                              decoration: pw.BoxDecoration(
-                                border: pw.Border(right: pw.BorderSide(width: 1)),
-                              ),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                mainAxisAlignment: pw.MainAxisAlignment.start,
-                                children: [
-                                  pw.Text('Charges for', style: pw.TextStyle(font: boldFont, fontSize: 8)),
-                                  pw.SizedBox(height: 2),
-                                  pw.Container(
-                                    width: double.infinity,
-                                    child: pw.Text(
-                                      'FTL',
-                                      style: pw.TextStyle(font: font, fontSize: 8),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          pw.Expanded(
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                mainAxisAlignment: pw.MainAxisAlignment.start,
-                                children: [
-                                  pw.Text('Value of', style: pw.TextStyle(font: boldFont, fontSize: 8)),
-                                  pw.SizedBox(height: 2),
-                                  pw.Container(
-                                    width: double.infinity,
-                                    child: pw.Text(
-                                      controller.invValueCtrl.text,
-                                      style: pw.TextStyle(font: font, fontSize: 8),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
-
-                    // Row 3: Delivery Instructions
-                    pw.Container(
-                      height: 50,
-                      decoration: pw.BoxDecoration(
-                        border: pw.Border(right: pw.BorderSide(width: 1)),
-                      ),
-                      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        mainAxisAlignment: pw.MainAxisAlignment.start,
-                        children: [
-                          pw.Center(
-                            child: pw.Text(
-                              'Delivery from & Special Instructions',
-                              style: pw.TextStyle(font: boldFont, fontSize: 7.5),
-                            ),
-                          ),
-                          pw.SizedBox(height: 4),
-                          pw.Text(
-                            controller.deliveryInstructionsCtrl.text,
-                            style: pw.TextStyle(font: font, fontSize: 7),
-                            maxLines: 2,
-                            overflow: pw.TextOverflow.clip,
-                          ),
-                          pw.Spacer(),
-                          pw.Divider(height: 1),
-                          pw.SizedBox(height: 1),
-                          pw.Text(
-                            'GSTIN to be paid by : Consignor / Consignee',
-                            style: pw.TextStyle(font: font, fontSize: 7.5),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // RIGHT SIDE: Certificate and Freight section
-              pw.Expanded(
-                flex: 9,
-                child: pw.Column(
-                  children: [
-                    // Header row
-                    pw.Container(
-                      height: 22,
-                      decoration: pw.BoxDecoration(
-                        border: pw.Border(bottom: pw.BorderSide(width: 1)),
-                      ),
-                      child: pw.Row(
-                        children: [
-                          // Not responsible for leakage
-                          pw.Expanded(
-                            flex: 5,
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.all(2),
-                              decoration: pw.BoxDecoration(
-                                border: pw.Border(right: pw.BorderSide(width: 1)),
-                              ),
-                              child: pw.Center(
-                                child: pw.Text(
-                                  'Not responsible for leakage or Breakage',
-                                  style: pw.TextStyle(
-                                    font: boldFont,
-                                    fontSize: 8,
-                                    color: PdfColors.red,
-                                  ),
-                                  textAlign: pw.TextAlign.center,
-                                ),
-                              ),
-                            ),
-                          ),
-                          // Freight to pay
-                          pw.Expanded(
-                            flex: 5,
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.all(2),
-                              decoration: pw.BoxDecoration(
-                                border: pw.Border(right: pw.BorderSide(width: 1)),
-                              ),
-                              child: pw.Center(
-                                child: pw.Text(
-                                  'FREIGHT TO PAY Rs.          P.',
-                                  style: pw.TextStyle(font: boldFont, fontSize: 8),
-                                ),
-                              ),
-                            ),
-                          ),
-                          // Payment section
-                          pw.Expanded(
-                            flex: 4,
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                              child: pw.Column(
-                                mainAxisAlignment: pw.MainAxisAlignment.center,
-                                children: [
-                                  pw.Text('Payment', style: pw.TextStyle(font: boldFont, fontSize: 7.5)),
-                                  pw.Text('Frieght Receipt', style: pw.TextStyle(font: boldFont, fontSize: 7)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Content row
-                    pw.Container(
-                      height: 110,
-                      child: pw.Row(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          // Certificate column
-                          pw.Expanded(
-                            flex: 5,
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.all(6),
-                              decoration: pw.BoxDecoration(
-                                border: pw.Border(right: pw.BorderSide(width: 1)),
-                              ),
-                              child: pw.Center(
-                                child: pw.Text(
-                                  '"Certified that the credit of Input Tax Charged on Goods and Services used in Supplying of GTA Services has not been Taken in view of Notification Issued under Goods & Service Tax"',
-                                  style: pw.TextStyle(font: font, fontSize: 7),
-                                  textAlign: pw.TextAlign.justify,
-                                ),
-                              ),
-                            ),
-                          ),
-                          // Freight breakdown column
-                          pw.Expanded(
-                            flex: 5,
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                              decoration: pw.BoxDecoration(
-                                border: pw.Border(right: pw.BorderSide(width: 1)),
-                              ),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
-                                children: [
-                                  pw.Row(
-                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      pw.Text('Frieght per Ton. C.M.', style: pw.TextStyle(font: font, fontSize: 8)),
-                                      pw.Container(width: 35, height: 1, color: PdfColors.black),
-                                    ],
-                                  ),
-                                  pw.Row(
-                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      pw.Text('Surcharges (Goods/Tax)', style: pw.TextStyle(font: font, fontSize: 8)),
-                                      pw.Container(width: 35, height: 1, color: PdfColors.black),
-                                    ],
-                                  ),
-                                  pw.Row(
-                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      pw.Text('Hamali', style: pw.TextStyle(font: font, fontSize: 8)),
-                                      pw.Container(width: 35, height: 1, color: PdfColors.black),
-                                    ],
-                                  ),
-                                  pw.Row(
-                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      pw.Text('Risk Charges', style: pw.TextStyle(font: font, fontSize: 8)),
-                                      pw.Container(width: 35, height: 1, color: PdfColors.black),
-                                    ],
-                                  ),
-                                  pw.Row(
-                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      pw.Text('St. Charges', style: pw.TextStyle(font: font, fontSize: 8)),
-                                      pw.Container(width: 35, height: 1, color: PdfColors.black),
-                                    ],
-                                  ),
-                                  pw.Container(height: 1, width: double.infinity, color: PdfColors.black),
-                                  pw.Row(
-                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      pw.Text('Total', style: pw.TextStyle(font: boldFont, fontSize: 8)),
-                                      pw.Container(width: 35, height: 1, color: PdfColors.black),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          // Receipt column
-                          pw.Expanded(
-                            flex: 4,
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                mainAxisAlignment: pw.MainAxisAlignment.start,
-                                children: [
-                                  pw.Text('Receipt / Bill No.', style: pw.TextStyle(font: font, fontSize: 7.5)),
-                                  pw.SizedBox(height: 6),
-                                  pw.Container(width: double.infinity, height: 1, color: PdfColors.black),
-                                  pw.SizedBox(height: 14),
-                                  pw.Text('Date', style: pw.TextStyle(font: font, fontSize: 7.5)),
-                                  pw.SizedBox(height: 6),
-                                  pw.Container(width: double.infinity, height: 1, color: PdfColors.black),
-                                  pw.SizedBox(height: 14),
-                                  pw.Text('Amount', style: pw.TextStyle(font: font, fontSize: 7.5)),
-                                  pw.SizedBox(height: 6),
-                                  pw.Container(width: double.infinity, height: 1, color: PdfColors.black),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
+                    // Receipt column
+                    pw.Expanded(
+                      flex: 4,
+                      child: pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          mainAxisAlignment: pw.MainAxisAlignment.start,
+                          children: [
+                            pw.Text('Receipt / Bill No.', style: pw.TextStyle(font: font, fontSize: 7.5)),
+                            pw.SizedBox(height: 6),
+                            pw.Container(width: double.infinity, height: 1, color: PdfColors.black),
+                            pw.SizedBox(height: 14),
+                            pw.Text('Date', style: pw.TextStyle(font: font, fontSize: 7.5)),
+                            pw.SizedBox(height: 6),
+                            pw.Container(width: double.infinity, height: 1, color: PdfColors.black),
+                            pw.SizedBox(height: 14),
+                            pw.Text('Amount', style: pw.TextStyle(font: font, fontSize: 7.5)),
+                            pw.SizedBox(height: 6),
+                            pw.Container(width: double.infinity, height: 1, color: PdfColors.black),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -1201,6 +1227,9 @@ class GCPdfGenerator {
           ),
         ),
       ],
+    ),
+    ),
+    ],
     );
   }
 
@@ -1210,37 +1239,50 @@ class GCPdfGenerator {
       GCFormController controller, {
         required String copyTitle,
       }) {
-    return pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: pw.CrossAxisAlignment.end,
+    return pw.Column(
       children: [
-        pw.Column(
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: pw.CrossAxisAlignment.end,
           children: [
-            pw.Container(width: 150, height: 0.5, child: pw.Divider()),
-            pw.SizedBox(height: 2),
+            pw.Column(
+              children: [
+                pw.Container(width: 150, height: 0.5, child: pw.Divider()),
+                pw.SizedBox(height: 2),
+                pw.Text(
+                  'Signature of Consignor or his Agent',
+                  style: pw.TextStyle(font: font, fontSize: 8),
+                ),
+              ],
+            ),
             pw.Text(
-              'Signature of Consignor or his Agent',
-              style: pw.TextStyle(font: font, fontSize: 8),
+              copyTitle,
+              style: pw.TextStyle(
+                font: boldFont,
+                fontSize: 12,
+                color: PdfColors.red,
+              ),
+            ),
+            pw.Column(
+              children: [
+                pw.Container(width: 150, height: 0.5, child: pw.Divider()),
+                pw.SizedBox(height: 2),
+                pw.Text(
+                  'Signature of Booking Officer',
+                  style: pw.TextStyle(font: font, fontSize: 8),
+                ),
+              ],
             ),
           ],
         ),
-        pw.Text(
-          copyTitle,
-          style: pw.TextStyle(
-            font: boldFont,
-            fontSize: 12,
-            color: PdfColors.red,
+        pw.SizedBox(height: 10),
+        // Subject to Chennai Jurisdiction at the bottom
+        pw.Center(
+          child: pw.Text(
+            'Subject to Chennai Jurisdiction',
+            style: pw.TextStyle(font: font, fontSize: 8),
+            textAlign: pw.TextAlign.center,
           ),
-        ),
-        pw.Column(
-          children: [
-            pw.Container(width: 150, height: 0.5, child: pw.Divider()),
-            pw.SizedBox(height: 2),
-            pw.Text(
-              'Signature of Booking Officer',
-              style: pw.TextStyle(font: font, fontSize: 8),
-            ),
-          ],
         ),
       ],
     );
@@ -1265,6 +1307,7 @@ class GCPdfGenerator {
       GCFormController controller,
       ) async {
     print('Date from form :${controller.gcDateCtrl.text}');
+    print('Delivery address : ${controller.deliveryAddressCtrl.text}');
     final pdfData = await generatePDF(controller);
     final gcNumber = controller.gcNumberCtrl.text.isNotEmpty
         ? controller.gcNumberCtrl.text

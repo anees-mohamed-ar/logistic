@@ -7,9 +7,31 @@ import 'package:logistic/controller/id_controller.dart';
 
 class BrokerController extends GetxController {
   final String baseUrl = '${ApiConfig.baseUrl}/broker';
-  var brokers = <Broker>[].obs;
-  var isLoading = false.obs;
+  final brokers = <Broker>[].obs;
+  final filteredBrokers = <Broker>[].obs;
+  final isLoading = false.obs;
+  final error = ''.obs;
   final idController = Get.find<IdController>();
+  
+  // For search functionality
+  void filterBrokers(String query) {
+    if (query.isEmpty) {
+      filteredBrokers.assignAll(brokers);
+      return;
+    }
+    
+    final queryLower = query.toLowerCase();
+    filteredBrokers.assignAll(brokers.where((broker) {
+      return broker.brokerName.toLowerCase().contains(queryLower) ||
+          (broker.phoneNumber?.toLowerCase().contains(queryLower) ?? false) ||
+          (broker.email?.toLowerCase().contains(queryLower) ?? false);
+    }));
+  }
+  
+  // Refresh brokers list
+  Future<void> refreshBrokers() async {
+    await fetchBrokers();
+  }
 
   @override
   void onInit() {
@@ -20,6 +42,7 @@ class BrokerController extends GetxController {
   Future<void> fetchBrokers() async {
     try {
       isLoading(true);
+      error.value = '';
       final response = await http.get(
         Uri.parse('$baseUrl/search'),
         headers: {'Content-Type': 'application/json'},
@@ -27,12 +50,14 @@ class BrokerController extends GetxController {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        brokers.value = data.map((json) => Broker.fromJson(json)).toList();
+        brokers.assignAll(data.map((json) => Broker.fromJson(json)).toList());
+        filteredBrokers.assignAll(brokers);
       } else {
-        Get.snackbar('Error', 'Failed to load brokers');
+        final errorData = json.decode(response.body);
+        error.value = errorData['message'] ?? 'Failed to load brokers';
       }
     } catch (e) {
-      Get.snackbar('Error', 'An error occurred: $e');
+      error.value = 'An error occurred: $e';
     } finally {
       isLoading(false);
     }
@@ -41,8 +66,8 @@ class BrokerController extends GetxController {
   Future<bool> addBroker(Broker broker) async {
     try {
       isLoading(true);
+      error.value = '';
       final brokerData = broker.toJson();
-      print('Sending broker data: $brokerData');
       
       final response = await http.post(
         Uri.parse('$baseUrl/add'),
@@ -50,21 +75,18 @@ class BrokerController extends GetxController {
         body: json.encode(brokerData),
       );
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
       if (response.statusCode == 200) {
         await fetchBrokers();
         return true;
       } else {
-        final error = json.decode(response.body)['error'] ?? 'Failed to add broker';
-        Get.snackbar('Error', error);
+        final errorData = json.decode(response.body);
+        error.value = errorData['error'] ?? 'Failed to add broker';
+        Get.snackbar('Error', error.value);
         return false;
       }
-    } catch (e, stackTrace) {
-      print('Error in addBroker: $e');
-      print('Stack trace: $stackTrace');
-      Get.snackbar('Error', 'An error occurred: $e');
+    } catch (e) {
+      error.value = 'An error occurred: $e';
+      Get.snackbar('Error', error.value);
       return false;
     } finally {
       isLoading(false);
@@ -74,13 +96,14 @@ class BrokerController extends GetxController {
   Future<bool> updateBroker(Broker broker) async {
     try {
       if (broker.id == null) {
-        Get.snackbar('Error', 'Cannot update broker: Missing ID');
+        error.value = 'Cannot update broker: Missing ID';
+        Get.snackbar('Error', error.value);
         return false;
       }
       
       isLoading(true);
+      error.value = '';
       final brokerData = broker.toJson();
-      print('Updating broker with data: $brokerData');
       
       final response = await http.put(
         Uri.parse('$baseUrl/update/${broker.id}'),
@@ -88,21 +111,18 @@ class BrokerController extends GetxController {
         body: json.encode(brokerData),
       );
 
-      print('Update response status: ${response.statusCode}');
-      print('Update response body: ${response.body}');
-
       if (response.statusCode == 200) {
         await fetchBrokers();
         return true;
       } else {
-        final error = json.decode(response.body)['error'] ?? 'Failed to update broker';
-        Get.snackbar('Error', error);
+        final errorData = json.decode(response.body);
+        error.value = errorData['error'] ?? 'Failed to update broker';
+        Get.snackbar('Error', error.value);
         return false;
       }
-    } catch (e, stackTrace) {
-      print('Error in updateBroker: $e');
-      print('Stack trace: $stackTrace');
-      Get.snackbar('Error', 'An error occurred: $e');
+    } catch (e) {
+      error.value = 'An error occurred: $e';
+      Get.snackbar('Error', error.value);
       return false;
     } finally {
       isLoading(false);
@@ -112,6 +132,7 @@ class BrokerController extends GetxController {
   Future<bool> deleteBroker(int id) async {
     try {
       isLoading(true);
+      error.value = '';
       final response = await http.delete(
         Uri.parse('$baseUrl/delete/$id'),
         headers: {'Content-Type': 'application/json'},
@@ -121,12 +142,14 @@ class BrokerController extends GetxController {
         await fetchBrokers();
         return true;
       } else {
-        final error = json.decode(response.body)['error'] ?? 'Failed to delete broker';
-        Get.snackbar('Error', error);
+        final errorData = json.decode(response.body);
+        error.value = errorData['error'] ?? 'Failed to delete broker';
+        Get.snackbar('Error', error.value);
         return false;
       }
     } catch (e) {
-      Get.snackbar('Error', 'An error occurred: $e');
+      error.value = 'An error occurred: $e';
+      Get.snackbar('Error', error.value);
       return false;
     } finally {
       isLoading(false);

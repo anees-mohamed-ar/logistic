@@ -27,11 +27,14 @@ import 'package:logistic/views/broker/broker_list_page.dart';
 import 'package:logistic/views/broker/add_edit_broker_page.dart';
 import 'package:logistic/views/weight_rate/weight_rate_list_page.dart';
 import 'package:logistic/views/weight_rate/add_edit_weight_rate_page.dart';
+import 'package:logistic/screens/settings_menu_screen.dart';
+import 'package:logistic/screens/settings_screen.dart';
 import 'package:logistic/views/truck/truck_list_page.dart';
 import 'package:logistic/views/truck/truck_form_page.dart';
 import 'package:logistic/bindings/truck_binding.dart';
 import 'package:logistic/register_screen.dart';
 import 'package:logistic/gc_assignment_page.dart';
+import 'package:logistic/screens/settings_screen.dart';
 
 class AppRoutes {
   // Route names
@@ -48,6 +51,8 @@ class AppRoutes {
   static const String userManagement = '/user_management';
   static const String driverManagement = '/driver_management';
   static const String kmList = '/km_list';
+  static const String settings = '/settings';
+  static const String changePassword = '/settings/change-password';
   static const String kmForm = '/km_form';
   static const String locationList = '/location_list';
   static const String locationForm = '/location_form';
@@ -89,6 +94,21 @@ class AppRoutes {
     GetPage(
       name: gcForm, 
       page: () => const GCFormScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: kmList,
+      page: () => KMListPage(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: settings,
+      page: () => const SettingsMenuScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: changePassword,
+      page: () => const ChangePasswordScreen(),
       transition: Transition.rightToLeft,
     ),
     GetPage(

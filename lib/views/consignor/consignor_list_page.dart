@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:logistic/controller/consignor_controller.dart';
+import 'package:logistic/models/consignor.dart';
 import 'package:logistic/widgets/custom_app_bar.dart';
 import 'add_edit_consignor_page.dart';
-import 'package:logistic/models/consignor.dart';
 
 class ConsignorListPage extends StatelessWidget {
   final ConsignorController controller = Get.put(ConsignorController());
@@ -48,38 +48,120 @@ class ConsignorListPage extends StatelessWidget {
           );
         }
 
-        return RefreshIndicator(
-          onRefresh: () => controller.fetchConsignors(),
-          child: ListView.builder(
-            itemCount: controller.consignors.length,
-            itemBuilder: (context, index) {
-              final consignor = controller.consignors[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: ListTile(
-                  title: Text(consignor.consignorName),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('GST: ${consignor.gst}'),
-                      Text('Location: ${consignor.location}, ${consignor.state}'),
-                      Text('Contact: ${consignor.contact} (${consignor.mobileNumber})'),
-                    ],
+        return Column(
+          children: [
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TextField(
+                controller: controller.searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search consignors...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
                   ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.blue),
-                        onPressed: () => _navigateToEditPage(consignor),
-                      ),
-                    ],
-                  ),
-                  onTap: () => _navigateToEditPage(consignor),
+                  filled: true,
+                  fillColor: Colors.grey[200],
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                  suffixIcon: controller.searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            controller.searchController.clear();
+                            controller.filterConsignors('');
+                          },
+                        )
+                      : null,
                 ),
-              );
-            },
-          ),
+                onChanged: (value) => controller.filterConsignors(value),
+              ),
+            ),
+            // Consignors List
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () => controller.fetchConsignors(),
+                child: ListView.builder(
+                  // itemExtent: 100, // Fixed height for each item
+                  cacheExtent: 1000, // Cache more items off-screen for smoother scrolling
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  itemCount: controller.filteredConsignors.length,
+                  itemBuilder: (context, index) {
+                    final consignor = controller.filteredConsignors[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.blue.shade100,
+                          child: Text(
+                            consignor.consignorName.isNotEmpty ? consignor.consignorName[0].toUpperCase() : 'C',
+                            style: const TextStyle(color: Colors.blue),
+                          ),
+                        ),
+                        title: Text(
+                          consignor.consignorName,
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (consignor.mobileNumber.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.phone, size: 14, color: Colors.grey),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      consignor.mobileNumber,
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            if (consignor.gst.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.receipt, size: 14, color: Colors.grey),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      consignor.gst,
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            if (consignor.location.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        '${consignor.location}${consignor.state.isNotEmpty ? ', ${consignor.state}' : ''}',
+                                        style: const TextStyle(fontSize: 13),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                        onTap: () => Get.to(() => AddEditConsignorPage(consignor: consignor)),
+                      ),
+                    );
+                    
+                  },
+                ),
+              ),
+            ),
+          ],
         );
       }),
       floatingActionButton: FloatingActionButton(
@@ -87,6 +169,7 @@ class ConsignorListPage extends StatelessWidget {
         backgroundColor: const Color(0xFF1E2A44),
         child: const Icon(Icons.add, color: Colors.white),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 

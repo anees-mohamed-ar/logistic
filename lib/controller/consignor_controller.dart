@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:get_storage/get_storage.dart';
@@ -8,12 +9,41 @@ import '../api_config.dart';
 class ConsignorController extends GetxController {
   final isLoading = false.obs;
   final consignors = <Consignor>[].obs;
+  final filteredConsignors = <Consignor>[].obs;
+  final TextEditingController searchController = TextEditingController();
   final storage = GetStorage();
 
   @override
   void onInit() {
     super.onInit();
     fetchConsignors();
+    // Initialize filtered list with all consignors
+    ever(consignors, (_) => filterConsignors(''));
+    // Update filtered list when search text changes
+    searchController.addListener(() => filterConsignors(searchController.text));
+  }
+
+  @override
+  void onClose() {
+    searchController.dispose();
+    super.onClose();
+  }
+
+  void filterConsignors(String query) {
+    if (query.isEmpty) {
+      filteredConsignors.assignAll(consignors);
+      return;
+    }
+
+    final searchLower = query.toLowerCase();
+    filteredConsignors.assignAll(consignors.where((consignor) {
+      return consignor.consignorName.toLowerCase().contains(searchLower) ||
+          (consignor.mobileNumber?.toLowerCase().contains(searchLower) ?? false) ||
+          (consignor.gst?.toLowerCase().contains(searchLower) ?? false) ||
+          (consignor.location?.toLowerCase().contains(searchLower) ?? false) ||
+          (consignor.state?.toLowerCase().contains(searchLower) ?? false) ||
+          (consignor.email?.toLowerCase().contains(searchLower) ?? false);
+    }));
   }
 
   Future<void> fetchConsignors() async {

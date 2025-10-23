@@ -7,6 +7,8 @@ import 'package:logistic/api_config.dart';
 class CustomerController extends GetxController {
   final isLoading = false.obs;
   final customers = <Customer>[].obs;
+  final filteredCustomers = <Customer>[].obs;
+  final error = ''.obs;
   final _client = http.Client();
 
   @override
@@ -14,32 +16,37 @@ class CustomerController extends GetxController {
     super.onInit();
     print('CustomerController initialized');
     fetchCustomers();
+    // Initialize filtered list with all items
+    ever(customers, (_) => filterCustomers(''));
   }
 
   Future<void> fetchCustomers() async {
     try {
       print('Fetching customers from: ${ApiConfig.baseUrl}/customer/search');
       isLoading.value = true;
+      error.value = '';
       final response = await _client.get(
         Uri.parse('${ApiConfig.baseUrl}/customer/search'),
         headers: {'Content-Type': 'application/json'},
       );
       
       print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
       
       if (response.statusCode == 200) {
         print('Customers fetched successfully');
         final List<dynamic> data = jsonDecode(response.body);
         customers.value = data.map((json) => Customer.fromJson(json)).toList();
+        filterCustomers('');
         print('Total customers: ${customers.length}');
-        print('Successfully loaded ${customers.length} customers');
       } else {
-        print('Failed to load customers. Status code: ${response.statusCode}');
-        throw Exception('Failed to load customers');
+        final errorMessage = 'Failed to load customers. Status: ${response.statusCode}';
+        error.value = errorMessage;
+        throw Exception(errorMessage);
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to load customers');
+      final errorMessage = 'Failed to load customers: ${e.toString()}';
+      error.value = errorMessage;
+      Get.snackbar('Error', errorMessage);
     } finally {
       isLoading.value = false;
     }
@@ -95,6 +102,25 @@ class CustomerController extends GetxController {
     }
   }
   
+  void filterCustomers(String query) {
+    if (query.isEmpty) {
+      filteredCustomers.assignAll(customers);
+    } else {
+      final queryLower = query.toLowerCase();
+      filteredCustomers.assignAll(customers.where((customer) {
+        return customer.customerName.toLowerCase().contains(queryLower) ||
+               customer.phoneNumber.contains(query) ||
+               customer.mobileNumber.contains(query) ||
+               customer.gst.toLowerCase().contains(queryLower) ||
+               customer.address.toLowerCase().contains(queryLower);
+      }).toList());
+    }
+  }
+
+  Future<void> refreshCustomers() async {
+    await fetchCustomers();
+  }
+
   @override
   void onClose() {
     _client.close();

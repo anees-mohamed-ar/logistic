@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:logistic/controller/truck_controller.dart';
 import 'package:logistic/models/truck.dart';
-import 'package:logistic/routes.dart';
+import 'package:logistic/views/truck/truck_form_page.dart';
 import 'package:logistic/widgets/custom_app_bar.dart';
-import 'package:logistic/widgets/loading_indicator.dart';
-import 'package:logistic/widgets/custom_text_field.dart';
 
 class TruckListPage extends StatefulWidget {
   const TruckListPage({super.key});
@@ -15,39 +13,16 @@ class TruckListPage extends StatefulWidget {
 }
 
 class _TruckListPageState extends State<TruckListPage> {
-  late final TruckController _controller;
-  final TextEditingController _searchController = TextEditingController();
+  final TruckController controller = Get.put(TruckController());
+  final searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _controller = Get.find<TruckController>();
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _onSearchChanged(String query) {
-    _controller.searchTrucks(query);
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$label: ',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          Expanded(child: Text(value)),
-        ],
-      ),
-    );
+    controller.fetchTrucks();
+    searchController.addListener(() {
+      controller.searchTrucks(searchController.text);
+    });
   }
 
   Future<void> _deleteTruck(int id) async {
@@ -69,7 +44,7 @@ class _TruckListPageState extends State<TruckListPage> {
     );
 
     if (confirmed == true) {
-      final success = await _controller.deleteTruck(id);
+      final success = await controller.deleteTruck(id);
       if (success) {
         Get.snackbar('Success', 'Truck deleted successfully');
       }
@@ -79,155 +54,247 @@ class _TruckListPageState extends State<TruckListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CustomAppBar(
-        title: 'Truck Management',
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Get.toNamed(AppRoutes.truckForm)?.then((_) => _controller.fetchTrucks()),
-        backgroundColor: const Color(0xFF1E2A44),
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
+      appBar: const CustomAppBar(title: 'Truck Management'),
       body: Obx(() {
-        if (_controller.isLoading.value && _controller.trucks.isEmpty) {
-          return const Center(child: LoadingIndicator());
+        if (controller.isLoading.value && controller.filteredTrucks.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (controller.error.isNotEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                const SizedBox(height: 16),
+                Text(
+                  controller.error.value,
+                  style: const TextStyle(fontSize: 16, color: Colors.red),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: controller.fetchTrucks,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E2A44),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (controller.filteredTrucks.isEmpty) {
+          if (searchController.text.isNotEmpty) {
+            return Column(
+              children: [
+                // Search Bar
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _buildSearchBar(),
+                ),
+                // Empty state with search icon
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No matching trucks found',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.local_shipping, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                const Text(
+                  'No trucks found',
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton.icon(
+                  onPressed: controller.fetchTrucks,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('Refresh'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E2A44),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
         return Column(
           children: [
+            // Search Bar
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: TextField(
-                controller: _searchController,
-                onChanged: _onSearchChanged,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                  hintText: 'Search by vehicle number, owner, or engine number',
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8.0),
-                    borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+              child: _buildSearchBar(),
+            ),
+            // Trucks List
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () => controller.refreshTrucks(),
+                child: ListView.builder(
+                  cacheExtent: 1000,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8.0),
-                    borderSide: const BorderSide(color: Colors.grey, width: 1.0),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8.0),
-                    borderSide: const BorderSide(color: Colors.blue, width: 2.0),
-                  ),
+                  itemCount: controller.filteredTrucks.length,
+                  itemBuilder: (context, index) {
+                    final truck = controller.filteredTrucks[index];
+                    return _buildTruckCard(truck);
+                  },
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: _buildTruckList(),
             ),
           ],
         );
       }),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-    );
-  }
-
-  Widget _buildTruckList() {
-    if (_controller.error.value.isNotEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Error: ${_controller.error.value}'),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _controller.fetchTrucks,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_controller.filteredTrucks.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.search_off, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text(
-              _controller.searchQuery.isEmpty 
-                  ? 'No trucks found' 
-                  : 'No trucks found for "${_controller.searchQuery.value}"',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            if (_controller.searchQuery.isNotEmpty)
-              TextButton(
-                onPressed: () {
-                  _searchController.clear();
-                  _controller.searchTrucks('');
-                },
-                child: const Text('Clear search'),
-              ),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: () => _controller.fetchTrucks(),
-      child: ListView.builder(
-        itemCount: _controller.filteredTrucks.length,
-        itemBuilder: (context, index) {
-        final truck = _controller.filteredTrucks[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: ExpansionTile(
-            title: Text(
-              truck.vechileNumber,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            subtitle: Text(
-              'Owner: ${truck.ownerName ?? 'N/A'} • ${truck.ownerMobileNumber ?? 'N/A'}',
-              style: const TextStyle(fontSize: 14),
-            ),
-            trailing: IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-              onPressed: () {
-                print('📝 Editing truck: ${truck.vechileNumber} (ID: ${truck.id})');
-                Get.toNamed(
-                  AppRoutes.truckForm,
-                  arguments: truck,
-                )?.then((_) => _controller.fetchTrucks());
-              },
-            ),
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInfoRow('Owner Name', truck.ownerName ?? 'N/A'),
-                    _buildInfoRow('Address', truck.ownerAddress ?? 'N/A'),
-                    _buildInfoRow('Mobile', truck.ownerMobileNumber ?? 'N/A'),
-                    if (truck.ownerEmail?.isNotEmpty ?? false)
-                      _buildInfoRow('Email', truck.ownerEmail!),
-                    if (truck.ownerPanNumber?.isNotEmpty ?? false)
-                      _buildInfoRow('PAN', truck.ownerPanNumber!),
-                    const Divider(),
-                    _buildInfoRow('Vehicle Type', truck.typeofVechile ?? 'N/A'),
-                    _buildInfoRow('Engine No.', truck.engineeNumber ?? 'N/A'),
-                    _buildInfoRow('Chassis No.', truck.chaseNumber ?? 'N/A'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Get.to(() => const TruckFormPage()),
+        backgroundColor: const Color(0xFF1E2A44),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
 
+  Widget _buildSearchBar() {
+    return TextField(
+      controller: searchController,
+      decoration: InputDecoration(
+        hintText: 'Search by vehicle number, owner, or engine number',
+        prefixIcon: const Icon(Icons.search),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        filled: true,
+        fillColor: Colors.grey[200],
+        contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+        suffixIcon: searchController.text.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  searchController.clear();
+                  controller.searchTrucks('');
+                },
+              )
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildTruckCard(Truck truck) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.orange.shade100,
+          child: const Icon(Icons.local_shipping, color: Colors.orange),
+        ),
+        title: Text(
+          truck.vechileNumber,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${truck.ownerName ?? 'No owner'} • ${truck.ownerMobileNumber ?? ''}',
+            ),
+            if (truck.engineeNumber?.isNotEmpty ?? false)
+              Text(
+                'Engine: ${truck.engineeNumber}',
+                style: const TextStyle(fontSize: 12),
+              ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+              onPressed: () => Get.to(() => TruckFormPage(truck: truck)),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+            // const SizedBox(width: 8),
+            // IconButton(
+            //   icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+            //   onPressed: () => _deleteTruck(truck.id!),
+            //   padding: EdgeInsets.zero,
+            //   constraints: const BoxConstraints(),
+            // ),
+          ],
+        ),
+        onTap: () => Get.to(() => TruckFormPage(truck: truck)),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+          ),
+          const Text(':  ', style: TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
+        ],
+      ),
+    );
+  }
 }
+
+//   // Future<void> _deleteTruck(String id) async {
+//   //   final confirmed = await Get.dialog<bool>(
+//   //     AlertDialog(
+//   //       title: const Text('Delete Truck'),
+//   //       content: const Text('Are you sure you want to delete this truck?'),
+//   //       actions: [
+//   //         TextButton(
+//   //           onPressed: () => Get.back(result: false),
+//   //           child: const Text('Cancel'),
+//   //         ),
+//   //         TextButton(
+//   //           onPressed: () => Get.back(result: true),
+//   //           child: const Text('Delete', style: TextStyle(color: Colors.red)),
+//   //         ),
+//   //       ],
+//   //     ),
+//     );
+//
+//     if (confirmed == true) {
+//       await controller.deleteTruck(id as int);
+//     }
+//   }
+// }

@@ -68,10 +68,19 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
           final List<dynamic> data = responseData['data'];
 
           // Filter for active and queued status only
+          // Filter and sort data to show active first, then queued by assignment time
           final filteredData = data
               .where((item) => item['status'] == 'active' || item['status'] == 'queued')
               .map((item) => GCUsageData.fromJson(item))
-              .toList();
+              .toList()
+              ..sort((a, b) {
+                // Sort active items first
+                if (a.status == 'active' && b.status != 'active') return -1;
+                if (a.status != 'active' && b.status == 'active') return 1;
+                
+                // For items with the same status, sort by assignedAt (oldest first)
+                return a.assignedAt.compareTo(b.assignedAt);
+              });
 
           setState(() {
             _usageData = filteredData;

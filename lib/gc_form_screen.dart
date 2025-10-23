@@ -866,8 +866,9 @@ class _GCFormScreenState extends State<GCFormScreen> {
                             if (info != null) {
                               controller.consignorGstCtrl.text = info['gst'] ?? '';
                               controller.consignorAddressCtrl.text = info['address'] ?? '';
-                              // Auto-fill From field with consignor's address
-                              controller.fromCtrl.text = info['address'] ?? '';
+                              final location = info['location'] ?? '';
+                              // Auto-fill From field with consignor's location when available, otherwise address
+                              controller.fromCtrl.text = location.isNotEmpty ? location : (info['address'] ?? '');
                             }
                           }
                         },
@@ -942,8 +943,10 @@ class _GCFormScreenState extends State<GCFormScreen> {
                               controller.consigneeGstCtrl.text = info['gst'] ?? '';
                               final address = info['address'] ?? '';
                               controller.consigneeAddressCtrl.text = address;
-                              // Auto-fill To field and Billing Address with consignee's address
-                              controller.toCtrl.text = address;
+                              final location = info['location'] ?? '';
+                              final toValue = location.isNotEmpty ? location : address;
+                              // Auto-fill To field and Billing Address with consignee's location/address
+                              controller.toCtrl.text = toValue;
                               controller.billingAddressCtrl.text = address;
                             }
                           }
@@ -1420,6 +1423,18 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 onChanged: (_) {},
               ),
               const SizedBox(height: 16),
+              
+              // // Delivery Address
+              // TextFormField(
+              //   controller: controller.deliveryAddressCtrl,
+              //   decoration: _inputDecoration(
+              //     'Delivery Address',
+              //     Icons.local_shipping,
+              //   ),
+              //   maxLines: 2,
+              //   onChanged: (_) {},
+              // ),
+              // const SizedBox(height: 16),
 
               // Delivery from & Special Instructions / Remarks
               TextFormField(

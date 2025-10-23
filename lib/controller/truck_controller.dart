@@ -16,6 +16,11 @@ class TruckController extends GetxController {
     super.onInit();
     fetchTrucks();
   }
+  
+  // Refresh trucks list
+  Future<void> refreshTrucks() async {
+    await fetchTrucks();
+  }
 
   Future<void> searchTrucks(String query) async {
     searchQuery.value = query;

@@ -331,10 +331,10 @@ class _SupplierFormPageState extends State<SupplierFormPage> {
             ),
             if (widget.supplier != null) ...{
               const SizedBox(height: 10),
-              TextButton(
-                onPressed: () => _confirmDelete(),
-                child: const Text('Delete Supplier', style: TextStyle(color: Colors.red)),
-              ),
+              // TextButton(
+              //   onPressed: () => _confirmDelete(),
+              //   child: const Text('Delete Supplier', style: TextStyle(color: Colors.red)),
+              // ),
             },
             const SizedBox(height: 20),
           ],

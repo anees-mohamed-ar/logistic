@@ -89,6 +89,31 @@ class LocationController extends GetxController {
     }
   }
 
+  Future<bool> deleteLocation(String id) async {
+    try {
+      isLoading.value = true;
+      final response = await _client.delete(
+        Uri.parse('${ApiConfig.baseUrl}/location/delete/$id'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      
+      if (response.statusCode == 200) {
+        await fetchLocations();
+        Get.snackbar('Success', 'Location deleted successfully');
+        return true;
+      } else {
+        final error = jsonDecode(response.body)['error'] ?? 'Failed to delete location';
+        Get.snackbar('Error', error.toString());
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to delete location: ${e.toString()}');
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getBranches() async {
     try {
       final response = await _client.get(
