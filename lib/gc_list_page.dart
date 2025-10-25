@@ -16,6 +16,7 @@ class GCListPage extends StatefulWidget {
 }
 
 class _GCListPageState extends State<GCListPage> {
+  final IdController _idController = Get.find<IdController>();
   List<Map<String, dynamic>> gcList = [];
   List<Map<String, dynamic>> filteredGcList = [];
   bool isLoading = true;
@@ -1127,6 +1128,13 @@ class _GCListPageState extends State<GCListPage> {
   }
 
   bool _canEditGC(Map<String, dynamic> gc) {
+    // Check if user is admin - allow edit regardless of time
+    final idController = Get.find<IdController>();
+    if (idController.userRole.value == 'admin') {
+      debugPrint('Admin override: Allowing edit for GC ${gc['GcNumber']}');
+      return true;
+    }
+
     final createdAt = gc['created_at']?.toString();
     if (createdAt == null || createdAt.isEmpty) return false;
 
@@ -1150,7 +1158,74 @@ class _GCListPageState extends State<GCListPage> {
     }
   }
 
-  void _editGC(Map<String, dynamic> gc) {
+  Future<bool> _releaseGCLock(String gcNumber) async {
+    try {
+      final userId = _idController.userId.value;
+      final url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/release-lock');
+      
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'gcNumber': gcNumber,
+          'userId': userId,
+        }),
+      );
+
+      final data = json.decode(response.body);
+      return data['success'] == true;
+    } catch (e) {
+      debugPrint('Error releasing GC lock: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _acquireGCLock(String gcNumber) async {
+    try {
+      final userId = _idController.userId.value;
+      final url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/acquire-lock');
+      
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'gcNumber': gcNumber,
+          'userId': userId,
+        }),
+      );
+
+      final data = json.decode(response.body);
+      return data['success'] == true;
+    } catch (e) {
+      debugPrint('Error acquiring GC lock: $e');
+      return false;
+    }
+  }
+
+  Future<void> _editGC(Map<String, dynamic> gc) async {
+    final gcNumber = gc['GcNumber']?.toString() ?? '';
+    
+    // Check if it's a temporary GC
+    final isTemporaryGC = gc['isTemporary'] == true || 
+                         (gc['tempGcNumber'] != null && gc['tempGcNumber'].toString().isNotEmpty);
+    
+    if (isTemporaryGC) {
+      // For temporary GCs, try to acquire a lock
+      final lockAcquired = await _acquireGCLock(gcNumber);
+      
+      if (!lockAcquired) {
+        Fluttertoast.showToast(
+          msg: 'This temporary GC is currently in use by another user',
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.orange,
+          textColor: Colors.white,
+        );
+        return;
+      }
+    }
+    
+    // Then check the 24-hour edit restriction
     if (!_canEditGC(gc)) {
       Fluttertoast.showToast(
         msg: 'Cannot edit: GC can only be edited within 24 hours of creation',
@@ -1179,10 +1254,16 @@ class _GCListPageState extends State<GCListPage> {
       _populateFormWithGCData(gcController, gc, companyId);
     }
 
-    Get.to(
-          () => const GCFormScreen(),
+    // Navigate to the form screen
+    final result = await Get.to<Map<String, dynamic>>(
+      () => const GCFormScreen(),
       preventDuplicates: false,
     );
+    
+    // If this was a temporary GC, release the lock when returning from the form
+    if (isTemporaryGC && result?['gcNumber'] == gcNumber) {
+      await _releaseGCLock(gcNumber);
+    }
   }
 
   void _populateFormWithGCData(GCFormController controller, Map<String, dynamic> gc, String companyId) {
@@ -1234,6 +1315,11 @@ class _GCListPageState extends State<GCListPage> {
     controller.consigneeNameCtrl.text = gc['ConsigneeName']?.toString() ?? '';
     controller.consigneeGstCtrl.text = gc['ConsigneeGst']?.toString() ?? '';
     controller.consigneeAddressCtrl.text = consigneeAddress;
+
+    controller.selectedBillTo.value = gc['BillToName']?.toString() ?? 'Select Bill To';
+    controller.billToNameCtrl.text = gc['BillToName']?.toString() ?? '';
+    controller.billToGstCtrl.text = gc['BillToGst']?.toString() ?? '';
+    controller.billToAddressCtrl.text = gc['BillToAddress']?.toString() ?? '';
 
     final weight = gc['ActualWeightKgs']?.toString() ?? '';
     final natureOfGoods = gc['GoodContain']?.toString() ?? '';

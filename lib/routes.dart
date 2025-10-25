@@ -20,9 +20,7 @@ import 'package:logistic/views/customer/customer_list_page.dart';
 import 'package:logistic/views/customer/customer_form_page.dart';
 import 'package:logistic/views/supplier/supplier_form_page.dart';
 import 'package:logistic/views/supplier/supplier_list_page.dart';
-import 'package:logistic/views/supplier/supplier_form_page.dart';
 import 'package:logistic/views/gst/gst_list_page.dart';
-// import 'package:logistic/views/gst/gst_form_page.dart';
 import 'package:logistic/views/broker/broker_list_page.dart';
 import 'package:logistic/views/broker/add_edit_broker_page.dart';
 import 'package:logistic/views/weight_rate/weight_rate_list_page.dart';
@@ -34,7 +32,7 @@ import 'package:logistic/views/truck/truck_form_page.dart';
 import 'package:logistic/bindings/truck_binding.dart';
 import 'package:logistic/register_screen.dart';
 import 'package:logistic/gc_assignment_page.dart';
-import 'package:logistic/screens/settings_screen.dart';
+import 'package:logistic/screens/temporary_gc_list_screen.dart';
 
 class AppRoutes {
   // Route names
@@ -70,6 +68,7 @@ class AppRoutes {
   static const String truckList = '/truck_list';
   static const String truckForm = '/truck_form';
   static const String gcAssignment = '/gc_assignment';
+  static const String temporaryGcList = '/temporary-gc-list';
 
   static final routes = [
     GetPage(
@@ -253,6 +252,11 @@ class AppRoutes {
             : const TruckFormPage();
       },
       binding: TruckBinding(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: temporaryGcList,
+      page: () => const TemporaryGCListScreen(),
       transition: Transition.rightToLeft,
     ),
   ];

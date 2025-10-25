@@ -9,6 +9,7 @@ import 'controller/location_controller.dart';
 import 'controller/customer_controller.dart';
 import 'controller/weight_to_rate_controller.dart';
 import 'controller/login_controller.dart';
+import 'controller/temporary_gc_controller.dart';
 
 void main() async { // Make main async
   WidgetsFlutterBinding.ensureInitialized(); // Ensure bindings are initialized
@@ -19,6 +20,7 @@ void main() async { // Make main async
   Get.put(CustomerController());
   Get.put(WeightToRateController());
   Get.put(LoginController()); // Ensure LoginController is available globally
+  Get.put(TemporaryGCController()); // Initialize temporary GC controller
 
   runApp(const LogisticsGCApp());
 }

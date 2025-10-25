@@ -213,11 +213,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
   }
 
+  // Initialize controllers
+  final GCFormController gcFormController = Get.put(GCFormController());
+  final IdController idController = Get.find<IdController>();
+  
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isSmallScreen = MediaQuery.of(context).size.width < 700;
-    final idController = Get.find<IdController>();
     final isAdmin = idController.userRole.value == 'admin';
 
     return MainLayout(
@@ -252,10 +255,26 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               const SizedBox(height: 32)
               ],
 
-              if (!isAdmin) ...[
-                const SizedBox(height: 32),
-                const GCUsageWidget(),
-              ],
+              // Show GC Usage widget for all users when they don't have active/queued GC ranges
+              Obx(() {
+                return FutureBuilder<bool>(
+                  future: gcFormController.checkGCAccess(idController.userId.value),
+                  builder: (context, snapshot) {
+                    // If we're still checking access, show a loading indicator
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    
+                    // Show GCUsageWidget for all users
+                    return const Column(
+                      children: [
+                        SizedBox(height: 32),
+                        GCUsageWidget(),
+                      ],
+                    );
+                  },
+                );
+              }),
 
               // Quick Actions Section
               _buildQuickActionsSection(context, isSmallScreen, isAdmin),
@@ -547,6 +566,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         subtitle: 'Track shipments',
         color: const Color(0xFF8E24AA),
         onTap: () => Get.toNamed(AppRoutes.updateTransit),
+      ),
+      _ActionData(
+        icon: Icons.description_outlined,
+        title: 'Temporary GC',
+        subtitle: 'Quick fill forms',
+        color: const Color(0xFFFF6F00),
+        onTap: () => Get.toNamed(AppRoutes.temporaryGcList),
       ),
       if (isAdmin)
         _ActionData(

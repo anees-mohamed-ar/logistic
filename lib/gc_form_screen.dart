@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:logistic/controller/gc_form_controller.dart';
 import 'package:logistic/controller/id_controller.dart';
+import 'package:logistic/controller/temporary_gc_controller.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:logistic/widgets/gc_pdf.dart';
@@ -19,6 +20,9 @@ class GCFormScreen extends StatefulWidget {
 
 class _GCFormScreenState extends State<GCFormScreen> {
   late final TextEditingController searchCtrl;
+  final TemporaryGCController? tempController = Get.isRegistered<TemporaryGCController>()
+      ? Get.find<TemporaryGCController>()
+      : null;
 
   @override
   void initState() {
@@ -32,7 +36,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final idController = Get.find<IdController>();
       final userId = idController.userId.value;
-      
+
       if (userId.isEmpty) {
         Fluttertoast.showToast(
           msg: 'User ID not found. Please login again.',
@@ -44,12 +48,12 @@ class _GCFormScreenState extends State<GCFormScreen> {
         Get.back();
         return;
       }
-      
-      // Only check access and fetch GC number if not in edit mode
-      if (!controller.isEditMode.value) {
+
+      if (controller.isTemporaryMode.value) {
         controller.clearForm();
-        
-        // Check access first
+        controller.prepareTemporaryGcForm();
+      } else if (controller.isFillTemporaryMode.value) {
+        // When filling temporary GC, check access and get next GC number
         final hasAccess = await controller.checkGCAccess(userId);
         if (!hasAccess) {
           Fluttertoast.showToast(
@@ -62,28 +66,52 @@ class _GCFormScreenState extends State<GCFormScreen> {
           Get.back();
           return;
         }
-        
-        // If access is granted, fetch and set the next GC number
+
         try {
           final nextGC = await controller.fetchNextGCNumber(userId);
           if (nextGC != null) {
             controller.gcNumberCtrl.text = nextGC;
           }
-          
-          // Check GC usage and show warning if needed
+
           await controller.checkGCUsageAndWarn(userId);
         } catch (e) {
           print('Error in form initialization: $e');
-          // Don't block the form if there's an error
+        }
+      } else if (!controller.isEditMode.value) {
+        controller.clearForm();
+
+        final hasAccess = await controller.checkGCAccess(userId);
+        if (!hasAccess) {
+          Fluttertoast.showToast(
+            msg: controller.accessMessage.value,
+            toastLength: Toast.LENGTH_LONG,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: Colors.red,
+            textColor: Colors.white,
+          );
+          Get.back();
+          return;
+        }
+
+        try {
+          final nextGC = await controller.fetchNextGCNumber(userId);
+          if (nextGC != null) {
+            controller.gcNumberCtrl.text = nextGC;
+          }
+
+          await controller.checkGCUsageAndWarn(userId);
+        } catch (e) {
+          print('Error in form initialization: $e');
         }
       }
-      
+
       controller.currentTab.value = 0;
     });
   }
 
   @override
   void dispose() {
+    _unlockIfNeeded();
     searchCtrl.dispose();
     // Don't dispose the controller here as it's managed by GetX with permanent: true
     // The controller will be managed by GetX and can be reused
@@ -98,6 +126,13 @@ class _GCFormScreenState extends State<GCFormScreen> {
     final theme = Theme.of(context);
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
 
+    // Ensure the tab index stays within the available range (0-2)
+    if (controller.currentTab.value > 2) {
+      controller.currentTab.value = 2;
+    } else if (controller.currentTab.value < 0) {
+      controller.currentTab.value = 0;
+    }
+
     // Attach once; avoids repeated subscriptions on rebuilds
     controller.attachTabScrollListener(context);
 
@@ -111,9 +146,24 @@ class _GCFormScreenState extends State<GCFormScreen> {
       }
     });
 
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: () async {
+        await _unlockIfNeeded();
+        return true;
+      },
+      child: Scaffold(
       appBar: AppBar(
-        title: const Text('GC Shipment Form'),
+        title: Obx(() {
+          if (controller.isTemporaryMode.value) {
+            return const Text('Create Temporary GC');
+          } else if (controller.isFillTemporaryMode.value) {
+            return const Text('Fill Temporary GC');
+          } else if (controller.isEditMode.value) {
+            return const Text('Edit GC');
+          } else {
+            return const Text('GC Shipment Form');
+          }
+        }),
         backgroundColor: const Color(0xFF1E2A44),
         foregroundColor: Colors.white,
         elevation: 0,
@@ -183,7 +233,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: List.generate(
-                        4,
+                        3,
                             (index) => GestureDetector(
                           onTap: () {
                             controller.changeTab(index);
@@ -210,7 +260,6 @@ class _GCFormScreenState extends State<GCFormScreen> {
                                     Icons.local_shipping,
                                     Icons.group,
                                     Icons.inventory,
-                                    Icons.attach_money,
                                   ][index],
                                   size: 16,
                                   color: controller.currentTab.value == index
@@ -223,7 +272,6 @@ class _GCFormScreenState extends State<GCFormScreen> {
                                     'Shipment',
                                     'Parties',
                                     'Goods',
-                                    'Charges',
                                   ][index],
                                   style: theme.textTheme.labelLarge?.copyWith(
                                     color: controller.currentTab.value == index
@@ -253,8 +301,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         _buildShipmentTab(context, controller, isSmallScreen),
                         _buildPartiesTab(context, controller, isSmallScreen),
                         _buildGoodsTab(context, controller, isSmallScreen),
-                        _buildChargesTab(context, controller, isSmallScreen),
-                      ][controller.currentTab.value],
+                      ][controller.currentTab.value.clamp(0, 2).toInt()],
                     ),
                   ),
                 ),
@@ -313,7 +360,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                             ),
                           if (controller.currentTab.value > 0)
                             const SizedBox(width: 12),
-                          if (controller.currentTab.value < 3)
+                          if (controller.currentTab.value < 2)
                             Expanded(
                               flex: controller.currentTab.value > 0 ? 1 : 2,
                               child: ElevatedButton(
@@ -332,9 +379,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      controller.currentTab.value < 3
-                                          ? 'Next'
-                                          : 'Submit',
+                                      'Next',
                                       style: theme.textTheme.labelLarge
                                           ?.copyWith(color: Colors.white),
                                     ),
@@ -348,7 +393,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                                 ),
                               ),
                             ),
-                          if (controller.currentTab.value == 3)
+                          if (controller.currentTab.value == 2)
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: controller.isLoading.value
@@ -369,12 +414,16 @@ class _GCFormScreenState extends State<GCFormScreen> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                                    : Row(
+                                    : Obx(() => Row(
                                   mainAxisAlignment:
                                   MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      'Submit Form',
+                                      controller.isTemporaryMode.value
+                                          ? 'Create Temporary GC'
+                                          : controller.isFillTemporaryMode.value
+                                              ? 'Submit & Convert'
+                                              : 'Submit Form',
                                       style: theme.textTheme.labelLarge
                                           ?.copyWith(color: Colors.white),
                                     ),
@@ -385,7 +434,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                                       color: Colors.white,
                                     ),
                                   ],
-                                ),
+                                )),
                               ),
                             ),
                         ],
@@ -398,7 +447,21 @@ class _GCFormScreenState extends State<GCFormScreen> {
           ),
         ),
       ),
+      ),
     );
+  }
+
+  Future<void> _unlockIfNeeded() async {
+    if (tempController != null) {
+      final controller = Get.isRegistered<GCFormController>()
+          ? Get.find<GCFormController>()
+          : null;
+      if (controller != null && controller.isFillTemporaryMode.value && controller.tempGcNumber.value.isNotEmpty) {
+        await tempController!.unlockTemporaryGC(controller.tempGcNumber.value);
+        controller.isFillTemporaryMode.value = false;
+        controller.tempGcNumber.value = '';
+      }
+    }
   }
 
   Widget _buildShipmentTab(
@@ -921,6 +984,65 @@ class _GCFormScreenState extends State<GCFormScreen> {
               ),
               const SizedBox(height: 24),
               Text(
+                'Bill To Details',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Obx(() {
+                      return _buildDropdownField(
+                        context: context,
+                        label: 'Bill To Name',
+                        value: controller.selectedBillTo.value,
+                        items: controller.billTos.toList(),
+                        onChanged: controller.onBillToSelected,
+                        validator: null,
+                        compact: true,
+                        searchable: true,
+                        isLoading: controller.billTosLoading.value,
+                        error: controller.billTosError.value,
+                        onRetry: () => controller.fetchBillTos(),
+                      );
+                    }),
+                  ),
+                  if (!isSmallScreen) const SizedBox(width: 16),
+                  if (!isSmallScreen)
+                    Expanded(
+                      child: Tooltip(
+                        message: 'e.g., 27AABCU9603R1Z',
+                        child: TextFormField(
+                          controller: controller.billToGstCtrl,
+                          decoration: _inputDecoration('GST', Icons.business),
+                          validator: null,
+                          onChanged: (_) {},
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              if (isSmallScreen) const SizedBox(height: 16),
+              if (isSmallScreen)
+                Tooltip(
+                  message: 'e.g., 27AABCU9603R1Z',
+                  child: TextFormField(
+                    controller: controller.billToGstCtrl,
+                    decoration: _inputDecoration('GST', Icons.business),
+                    validator: null,
+                    onChanged: (_) {},
+                  ),
+                ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: controller.billToAddressCtrl,
+                decoration: _inputDecoration('Address', Icons.location_on),
+                maxLines: 2,
+                validator: null,
+                onChanged: (_) {},
+              ),
+              const SizedBox(height: 24),
+              Text(
                 'Consignee Details',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
@@ -1363,6 +1485,54 @@ class _GCFormScreenState extends State<GCFormScreen> {
               
               const SizedBox(height: 24),
               
+              // Actual Weight field
+              TextFormField(
+                controller: controller.actualWeightCtrl,
+                decoration: _inputDecoration(
+                  'Actual Weight (Kgs)',
+                  Icons.scale,
+                  isOptional: true,
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) {},
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // GST Payer dropdown
+              Obx(() => _buildDropdownField(
+                context: context,
+                label: 'GST Payer',
+                value: controller.selectedGstPayer.value,
+                items: controller.gstPayerOptions,
+                onChanged: (value) {
+                  controller.selectedGstPayer.value = value!;
+                },
+                validator: null,
+                compact: true,
+                searchable: false,
+              )),
+              
+              const SizedBox(height: 16),
+              
+              // Payment Method dropdown
+              Obx(() => _buildDropdownField(
+                context: context,
+                label: 'Payment Method',
+                value: controller.selectedPayment.value,
+                items: [ ...controller.paymentOptions],
+                onChanged: (value) {
+                  if (value != null) {
+                    controller.selectedPayment.value = value;
+                  }
+                },
+                validator: null,
+                compact: true,
+                searchable: false,
+              )),
+              
+              const SizedBox(height: 24),
+              
               // Private Mark in its own row
               TextFormField(
                 controller: controller.remarksCtrl,
@@ -1383,158 +1553,6 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   Icons.monetization_on_outlined,
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChargesTab(
-      BuildContext context,
-      GCFormController controller,
-      bool isSmallScreen,
-      ) {
-    return SingleChildScrollView(
-      key: const ValueKey(3),
-      child: Card(
-        elevation: 1,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Charges & Billing',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 16),
-
-              // Billing Address
-              TextFormField(
-                controller: controller.billingAddressCtrl,
-                decoration: _inputDecoration(
-                  'Billing Address',
-                  Icons.location_on,
-                ),
-                maxLines: 2,
-                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                onChanged: (_) {},
-              ),
-              const SizedBox(height: 16),
-              
-              // // Delivery Address
-              // TextFormField(
-              //   controller: controller.deliveryAddressCtrl,
-              //   decoration: _inputDecoration(
-              //     'Delivery Address',
-              //     Icons.local_shipping,
-              //   ),
-              //   maxLines: 2,
-              //   onChanged: (_) {},
-              // ),
-              // const SizedBox(height: 16),
-
-              // Delivery from & Special Instructions / Remarks
-              TextFormField(
-                controller: controller.deliveryInstructionsCtrl,
-                decoration: _inputDecoration(
-                  'Delivery from & Special Instructions / Remarks',
-                  Icons.note_alt_outlined,
-                ),
-                maxLines: 2,
-                onChanged: (_) {},
-              ),
-              const SizedBox(height: 16),
-
-              // Goods & Service Tax Payer (Dropdown)
-              Obx(() => _buildDropdownField(
-                context: context,
-                label: 'GST Payer', // New label for clarity
-                value: controller.selectedGstPayer.value,
-                items: controller.gstPayerOptions,
-                onChanged: (value) {
-                  controller.selectedGstPayer.value = value!;
-                },
-                validator: (value) =>
-                value == null || value.isEmpty || value == 'Select GST Payer' ? 'Required' : null,
-                compact: true,
-                searchable: false, // Not searchable as per request
-              )),
-              const SizedBox(height: 16),
-
-              // Payment Method (Dropdown)
-              Obx(() => _buildDropdownField(
-                context: context,
-                label: 'Payment Method',
-                value: controller.selectedPayment.value,
-                items: ['Select Payment', ...controller.paymentOptions],
-                onChanged: (value) {
-                  if (value != null && value != 'Select Payment') {
-                    controller.selectedPayment.value = value;
-                  }
-                },
-                validator: (value) =>
-                value == null || value.isEmpty || value == 'Select Payment' ? 'Required' : null,
-                compact: true,
-                searchable: false,
-              )),
-              const SizedBox(height: 16),
-
-              // Freight Charge (referenced from goods total)
-              Obx(() => TextFormField(
-                readOnly: true,
-                controller: TextEditingController(
-                  text: controller.calculatedGoodsTotal.value.isNotEmpty
-                      ? '₹${controller.calculatedGoodsTotal.value}'
-                      : '0.00',
-                ),
-                decoration: _inputDecoration(
-                  'Freight Charge',
-                  Icons.local_shipping,
-                ),
-              )),
-              const SizedBox(height: 16),
-
-              // Hire Amount
-              TextFormField(
-                controller: controller.hireAmountCtrl,
-                decoration: _inputDecoration(
-                  'Hire Amount',
-                  Icons.money,
-                  isOptional: true,
-                ),
-                keyboardType: TextInputType.number,
-                onChanged: (_) {
-                  // Listener in controller updates balanceAmount
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Advance Amount
-              TextFormField(
-                controller: controller.advanceAmountCtrl,
-                decoration: _inputDecoration(
-                  'Advance Amount',
-                  Icons.payment,
-                ),
-                keyboardType: TextInputType.number,
-                onChanged: (_) {
-                  // Listener in controller updates balanceAmount
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Balance Amount (read-only, calculated field)
-              Obx(() => TextFormField(
-                readOnly: true,
-                controller: TextEditingController(text: controller.balanceAmount.value),
-                decoration: _inputDecoration(
-                  'Balance Amount',
-                  Icons.account_balance_wallet,
-                ),
-              )),
             ],
           ),
         ),

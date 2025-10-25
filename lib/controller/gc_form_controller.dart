@@ -5,10 +5,11 @@ import 'package:http/http.dart' as http;
 import 'package:logistic/api_config.dart';
 import 'package:logistic/controller/id_controller.dart';
 import 'package:logistic/models/km_location.dart';
+import 'package:logistic/models/temporary_gc.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'dart:convert';
 import 'dart:async';
-import 'package:collection/collection.dart';
+import 'dart:math';
 
 class WeightRate {
   final int id;
@@ -49,6 +50,7 @@ class WeightRate {
 class GCFormController extends GetxController {
   // NEW: Get an instance of IdController to trigger refreshes
   final IdController _idController = Get.find<IdController>();
+  final Random _random = Random();
 
   // General Form State
   final formKey = GlobalKey<FormState>();
@@ -95,6 +97,9 @@ class GCFormController extends GetxController {
   final selectedConsignee = 'Select Consignee'.obs;
   final consigneesLoading = false.obs;
   final consignees = <String>['Select Consignee'].obs;
+  final selectedBillTo = 'Select Bill To'.obs;
+  final billTosLoading = false.obs;
+  final billTos = <String>['Select Bill To'].obs;
 
   // Error states for dropdowns
   final branchesError = RxnString();
@@ -102,6 +107,7 @@ class GCFormController extends GetxController {
   final brokersError = RxnString();
   final consignorsError = RxnString();
   final consigneesError = RxnString();
+  final billTosError = RxnString();
 
   // Parties Tab Controllers
   final brokerNameCtrl = TextEditingController();
@@ -117,6 +123,9 @@ class GCFormController extends GetxController {
   final consigneeNameCtrl = TextEditingController();
   final consigneeGstCtrl = TextEditingController();
   final consigneeAddressCtrl = TextEditingController();
+  final billToNameCtrl = TextEditingController();
+  final billToGstCtrl = TextEditingController();
+  final billToAddressCtrl = TextEditingController();
 
   // Parties Tab Observables (fetched data)
   final selectedDriver = ''.obs; // This will hold the selected driver name
@@ -126,6 +135,7 @@ class GCFormController extends GetxController {
   final driverInfo = <String, Map<String, dynamic>>{}; // Map driver name -> details
   final consignorInfo = <String, Map<String, String>>{}; // Map consignor name -> details
   final consigneeInfo = <String, Map<String, String>>{}; // Map consignee name -> details
+  final billToInfo = <String, Map<String, String>>{}; // Map bill to name -> details
 
   // Goods Tab Controllers
   final customInvoiceCtrl = TextEditingController();
@@ -156,7 +166,7 @@ class GCFormController extends GetxController {
   final paymentOptions = ['To be billed','Paid','To pay'];
   final serviceOptions = ['Express', 'Standard', 'Pickup'];
   final packageMethods = ['Boxes', 'Cartons', 'Pallets', 'Bags', 'Barrels'];
-  final selectedPayment = 'Cash'.obs;
+  final selectedPayment = 'To be billed'.obs;
   final selectedService = 'Express'.obs;
   final selectedPackageMethod = 'Boxes'.obs;
 
@@ -176,15 +186,176 @@ class GCFormController extends GetxController {
     }
   }
 
+  Future<void> _showToast(
+    String message, {
+    Toast toastLength = Toast.LENGTH_SHORT,
+    ToastGravity gravity = ToastGravity.BOTTOM,
+    Color backgroundColor = const Color(0xFF323232),
+    Color textColor = Colors.white,
+  }) async {
+    try {
+      await Fluttertoast.showToast(
+        msg: message,
+        toastLength: toastLength,
+        gravity: gravity,
+        backgroundColor: backgroundColor,
+        textColor: textColor,
+      );
+    } catch (e) {
+      debugPrint('Toast failed: $e');
+      debugPrint('Toast message: $message');
+    }
+  }
+
   // Charges Tab Observables
   final RxString balanceAmount = '0.00'.obs; // Reactive balance amount
   final gstPayerOptions = ['Consignor', 'Consignee', 'Transporter'];
   final selectedGstPayer = 'Consignor'.obs; // Default value for GST Payer
 
+  // Method to update GST Payer
+  void onGstPayerSelected(String? newValue) {
+    if (newValue != null && newValue.isNotEmpty) {
+      selectedGstPayer.value = newValue;
+    }
+  }
+
   // Edit Mode Variables
   final isEditMode = false.obs;
   final editingGcNumber = ''.obs;
   final editingCompanyId = ''.obs;
+  
+  // Temporary GC Mode
+  final isTemporaryMode = false.obs; // When true, save as temporary GC
+  final isFillTemporaryMode = false.obs; // When true, filling a temporary GC
+  final tempGcNumber = ''.obs; // Store temp GC number when filling
+  final tempGcPreview = ''.obs;
+
+  String _generateTempGcNumber() {
+    final timestamp = DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase();
+    final randomValue = _random.nextInt(0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase();
+    return 'TEMP-$timestamp-$randomValue';
+  }
+
+  void prepareTemporaryGcForm() {
+    final number = _generateTempGcNumber();
+    gcNumberCtrl.text = number;
+    tempGcPreview.value = number;
+  }
+
+  void loadTemporaryGc(TemporaryGC tempGC) {
+    // Branch
+    if (tempGC.branch != null) selectedBranch.value = tempGC.branch!;
+    if (tempGC.branchCode != null) selectedBranchCode.value = tempGC.branchCode!;
+
+    // GC date
+    if (tempGC.gcDate != null) {
+      try {
+        final parsed = DateTime.parse(tempGC.gcDate!);
+        gcDate.value = parsed;
+        gcDateCtrl.text = DateFormat('dd-MMM-yyyy').format(parsed);
+      } catch (_) {}
+    }
+
+    // E-days and delivery date
+    if (tempGC.eda != null && tempGC.eda!.isNotEmpty) {
+      eDaysCtrl.text = tempGC.eda!;
+      updateDeliveryDateFromInputs();
+    }
+
+    if (tempGC.deliveryDate != null) {
+      try {
+        final parsed = DateTime.parse(tempGC.deliveryDate!);
+        deliveryDate.value = parsed;
+        deliveryDateCtrl.text = DateFormat('dd-MMM-yyyy').format(parsed);
+      } catch (_) {}
+    }
+
+    // Truck details
+    if (tempGC.truckNumber != null && tempGC.truckNumber!.isNotEmpty) {
+      selectedTruck.value = tempGC.truckNumber!;
+      truckNumberCtrl.text = tempGC.truckNumber!;
+    }
+    if (tempGC.truckType != null) {
+      truckTypeCtrl.text = tempGC.truckType!;
+    }
+    if (tempGC.truckFrom != null) {
+      fromCtrl.text = tempGC.truckFrom!;
+    }
+    if (tempGC.truckTo != null) {
+      toCtrl.text = tempGC.truckTo!;
+    }
+
+    // Broker and driver
+    if (tempGC.brokerNameShow != null) {
+      selectedBroker.value = tempGC.brokerNameShow!;
+      brokerNameCtrl.text = tempGC.brokerNameShow!;
+    }
+    if (tempGC.driverNameShow != null) {
+      selectedDriver.value = tempGC.driverNameShow!;
+      driverNameCtrl.text = tempGC.driverNameShow!;
+    }
+    if (tempGC.driverPhoneNumber != null) {
+      driverPhoneCtrl.text = tempGC.driverPhoneNumber!;
+    }
+
+    // Consignor / Consignee
+    if (tempGC.consignorName != null) {
+      selectedConsignor.value = tempGC.consignorName!;
+      consignorAddressCtrl.text = tempGC.consignorAddress ?? '';
+      consignorGstCtrl.text = tempGC.consignorGst ?? '';
+    }
+    if (tempGC.consigneeName != null) {
+      selectedConsignee.value = tempGC.consigneeName!;
+      consigneeAddressCtrl.text = tempGC.consigneeAddress ?? '';
+      consigneeGstCtrl.text = tempGC.consigneeGst ?? '';
+    }
+
+    // Goods info
+    if (tempGC.goodContain != null) {
+      natureGoodsCtrl.text = tempGC.goodContain!;
+    }
+    if (tempGC.numberofPkg != null) {
+      packagesCtrl.text = tempGC.numberofPkg!;
+    }
+    if (tempGC.methodofPkg != null) {
+      selectedPackageMethod.value = tempGC.methodofPkg!;
+      methodPackageCtrl.text = tempGC.methodofPkg!;
+    }
+    if (tempGC.totalWeight != null) {
+      actualWeightCtrl.text = tempGC.totalWeight!;
+    }
+    if (tempGC.totalRate != null) {
+      rateCtrl.text = tempGC.totalRate!;
+    }
+
+    // Payment details
+    if (tempGC.paymentDetails != null) {
+      selectedPayment.value = tempGC.paymentDetails!;
+    }
+    if (tempGC.hireAmount != null) {
+      hireAmountCtrl.text = tempGC.hireAmount!;
+    }
+    if (tempGC.advanceAmount != null) {
+      advanceAmountCtrl.text = tempGC.advanceAmount!;
+    }
+    if (tempGC.balanceAmount != null) {
+      balanceAmount.value = tempGC.balanceAmount!;
+    }
+    if (tempGC.freightCharge != null) {
+      freightChargeCtrl.text = tempGC.freightCharge!;
+    }
+    if (tempGC.serviceTax != null) {
+      selectedGstPayer.value = tempGC.serviceTax!;
+    }
+
+    if (tempGC.custInvNo != null) customInvoiceCtrl.text = tempGC.custInvNo!;
+    if (tempGC.invValue != null) invValueCtrl.text = tempGC.invValue!;
+    if (tempGC.poNumber != null) poNumberCtrl.text = tempGC.poNumber!;
+    if (tempGC.tripId != null) tripIdCtrl.text = tempGC.tripId!;
+    if (tempGC.deliveryAddress != null) deliveryAddressCtrl.text = tempGC.deliveryAddress!;
+    if (tempGC.deliveryFromSpecial != null) deliveryInstructionsCtrl.text = tempGC.deliveryFromSpecial!;
+    if (tempGC.privateMark != null) remarksCtrl.text = tempGC.privateMark!;
+  }
 
 
   @override
@@ -206,6 +377,7 @@ class GCFormController extends GetxController {
     fetchDrivers();
     fetchConsignors();
     fetchConsignees();
+    fetchBillTos();
     fetchWeightRates();
     fetchKMLocations();
   }
@@ -250,6 +422,9 @@ class GCFormController extends GetxController {
     _disposeIfMounted(consigneeNameCtrl);
     _disposeIfMounted(consigneeGstCtrl);
     _disposeIfMounted(consigneeAddressCtrl);
+    _disposeIfMounted(billToNameCtrl);
+    _disposeIfMounted(billToGstCtrl);
+    _disposeIfMounted(billToAddressCtrl);
     _disposeIfMounted(packagesCtrl);
     _disposeIfMounted(natureGoodsCtrl);
     _disposeIfMounted(methodPackageCtrl);
@@ -313,15 +488,15 @@ class GCFormController extends GetxController {
   }
 
   void navigateToNextTab() {
-    if (currentTab.value < 3) {
+    if (currentTab.value < 2) {
       currentTab.value++;
     } else {
       // Validate only when submitting on the last tab
       if (formKey.currentState?.validate() ?? false) {
         submitFormToBackend();
       } else {
-        Fluttertoast.showToast(
-          msg: 'Please fill all required fields before submitting.',
+        _showToast(
+          'Please fill all required fields before submitting.',
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: Colors.red,
@@ -544,8 +719,8 @@ class GCFormController extends GetxController {
       } else {
         final errorMsg = 'Failed to load drivers: Tap to retry.';
         driversError.value = errorMsg;
-        Fluttertoast.showToast(
-          msg: errorMsg,
+        _showToast(
+          errorMsg,
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: Colors.red,
@@ -555,8 +730,8 @@ class GCFormController extends GetxController {
     } catch (e) {
       final errorMsg = 'Failed to load drivers: Tap to retry.';
       driversError.value = errorMsg;
-      Fluttertoast.showToast(
-        msg: errorMsg,
+      _showToast(
+        errorMsg,
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: Colors.red,
@@ -566,7 +741,6 @@ class GCFormController extends GetxController {
       driversLoading.value = false;
     }
   }
-
 
   Future<void> fetchConsignors() async {
     try {
@@ -601,8 +775,6 @@ class GCFormController extends GetxController {
         } else {
           consignorsError.value = 'Unexpected response format';
         }
-      } else {
-        consignorsError.value = 'Failed to load consignors (${response.statusCode})';
       }
     } catch (e) {
       consignorsError.value = 'Failed to load consignors. Tap to retry.';
@@ -644,13 +816,104 @@ class GCFormController extends GetxController {
         } else {
           consigneesError.value = 'Unexpected response format';
         }
-      } else {
-        consigneesError.value = 'Failed to load consignees (${response.statusCode})';
       }
     } catch (e) {
       consigneesError.value = 'Failed to load consignees. Tap to retry.';
     } finally {
       consigneesLoading.value = false;
+    }
+  }
+
+  Future<void> fetchBillTos() async {
+    try {
+      billTosLoading.value = true;
+      billTosError.value = null;
+      final url = Uri.parse('${ApiConfig.baseUrl}/consignee/search');
+      final response = await http.get(url).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final dynamic decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          billToInfo.clear();
+          final names = <String>{};
+          for (final e in decoded) {
+            final name = (e['consigneeName'] ?? '').toString();
+            if (name.isEmpty) continue;
+            names.add(name);
+            billToInfo[name] = {
+              'gst': (e['gst'] ?? '').toString(),
+              'address': (e['address'] ?? '').toString(),
+              'location': (e['location'] ?? '').toString(),
+            };
+          }
+          billTos
+            ..clear()
+            ..addAll(['Select Bill To', ...names.toList()]);
+          if (!billTos.contains(selectedBillTo.value)) {
+            selectedBillTo.value = 'Select Bill To'; // Reset if old value not found
+          }
+          if (names.isEmpty) {
+            billTosError.value = 'No bill to entries found';
+          }
+        } else {
+          billTosError.value = 'Unexpected response format';
+        }
+      }
+    } catch (e) {
+      billTosError.value = 'Failed to load bill to entries. Tap to retry.';
+    } finally {
+      billTosLoading.value = false;
+    }
+  }
+
+  void onBillToSelected(String? value) {
+    if (value == null || value.isEmpty) {
+      return;
+    }
+
+    selectedBillTo.value = value;
+    billToNameCtrl.text = value;
+
+    final info = billToInfo[value];
+    if (info != null) {
+      billToGstCtrl.text = info['gst'] ?? '';
+      billToAddressCtrl.text = info['address'] ?? '';
+    } else {
+      billToGstCtrl.clear();
+      billToAddressCtrl.clear();
+    }
+
+    if (value == 'Select Bill To') {
+      return;
+    }
+
+    // Ensure consignee lists know about this selection
+    if (!consignees.contains(value)) {
+      consignees.add(value);
+    }
+
+    if (info != null && !consigneeInfo.containsKey(value)) {
+      consigneeInfo[value] = {
+        'gst': info['gst'] ?? '',
+        'address': info['address'] ?? '',
+        'location': info['location'] ?? '',
+      };
+    }
+
+    selectedConsignee.value = value;
+    consigneeNameCtrl.text = value;
+
+    final consigneeDetails = consigneeInfo[value] ?? info;
+    if (consigneeDetails != null) {
+      final gst = consigneeDetails['gst'] ?? '';
+      final address = consigneeDetails['address'] ?? '';
+      final location = consigneeDetails['location'] ?? '';
+
+      consigneeGstCtrl.text = gst;
+      consigneeAddressCtrl.text = address;
+
+      final destination = location.isNotEmpty ? location : address;
+      toCtrl.text = destination;
+      billingAddressCtrl.text = address;
     }
   }
 
@@ -699,8 +962,8 @@ class GCFormController extends GetxController {
         final List<dynamic> data = json.decode(response.body);
         kmLocations.assignAll(data.map((json) => KMLocation.fromJson(json)).toList());
       } else {
-        Fluttertoast.showToast(
-          msg: 'Failed to load KM locations: ${response.statusCode}',
+        _showToast(
+          'Failed to load KM locations: ${response.statusCode}',
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: Colors.red,
@@ -708,8 +971,8 @@ class GCFormController extends GetxController {
         );
       }
     } catch (e) {
-      Fluttertoast.showToast(
-        msg: 'Error fetching KM locations: $e',
+      _showToast(
+        'Error fetching KM locations: $e',
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: Colors.red,
@@ -998,6 +1261,9 @@ class GCFormController extends GetxController {
     consigneeNameCtrl.clear();
     consigneeGstCtrl.clear();
     consigneeAddressCtrl.clear();
+    billToNameCtrl.clear();
+    billToGstCtrl.clear();
+    billToAddressCtrl.clear();
     customInvoiceCtrl.clear();
     invValueCtrl.clear();
     ewayBillCtrl.clear();
@@ -1028,7 +1294,8 @@ class GCFormController extends GetxController {
     selectedDriver.value = '';
     selectedConsignor.value = 'Select Consignor';
     selectedConsignee.value = 'Select Consignee';
-    selectedPayment.value = 'Cash';
+    selectedBillTo.value = 'Select Bill To';
+    selectedPayment.value = 'To be billed';
     selectedService.value = 'Express';
     selectedGstPayer.value = 'Consignor';
     selectedPackageMethod.value = 'Boxes';
@@ -1105,8 +1372,119 @@ class GCFormController extends GetxController {
     }
   }
 
+  // Helper method to check if the current user can edit the GC
+  Future<Map<String, dynamic>> _checkLockStatus(String gcNumber) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/temporary-gc/check-lock/$gcNumber'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final bool isLocked = data['isLocked'] == true;
+        final String? lockedByUserId = data['lockedByUserId']?.toString();
+        final String currentUserId = _idController.userId.value;
+        final bool isLockedByCurrentUser = lockedByUserId == currentUserId;
+        
+        debugPrint('Lock status check:');
+        debugPrint('- isLocked: $isLocked');
+        debugPrint('- lockedByUserId: $lockedByUserId');
+        debugPrint('- currentUserId: $currentUserId');
+        debugPrint('- isLockedByCurrentUser: $isLockedByCurrentUser');
+        
+        // If locked by current user, allow editing
+        if (isLockedByCurrentUser) {
+          debugPrint('GC is locked by current user - allowing edit');
+          return {
+            'canEdit': true,
+            'isLocked': false, 
+            'lockedBy': 'You',
+            'lockedByUserId': lockedByUserId,
+            'currentUserId': currentUserId,
+            'lockedAt': data['lockedAt'],
+            'lockedAgo': data['lockedAgo']
+          };
+        }
+        
+        // If locked by someone else
+        if (isLocked) {
+          debugPrint('GC is locked by another user');
+          return {
+            'canEdit': false,
+            'isLocked': true,
+            'lockedBy': data['lockedBy'] ?? 'Another user',
+            'lockedByUserId': lockedByUserId,
+            'currentUserId': currentUserId,
+            'lockedAt': data['lockedAt'],
+            'lockedAgo': data['lockedAgo']
+          };
+        }
+        
+        // Not locked at all
+        debugPrint('GC is not locked');
+        return {
+          'canEdit': true,
+          'isLocked': false,
+          'lockedBy': null,
+          'lockedByUserId': null,
+          'currentUserId': currentUserId,
+          'lockedAt': null,
+          'lockedAgo': null
+        };
+      }
+      
+      // If we can't determine the lock status, be permissive
+      return {
+        'canEdit': true, // Allow editing if we can't check lock status
+        'isLocked': false,
+        'error': response.statusCode == 404 ? 'Temporary GC not found' : 'Failed to check lock status'
+      };
+    } catch (e) {
+      debugPrint('Error checking lock status: $e');
+      // Be permissive on error to avoid blocking the user
+      return {
+        'canEdit': true,
+        'isLocked': false,
+        'error': 'Connection error: $e'
+      };
+    }
+  }
+
   Future<void> submitFormToBackend() async {
     if (!formKey.currentState!.validate()) return;
+
+    // For temporary GCs, verify the lock status before submission
+    if (isFillTemporaryMode.value && tempGcNumber.value.isNotEmpty) {
+      debugPrint('Checking lock status for GC: ${tempGcNumber.value}');
+      final lockStatus = await _checkLockStatus(tempGcNumber.value);
+      
+      // Debug log the lock status
+      debugPrint('Lock status for submission:');
+      lockStatus.forEach((key, value) {
+        debugPrint('  $key: $value');
+      });
+      
+      // Only block submission if explicitly told we can't edit
+      if (lockStatus['canEdit'] == false) {
+        final lockedBy = lockStatus['lockedBy'] ?? 'another user';
+        final lockedAgo = lockStatus['lockedAgo'] != null ? ' (${lockStatus['lockedAgo']})' : '';
+        
+        _showToast(
+          'Cannot submit: The GC is currently in use by $lockedBy$lockedAgo',
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.orange,
+          textColor: Colors.white,
+        );
+        return;
+      }
+      
+      // If we get here, we can proceed with submission
+      debugPrint('Proceeding with form submission - lock status allows editing');
+      debugPrint('Current user ID: ${lockStatus['currentUserId']}');
+      debugPrint('Locked by user ID: ${lockStatus['lockedByUserId']}');
+    }
 
     isLoading.value = true;
 
@@ -1137,6 +1515,10 @@ class GCFormController extends GetxController {
       'ConsigneeName': selectedConsignee.value,
       'ConsigneeAddress': consigneeAddressCtrl.text,
       'ConsigneeGst': consigneeGstCtrl.text,
+      'BillTo': selectedBillTo.value,
+      'BillToName': selectedBillTo.value,
+      'BillToAddress': billToAddressCtrl.text,
+      'BillToGst': billToGstCtrl.text,
       'CustInvNo': customInvoiceCtrl.text,
       'InvValue': invValueCtrl.text,
       'EInv': ewayBillCtrl.text,
@@ -1144,12 +1526,12 @@ class GCFormController extends GetxController {
       'Eda': eDaysCtrl.text,
       'NumberofPkg': packagesCtrl.text,
       'MethodofPkg': selectedPackageMethod.value,
-      'ActualWeightKgs': '',
-      'km': 0,
+      'ActualWeightKgs': actualWeightCtrl.text,
+      'km': kmCtrl.text,
       'PrivateMark': remarksCtrl.text,
       'GoodContain': natureGoodsCtrl.text,
-      'Rate': 0,
-      'Total': 0,
+      'Rate': rateCtrl.text,
+      'Total': calculatedGoodsTotal.value,
       'PoNumber': poNumberCtrl.text,
       'TripId': tripIdCtrl.text,
       'DeliveryFromSpecial': deliveryInstructionsCtrl.text,
@@ -1162,26 +1544,106 @@ class GCFormController extends GetxController {
       'BalanceAmount': balanceAmount.value,
       'FreightCharge': freightChargeCtrl.text,
       'Charges': 'FTL',
-      'CompanyId': '6',
+      'CompanyId': _idController.companyId.value,
+      'isTemporary': isTemporaryMode.value,
     };
 
     try {
       final Uri url;
       final http.Response response;
+      final userId = _idController.userId.value;
+      
+      if (userId.isEmpty) {
+        throw Exception('User ID not found. Please login again.');
+      }
 
-      if (isEditMode.value && editingGcNumber.value.isNotEmpty) {
+      // Handle temporary GC creation (Admin creates partial GC)
+      if (isTemporaryMode.value) {
+        data['userId'] = userId;
+        data['CompanyId'] = _idController.companyId.value;
+        
+        url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/create');
+        response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(data),
+        );
+      }
+      // Handle filling temporary GC (User completes and converts)
+      else if (isFillTemporaryMode.value && tempGcNumber.value.isNotEmpty) {
+        try {
+          data['userId'] = userId;
+          data['actualGcNumber'] = gcNumberCtrl.text;
+          
+          // Double-check lock status right before submission
+          final lockStatus = await _checkLockStatus(tempGcNumber.value);
+          if (lockStatus['isLocked'] == true) {
+            throw Exception('Lost lock on the temporary GC. Please try again.');
+          }
+          
+          // Convert the temporary GC to a real GC
+          url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/convert/${tempGcNumber.value}');
+          response = await http.post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(data),
+          );
+          
+          if (response.statusCode != 200) {
+            throw Exception('Failed to convert temporary GC: ${response.statusCode}');
+          }
+          
+          final responseData = jsonDecode(response.body);
+          if (responseData['success'] != true) {
+            throw Exception(responseData['message'] ?? 'Failed to convert temporary GC');
+          }
+          // The submit-gc endpoint is already called in the backend during conversion
+          // No need to call it again from the frontend
+          // Release the lock after successful conversion
+          await http.post(
+            Uri.parse('${ApiConfig.baseUrl}/temporary-gc/release-lock'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'gcNumber': tempGcNumber.value,
+              'userId': userId,
+              'force': true, // Add force flag to ensure release
+            }),
+          ).catchError((e) {
+            debugPrint('Error releasing lock: $e');
+            // Return a dummy response to satisfy the type system
+            // The actual response doesn't matter since we're in an error case
+            return http.Response('', 200);
+          });
+          
+        } catch (e) {
+          // Attempt to release the lock on error
+          try {
+            await http.post(
+              Uri.parse('${ApiConfig.baseUrl}/temporary-gc/release-lock'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'gcNumber': tempGcNumber.value,
+                'userId': userId,
+                'force': true,
+              }),
+            );
+          } catch (releaseError) {
+            debugPrint('Error releasing lock after error: $releaseError');
+          }
+          rethrow; // Re-throw the original error
+        }
+      }
+      // Handle regular GC edit
+      else if (isEditMode.value && editingGcNumber.value.isNotEmpty) {
         url = Uri.parse('${ApiConfig.baseUrl}/gc/updateGC/${editingGcNumber.value}');
         response = await http.put(
           url,
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(data),
         );
-      } else {
-        final userId = _idController.userId.value;
-        if (userId.isEmpty) {
-          throw Exception('User ID not found. Please login again.');
-        }
-
+      }
+      // Handle regular GC creation
+      else {
         url = Uri.parse('${ApiConfig.baseUrl}/gc/add?userId=$userId');
         response = await http.post(
           url,
@@ -1193,24 +1655,38 @@ class GCFormController extends GetxController {
       isLoading.value = false;
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        final message = isEditMode.value ? 'GC updated successfully!' : 'GC created successfully!';
+        String message;
+        if (isTemporaryMode.value) {
+          final responseData = jsonDecode(response.body);
+          final tempGcNum = responseData['data']?['temp_gc_number'] ?? 'Unknown';
+          message = 'Temporary GC created: $tempGcNum';
+        } else if (isFillTemporaryMode.value) {
+          message = 'GC created successfully from template!';
+        } else if (isEditMode.value) {
+          message = 'GC updated successfully!';
+        } else {
+          message = 'GC created successfully!';
+        }
 
-        Fluttertoast.showToast(
-          msg: message,
-          toastLength: Toast.LENGTH_SHORT,
+        _showToast(
+          message,
+          toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: const Color(0xFF4A90E2),
           textColor: Colors.white,
-          fontSize: 16.0,
         );
 
-        // *** THIS IS THE CRITICAL CHANGE ***
-        // If a new GC was created, signal the GCUsageWidget to refresh.
-        if (!isEditMode.value) {
+        // If a new GC was created, signal the GCUsageWidget to refresh
+        if (!isEditMode.value && !isTemporaryMode.value) {
           _idController.gcDataNeedsRefresh.value = true;
         }
 
         clearForm();
+        
+        // Reset temporary modes
+        isTemporaryMode.value = false;
+        isFillTemporaryMode.value = false;
+        tempGcNumber.value = '';
 
         Get.until((route) => route.isFirst);
       } else {
@@ -1219,13 +1695,12 @@ class GCFormController extends GetxController {
     } catch (e) {
       isLoading.value = false;
       final operation = isEditMode.value ? 'update' : 'create';
-      Fluttertoast.showToast(
-        msg: 'Failed to $operation GC: $e',
+      _showToast(
+        'Failed to $operation GC: $e',
         toastLength: Toast.LENGTH_LONG,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: Colors.red,
         textColor: Colors.white,
-        fontSize: 16.0,
       );
     }
   }

@@ -60,10 +60,22 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
       }
 
       final dio = Dio(BaseOptions(baseUrl: ApiConfig.baseUrl));
-      final response = await dio.get('/gc-management/gc-usage?userId=$userId');
+      final response = await dio.get('/gc-management/usage/$userId');
 
       if (response.statusCode == 200 && response.data != null) {
         final responseData = response.data as Map<String, dynamic>;
+        
+        // Handle case when no GC ranges found for user
+        if (responseData['success'] == false && 
+            responseData['message'] == 'No GC ranges found for user') {
+          setState(() {
+            _usageData = [];
+            _isLoading = false;
+            _errorMessage = 'No GC ranges found for user';
+          });
+          return;
+        }
+        
         if (responseData['success'] == true && responseData['data'] != null) {
           final List<dynamic> data = responseData['data'];
 
@@ -91,6 +103,7 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
             // This handles cases where API returns success:true but data is empty or null
             _usageData = [];
             _isLoading = false;
+            _errorMessage = 'No active or queued GC ranges found';
           });
         }
       } else {
@@ -99,9 +112,20 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
           _isLoading = false;
         });
       }
+    } on DioException catch (e) {
+      // Handle Dio-specific errors
+      String errorMessage = 'Failed to load GC usage';
+      if (e.response?.data != null && e.response?.data is Map) {
+        final errorData = e.response?.data as Map<String, dynamic>;
+        errorMessage = errorData['error']?.toString() ?? errorMessage;
+      }
+      setState(() {
+        _errorMessage = errorMessage;
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Failed to load GC usage: $e';
+        _errorMessage = 'An unexpected error occurred';
         _isLoading = false;
       });
     }
@@ -115,11 +139,7 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
       return _buildLoadingCard();
     }
 
-    if (_errorMessage != null) {
-      return const SizedBox.shrink(); // Don't show anything if there's an error
-    }
-
-    if (_usageData.isEmpty) {
+    if (_errorMessage != null || _usageData.isEmpty) {
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
         padding: const EdgeInsets.all(20.0),
@@ -339,16 +359,41 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          Text(
-                            '${usage.status == 'active' ? 'Last used GC' : 'Current GC'}: ${usage.currentGC}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey[600],
-                              height: 1.2,
+                          if (usage.status == 'active')
+                            usage.percentageUsed > 0
+                                ? Text(
+                                    'Last used: ${usage.currentGC}',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey[600],
+                                      height: 1.2,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  )
+                                : Text(
+                                    'New GC Series',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.green[600],
+                                      fontWeight: FontWeight.w500,
+                                      height: 1.2,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  )
+                          else if (usage.status == 'queued')
+                            Text(
+                              'Next in queue',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.blue[600],
+                                fontStyle: FontStyle.italic,
+                                height: 1.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
                         ],
                       ),
                     ),

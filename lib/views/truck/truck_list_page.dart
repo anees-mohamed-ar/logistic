@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:logistic/controller/truck_controller.dart';
+import 'package:logistic/controller/gc_form_controller.dart';
 import 'package:logistic/models/truck.dart';
 import 'package:logistic/views/truck/truck_form_page.dart';
 import 'package:logistic/widgets/custom_app_bar.dart';
@@ -249,7 +250,10 @@ class _TruckListPageState extends State<TruckListPage> {
             // ),
           ],
         ),
-        onTap: () => Get.to(() => TruckFormPage(truck: truck)),
+        onTap: () {
+          Get.put(GCFormController()); // Initialize controller before navigating
+          Get.to(() => TruckFormPage(truck: truck));
+        },
       ),
     );
   }
