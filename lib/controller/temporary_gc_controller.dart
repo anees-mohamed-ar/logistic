@@ -17,6 +17,9 @@ class TemporaryGCController extends GetxController {
   final selectedTempGC = Rxn<TemporaryGC>();
   final isLocking = false.obs;
   final isConverting = false.obs;
+  final RxString searchQuery = ''.obs;
+  final RxString currentFilter = 'all'.obs; // 'all', 'available', 'in_use'
+  final RxList<TemporaryGC> filteredGCs = <TemporaryGC>[].obs;
 
   HttpClient? _sseClient;
   StreamSubscription<String>? _sseSub;
@@ -102,6 +105,45 @@ class TemporaryGCController extends GetxController {
     super.onClose();
   }
 
+  // Apply search and filters to the temporary GCs list
+  void _applyFilters() {
+    var result = temporaryGCs.toList();
+    
+    // Apply search filter
+    if (searchQuery.value.isNotEmpty) {
+      final query = searchQuery.value.toLowerCase();
+      result = result.where((gc) {
+        return (gc.tempGcNumber?.toLowerCase().contains(query) ?? false) ||
+               (gc.truckFrom?.toLowerCase().contains(query) ?? false) ||
+               (gc.truckTo?.toLowerCase().contains(query) ?? false) ||
+               (gc.consignorName?.toLowerCase().contains(query) ?? false) ||
+               (gc.consigneeName?.toLowerCase().contains(query) ?? false) ||
+               (gc.vechileNumber?.toLowerCase().contains(query) ?? false);
+      }).toList();
+    }
+    
+    // Apply status filter
+    if (currentFilter.value == 'available') {
+      result = result.where((gc) => !gc.isLocked).toList();
+    } else if (currentFilter.value == 'in_use') {
+      result = result.where((gc) => gc.isLocked).toList();
+    }
+    
+    filteredGCs.value = result;
+  }
+  
+  // Update search query and apply filters
+  void updateSearchQuery(String query) {
+    searchQuery.value = query.trim();
+    _applyFilters();
+  }
+  
+  // Update filter and apply
+  void updateFilter(String filter) {
+    currentFilter.value = filter;
+    _applyFilters();
+  }
+
   // Fetch all available temporary GCs
   Future<void> fetchTemporaryGCs() async {
     try {
@@ -124,6 +166,7 @@ class TemporaryGCController extends GetxController {
         if (data['success'] == true) {
           final List<dynamic> gcList = data['data'];
           temporaryGCs.value = gcList.map((json) => TemporaryGC.fromJson(json)).toList();
+          _applyFilters();
         } else {
           Fluttertoast.showToast(
             msg: data['message'] ?? 'Failed to fetch temporary GCs',

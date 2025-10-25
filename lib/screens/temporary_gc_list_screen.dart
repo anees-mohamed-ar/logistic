@@ -54,18 +54,37 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
       accessMessage.value = hasAccess ? 'Access granted' : 'No active GC ranges found';
       
     } catch (e) {
-      // If there's an error, we'll grant access by default to avoid blocking users
-      hasGCAccess.value = true;
-      accessMessage.value = 'Access granted';
-      print('Error checking GC access, defaulting to granted access: $e');
-    } finally {
+      // If there's an error, we default to denying access to ensure security.
+      hasGCAccess.value = false;
+      accessMessage.value = 'Could not verify access. Please check your connection and try again.';
+      print('Error checking GC access, defaulting to denied access: $e');
+
+      // Optionally, show a temporary error message to the user.
+      Get.snackbar(
+        'Network Error',
+        'Failed to check permissions. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade100,
+        colorText: Colors.red.shade900,
+      );
+    }
+    finally {
       isCheckingAccess.value = false;
     }
   }
 
+  final RxBool isSearching = false.obs;
+  final TextEditingController searchController = TextEditingController();
+
   @override
   void dispose() {
+    // Clean up the search controller
+    searchController.dispose();
+    
+    // Remove lifecycle observer
     WidgetsBinding.instance.removeObserver(this);
+    
+    // Call super.dispose()
     super.dispose();
   }
 
@@ -87,37 +106,85 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
         elevation: 0,
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: Colors.white,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Temporary GC Forms',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Obx(() => Text(
-              '${controller.temporaryGCs.length} form${controller.temporaryGCs.length != 1 ? 's' : ''} available',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.white.withOpacity(0.9),
-                fontWeight: FontWeight.w400,
-              ),
-            )),
-          ],
-        ),
+        title: Obx(() => isSearching.value
+            ? Container(
+                height: 42,
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  controller: searchController,
+                  autofocus: true,
+                  style: const TextStyle(color: Colors.black87, fontSize: 16),
+                  decoration: InputDecoration(
+                    hintText: 'Search GCs...',
+                    hintStyle: TextStyle(color: Colors.grey[600]),
+                    border: InputBorder.none,
+                    prefixIcon: const Icon(Icons.search_rounded, color: Colors.grey),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    suffixIcon: searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, 
+                                size: 20, 
+                                color: Colors.grey),
+                            onPressed: () {
+                              searchController.clear();
+                              controller.updateSearchQuery('');
+                            },
+                          )
+                        : null,
+                  ),
+                  cursorColor: theme.colorScheme.primary,
+                  onChanged: controller.updateSearchQuery,
+                ),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Temporary GC Forms',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    '${controller.filteredGCs.length} of ${controller.temporaryGCs.length} form${controller.temporaryGCs.length != 1 ? 's' : ''} shown',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.9),
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              )),
         actions: [
-          // Search button
+          // Search toggle button
           Obx(() {
-            if (controller.temporaryGCs.isNotEmpty) {
-              return IconButton(
-                icon: const Icon(Icons.search_rounded),
-                tooltip: 'Search',
-                onPressed: () => _showSearchDialog(context, controller),
-              );
-            }
-            return const SizedBox.shrink();
+            if (controller.temporaryGCs.isEmpty) return const SizedBox.shrink();
+            
+            return isSearching.value
+                ? IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () {
+                      isSearching.value = false;
+                      searchController.clear();
+                      controller.updateSearchQuery('');
+                    },
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.search_rounded),
+                    onPressed: () => isSearching.value = true,
+                  );
           }),
           // Filter button
           Obx(() {
@@ -172,9 +239,9 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
                 color: theme.colorScheme.primary,
                 child: ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  itemCount: controller.temporaryGCs.length,
+                  itemCount: controller.filteredGCs.length,
                   itemBuilder: (context, index) {
-                    final tempGC = controller.temporaryGCs[index];
+                    final tempGC = controller.filteredGCs[index];
                     return _EnhancedTemporaryGCCard(
                       tempGC: tempGC,
                       controller: controller,
@@ -267,7 +334,7 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
               const SizedBox(height: 12),
               Obx(() => Text(
                 accessMessage.value.isEmpty
-                    ? 'No active or queued GC ranges found'
+                    ? 'No active or queued GC ranges found or Server down'
                     : accessMessage.value,
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -517,57 +584,67 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
     Get.toNamed(AppRoutes.gcForm);
   }
 
-  void _showSearchDialog(BuildContext context, TemporaryGCController controller) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Search Temporary GC'),
-        content: TextField(
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Enter GC number, route, or consignor...',
-            prefixIcon: Icon(Icons.search_rounded),
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (value) {
-            // Implement search functionality
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
+  // Removed _showSearchDialog as we've moved search to the app bar
 
   void _showFilterDialog(BuildContext context, TemporaryGCController controller) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Filter Forms'),
-        content: Column(
+        content: Obx(() => Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.all_inclusive_rounded),
               title: const Text('All Forms'),
-              onTap: () => Navigator.pop(context),
+              trailing: controller.currentFilter.value == 'all' 
+                  ? const Icon(Icons.check_rounded, color: Colors.green)
+                  : null,
+              onTap: () {
+                controller.updateFilter('all');
+                Navigator.pop(context);
+              },
             ),
+            const Divider(height: 1),
             ListTile(
-              leading: const Icon(Icons.check_circle_outline_rounded),
+              leading: const Icon(Icons.check_circle_outline_rounded, color: Colors.green),
               title: const Text('Available Only'),
-              onTap: () => Navigator.pop(context),
+              trailing: controller.currentFilter.value == 'available' 
+                  ? const Icon(Icons.check_rounded, color: Colors.green)
+                  : null,
+              onTap: () {
+                controller.updateFilter('available');
+                Navigator.pop(context);
+              },
             ),
+            const Divider(height: 1),
             ListTile(
-              leading: const Icon(Icons.lock_outline_rounded),
+              leading: const Icon(Icons.lock_outline_rounded, color: Colors.orange),
               title: const Text('In Use Only'),
-              onTap: () => Navigator.pop(context),
+              trailing: controller.currentFilter.value == 'in_use' 
+                  ? const Icon(Icons.check_rounded, color: Colors.green)
+                  : null,
+              onTap: () {
+                controller.updateFilter('in_use');
+                Navigator.pop(context);
+              },
             ),
           ],
-        ),
+        )),
+        actions: [
+          TextButton(
+            onPressed: () {
+              // Reset filters when canceling
+              if (controller.currentFilter.value != 'all' || 
+                  controller.searchQuery.value.isNotEmpty) {
+                controller.updateFilter('all');
+                controller.updateSearchQuery('');
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Reset'),
+          ),
+        ],
       ),
     );
   }
