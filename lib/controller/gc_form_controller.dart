@@ -224,11 +224,142 @@ class GCFormController extends GetxController {
   final editingGcNumber = ''.obs;
   final editingCompanyId = ''.obs;
   
+  // Format time for display
+  String formatTime(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final hours = twoDigits(duration.inHours);
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$hours:$minutes:$seconds';
+  }
+  
   // Temporary GC Mode
   final isTemporaryMode = false.obs; // When true, save as temporary GC
   final isFillTemporaryMode = false.obs; // When true, filling a temporary GC
   final tempGcNumber = ''.obs; // Store temp GC number when filling
   final tempGcPreview = ''.obs;
+  final Rx<DateTime?> lockedAt = Rx<DateTime?>(null);
+  
+  // Timer related variables for temporary GC lock
+  static const Duration lockDuration = Duration(minutes: 10);
+  final Rx<Duration> remainingTime = Duration.zero.obs;
+  Timer? _timer;
+  Timer? _confirmationTimer;
+  bool _isShowingDialog = false;
+
+  // Start the lock timer based on lockedAt timestamp
+  void startLockTimer() {
+    _timer?.cancel();
+    _confirmationTimer?.cancel();
+    
+    if (lockedAt.value == null) {
+      print('No lockedAt timestamp found, cannot start timer');
+      return;
+    }
+    
+    void updateTimer() {
+      final now = DateTime.now();
+      final expiry = lockedAt.value!.add(lockDuration);
+      remainingTime.value = expiry.isAfter(now) 
+          ? expiry.difference(now) 
+          : Duration.zero;
+      
+      if (remainingTime.value <= Duration.zero) {
+        _timer?.cancel();
+        _showTimeExtensionDialog();
+      }
+    }
+    
+    updateTimer();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => updateTimer());
+  }
+  
+  // Show time extension dialog with auto-close after 5 seconds
+  Future<void> _showTimeExtensionDialog() async {
+    if (_isShowingDialog) return;
+    _isShowingDialog = true;
+    
+    // Start 5-second confirmation timer
+    bool userResponded = false;
+    _confirmationTimer = Timer(const Duration(seconds: 5), () {
+      if (!userResponded) {
+        _isShowingDialog = false;
+        Get.back(); // Close form automatically
+      }
+    });
+    
+    final result = await Get.dialog<bool>(
+      WillPopScope(
+        onWillPop: () async => false, // Prevent back button
+        child: AlertDialog(
+          title: const Text('Time Expired'),
+          content: const Text('Your time is up! Would you like to extend your session?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                userResponded = true;
+                _confirmationTimer?.cancel();
+                Get.back(result: false);
+              },
+              child: const Text('No'),
+            ),
+            TextButton(
+              onPressed: () {
+                userResponded = true;
+                _confirmationTimer?.cancel();
+                Get.back(result: true);
+              },
+              child: const Text('Yes'),
+            ),
+          ],
+        ),
+      ),
+      barrierDismissible: false,
+    ) ?? false;
+    
+    _isShowingDialog = false;
+    _confirmationTimer?.cancel();
+    
+    if (result) {
+      // Extend time - attempt to lock again and restart timer from server timestamp
+      await _extendTemporaryGcLock();
+    } else {
+      // Close form
+      Get.back();
+    }
+  }
+
+  Future<void> _extendTemporaryGcLock() async {
+    try {
+      final tempNumber = tempGcNumber.value;
+      if (tempNumber.isEmpty) {
+        lockedAt.value = DateTime.now();
+        startLockTimer();
+        return;
+      }
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/temporary-gc/lock/$tempNumber'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'userId': _idController.userId.value}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final lockedAtStr = data['lockedAt'];
+        lockedAt.value = lockedAtStr != null
+            ? DateTime.tryParse(lockedAtStr.toString()) ?? DateTime.now()
+            : DateTime.now();
+        startLockTimer();
+      } else {
+        throw Exception('Failed to extend lock (${response.statusCode})');
+      }
+    } catch (e) {
+      print('Error extending temporary GC lock: $e');
+      lockedAt.value = DateTime.now();
+      startLockTimer();
+    }
+  }
 
   String _generateTempGcNumber() {
     final timestamp = DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase();
@@ -240,6 +371,8 @@ class GCFormController extends GetxController {
     final number = _generateTempGcNumber();
     gcNumberCtrl.text = number;
     tempGcPreview.value = number;
+    // Set lockedAt timestamp to current time when creating new temporary GC
+    lockedAt.value = DateTime.now();
   }
 
   void loadTemporaryGc(TemporaryGC tempGC) {
@@ -355,8 +488,28 @@ class GCFormController extends GetxController {
     if (tempGC.deliveryAddress != null) deliveryAddressCtrl.text = tempGC.deliveryAddress!;
     if (tempGC.deliveryFromSpecial != null) deliveryInstructionsCtrl.text = tempGC.deliveryFromSpecial!;
     if (tempGC.privateMark != null) remarksCtrl.text = tempGC.privateMark!;
+    
+    // Set lockedAt timestamp for timer
+    if (tempGC.lockedAt != null) {
+      try {
+        lockedAt.value = DateTime.parse(tempGC.lockedAt! as String);
+      } catch (e) {
+        print('Error parsing lockedAt timestamp: $e');
+        lockedAt.value = DateTime.now(); // Fallback to current time
+      }
+    } else {
+      lockedAt.value = DateTime.now(); // Default to current time if not provided
+    }
   }
 
+    // Cancel all timers
+  void _cancelTimers() {
+    _timer?.cancel();
+    _confirmationTimer?.cancel();
+    _timer = null;
+    _confirmationTimer = null;
+  }
+  
 
   @override
   void onInit() {
@@ -368,7 +521,19 @@ class GCFormController extends GetxController {
     toCtrl.addListener(_handleLocationChange);   // Listen to changes in 'To' field for KM lookup
     hireAmountCtrl.addListener(_updateBalanceAmount); // Listen for hire amount changes
     advanceAmountCtrl.addListener(_updateBalanceAmount); // Listen for advance amount changes
-
+    
+    // Start timer only in temporary mode
+    ever<bool>(isTemporaryMode, (isTemp) {
+      if (isTemp && lockedAt.value != null) {
+        startLockTimer();
+      }
+    });
+    
+    ever<bool>(isFillTemporaryMode, (isFillTemp) {
+      if (isFillTemp && lockedAt.value != null) {
+        startLockTimer();
+      }
+    });
 
     // Fetch initial data for dropdowns and rates
     fetchBranches();
@@ -388,21 +553,18 @@ class GCFormController extends GetxController {
     _tabScrollListenerAttached = false;
 
     // Remove listeners
-    try {
-      kmCtrl.removeListener(calculateRate);
-      fromCtrl.removeListener(_handleLocationChange);
-      toCtrl.removeListener(_handleLocationChange);
-      hireAmountCtrl.removeListener(_updateBalanceAmount);
-      advanceAmountCtrl.removeListener(_updateBalanceAmount);
-    } catch (e) {
-      // Ignore errors during listener removal
-    }
+    kmCtrl.removeListener(calculateRate);
+    fromCtrl.removeListener(_handleLocationChange);
+    toCtrl.removeListener(_handleLocationChange);
+    hireAmountCtrl.removeListener(_updateBalanceAmount);
+    advanceAmountCtrl.removeListener(_updateBalanceAmount);
+    
+    // Cancel timers
+    _cancelTimers();
 
-    // Dispose all TextEditingControllers safely
+    // Dispose controllers
     _disposeIfMounted(gcNumberCtrl);
-    _disposeIfMounted(gcDateCtrl);
     _disposeIfMounted(eDaysCtrl);
-    _disposeIfMounted(deliveryDateCtrl);
     _disposeIfMounted(poNumberCtrl);
     _disposeIfMounted(truckTypeCtrl);
     _disposeIfMounted(fromCtrl);
@@ -411,12 +573,9 @@ class GCFormController extends GetxController {
     _disposeIfMounted(brokerNameCtrl);
     _disposeIfMounted(driverNameCtrl);
     _disposeIfMounted(driverPhoneCtrl);
-    _disposeIfMounted(customInvoiceCtrl);
-    _disposeIfMounted(invValueCtrl);
-    _disposeIfMounted(ewayBillCtrl);
-    _disposeIfMounted(ewayBillDateCtrl);
-    _disposeIfMounted(ewayExpiredCtrl);
     _disposeIfMounted(consignorNameCtrl);
+    _disposeIfMounted(weightCtrl);
+    _disposeIfMounted(natureOfGoodsCtrl);
     _disposeIfMounted(consignorGstCtrl);
     _disposeIfMounted(consignorAddressCtrl);
     _disposeIfMounted(consigneeNameCtrl);
@@ -425,12 +584,17 @@ class GCFormController extends GetxController {
     _disposeIfMounted(billToNameCtrl);
     _disposeIfMounted(billToGstCtrl);
     _disposeIfMounted(billToAddressCtrl);
+    _disposeIfMounted(customInvoiceCtrl);
+    _disposeIfMounted(invValueCtrl);
+    _disposeIfMounted(ewayBillCtrl);
+    _disposeIfMounted(ewayBillDateCtrl);
+    _disposeIfMounted(ewayExpiredCtrl);
     _disposeIfMounted(packagesCtrl);
     _disposeIfMounted(natureGoodsCtrl);
     _disposeIfMounted(methodPackageCtrl);
     _disposeIfMounted(actualWeightCtrl);
-    _disposeIfMounted(rateCtrl);
     _disposeIfMounted(kmCtrl);
+    _disposeIfMounted(rateCtrl);
     _disposeIfMounted(remarksCtrl);
     _disposeIfMounted(fromLocationCtrl);
     _disposeIfMounted(toLocationCtrl);

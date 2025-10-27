@@ -1,4 +1,5 @@
 class TemporaryGC {
+  static const _unset = Object();
   final int id;
   final String tempGcNumber;
   final int createdByUserId;
@@ -297,8 +298,8 @@ class TemporaryGC {
 
   TemporaryGC copyWith({
     bool? isLocked,
-    int? lockedByUserId,
-    DateTime? lockedAt,
+    Object? lockedByUserId = _unset,
+    Object? lockedAt = _unset,
   }) {
     return TemporaryGC(
       id: id,
@@ -306,8 +307,11 @@ class TemporaryGC {
       createdByUserId: createdByUserId,
       createdAt: createdAt,
       isLocked: isLocked ?? this.isLocked,
-      lockedByUserId: lockedByUserId ?? this.lockedByUserId,
-      lockedAt: lockedAt ?? this.lockedAt,
+      lockedByUserId: lockedByUserId == _unset
+          ? this.lockedByUserId
+          : lockedByUserId as int?,
+      lockedAt:
+          lockedAt == _unset ? this.lockedAt : lockedAt as DateTime?,
       isConverted: isConverted,
       convertedGcNumber: convertedGcNumber,
       convertedByUserId: convertedByUserId,

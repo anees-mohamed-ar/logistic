@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:logistic/controller/temporary_gc_controller.dart';
@@ -783,7 +785,10 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      _CompactStatusBadge(isLocked: tempGC.isLocked),
+                      _CompactStatusBadge(
+                        isLocked: tempGC.isLocked,
+                        lockedAt: tempGC.lockedAt,
+                      ),
                       if (controller.isAdmin) ...[
                         const SizedBox(width: 8),
                         InkWell(
@@ -1204,13 +1209,86 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
   }
 }
 
-class _CompactStatusBadge extends StatelessWidget {
+class _CompactStatusBadge extends StatefulWidget {
   final bool isLocked;
+  final DateTime? lockedAt;
 
-  const _CompactStatusBadge({required this.isLocked});
+  const _CompactStatusBadge({required this.isLocked, required this.lockedAt});
+
+  @override
+  State<_CompactStatusBadge> createState() => _CompactStatusBadgeState();
+}
+
+class _CompactStatusBadgeState extends State<_CompactStatusBadge> {
+  static const Duration _lockDuration = Duration(minutes: 10);
+
+  Timer? _timer;
+  Duration? _remaining;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CompactStatusBadge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isLocked != widget.isLocked ||
+        oldWidget.lockedAt != widget.lockedAt) {
+      _startTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+
+    if (!widget.isLocked || widget.lockedAt == null) {
+      setState(() => _remaining = null);
+      return;
+    }
+
+    _updateRemaining();
+
+    if (_remaining != null && _remaining! > Duration.zero) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateRemaining());
+    }
+  }
+
+  void _updateRemaining() {
+    final lockedAtUtc = widget.lockedAt!.toUtc();
+    final now = DateTime.now().toUtc();
+    final expiry = lockedAtUtc.add(_lockDuration);
+    final remaining = expiry.difference(now);
+
+    if (!mounted) return;
+
+    if (remaining <= Duration.zero) {
+      _timer?.cancel();
+      setState(() => _remaining = Duration.zero);
+    } else {
+      setState(() => _remaining = remaining);
+    }
+  }
+
+  String _formatDuration(Duration duration) {
+    final totalSeconds = duration.inSeconds;
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isLocked = widget.isLocked;
+    final showCountdown = isLocked && _remaining != null;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -1231,7 +1309,11 @@ class _CompactStatusBadge extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           Text(
-            isLocked ? 'In Use' : 'Available',
+            isLocked
+                ? showCountdown
+                    ? 'In Use · ${_formatDuration(_remaining!)}'
+                    : 'In Use'
+                : 'Available',
             style: TextStyle(
               fontSize: 10,
               color: isLocked ? Colors.orange.shade800 : Colors.green.shade800,

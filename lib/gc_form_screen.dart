@@ -154,15 +154,60 @@ class _GCFormScreenState extends State<GCFormScreen> {
       child: Scaffold(
       appBar: AppBar(
         title: Obx(() {
-          if (controller.isTemporaryMode.value) {
-            return const Text('Create Temporary GC');
-          } else if (controller.isFillTemporaryMode.value) {
-            return const Text('Fill Temporary GC');
-          } else if (controller.isEditMode.value) {
-            return const Text('Edit GC');
-          } else {
-            return const Text('GC Shipment Form');
+          final isTemporary = controller.isTemporaryMode.value || controller.isFillTemporaryMode.value;
+
+          if (!isTemporary) {
+            // Regular GC form - no timer
+            if (controller.isEditMode.value) {
+              return const Text('Edit GC');
+            } else {
+              return const Text('GC Shipment Form');
+            }
           }
+
+          // Temporary GC mode - show timer
+          final minutes = controller.remainingTime.value.inMinutes;
+          final seconds = controller.remainingTime.value.inSeconds % 60;
+          final timeStr = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+
+          return Row(
+            children: [
+              // Timer display
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: controller.remainingTime.value.inSeconds <= 30
+                      ? Colors.red.shade600
+                      : Colors.orange.shade600,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  timeStr,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'monospace',
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Title text
+              Text(
+                controller.isTemporaryMode.value
+                    ? 'Create Temporary GC'
+                    : 'Fill Temporary GC',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          );
         }),
         backgroundColor: const Color(0xFF1E2A44),
         foregroundColor: Colors.white,
