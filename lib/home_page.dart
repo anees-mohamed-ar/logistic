@@ -121,6 +121,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _handleRefresh() async {
+    await _fetchSummaryData();
+  }
+
   double _parseDouble(dynamic value) {
     if (value == null) return 0.0;
     try {
@@ -237,11 +241,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ],
           ),
         ),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: RefreshIndicator(
+          onRefresh: _handleRefresh,
+          displacement: 32,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               // Welcome Section
               _buildWelcomeSection(context, isSmallScreen),
               const SizedBox(height: 32),
@@ -310,6 +320,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 _buildRecentActivitySection(),
               ],
             ],
+          ),
           ),
         ),
       ),
@@ -385,8 +396,26 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       return const Center(child: CircularProgressIndicator());
     }
     if (_summaryError != null) {
-      return Center(
-          child: Text(_summaryError!, style: const TextStyle(color: Colors.red)));
+      return Container(
+        height: 140,
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _summaryError!,
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _fetchSummaryData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
     }
 
     final cards = [

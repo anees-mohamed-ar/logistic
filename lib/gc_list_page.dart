@@ -571,12 +571,15 @@ class _GCListPageState extends State<GCListPage> {
             child: const Icon(Icons.description, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('GC Management', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              Text('Goods Consignment List', style: TextStyle(fontSize: 12, color: Colors.white70)),
-            ],
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('GC Management', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text('Goods Consignment List', style: TextStyle(fontSize: 12, color: Colors.white70)),
+              ],
+            ),
           ),
         ],
       ),
@@ -948,12 +951,19 @@ class _GCListPageState extends State<GCListPage> {
   Widget _buildCardSubtitle(Map<String, dynamic> gc) {
     return Container(
       margin: const EdgeInsets.only(top: 8),
-      child: Row(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           _buildInfoChip(Icons.business, gc['Branch']),
-          const SizedBox(width: 8),
           if (gc['GcDate']?.toString().isNotEmpty == true)
             _buildInfoChip(Icons.calendar_today, _formatDisplayDate(gc['GcDate'])),
+          if (gc['created_at']?.toString().isNotEmpty == true)
+            _buildInfoChip(
+              Icons.access_time,
+              _formatDisplayDateWithTime(gc['created_at']),
+            ),
         ],
       ),
     );
@@ -1122,6 +1132,20 @@ class _GCListPageState extends State<GCListPage> {
     try {
       final dateTime = DateTime.parse(date.toString());
       return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    } catch (e) {
+      return date.toString();
+    }
+  }
+
+  String _formatDisplayDateWithTime(dynamic date) {
+    if (date == null) return '';
+    try {
+      final dateTime = DateTime.parse(date.toString()).toLocal();
+      final hour = dateTime.hour % 12 == 0 ? 12 : dateTime.hour % 12;
+      final period = dateTime.hour >= 12 ? 'PM' : 'AM';
+      final hours = hour.toString().padLeft(2, '0');
+      final minutes = dateTime.minute.toString().padLeft(2, '0');
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year} • $hours:$minutes $period';
     } catch (e) {
       return date.toString();
     }
@@ -1362,6 +1386,8 @@ class _GCListPageState extends State<GCListPage> {
       controller.freightChargeCtrl.text = gc['FreightCharge']?.toString() ?? '';
     }
     controller.selectedPayment.value = gc['PaymentDetails']?.toString() ?? 'Cash';
+
+    controller.onGstPayerSelected(gc['ServiceTax']?.toString());
 
     controller.customInvoiceCtrl.text = gc['CustInvNo']?.toString() ?? '';
     controller.deliveryInstructionsCtrl.text = gc['DeliveryFromSpecial']?.toString() ?? '';

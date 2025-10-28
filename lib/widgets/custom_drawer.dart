@@ -124,13 +124,10 @@ class _CustomDrawerState extends State<CustomDrawer> {
           : '';
 
       return Container(
-        padding: const EdgeInsets.fromLTRB(80, 60, 100, 24),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+        width: double.infinity,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF1E2A44), Color(0xFF414457)],
-          ),
+          color: Color(0xFF1E2A44),
         ),
         child: Column(
           children: [
@@ -176,8 +173,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
                 fontWeight: FontWeight.bold,
               ),
               textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              softWrap: true,
             ),
 
             const SizedBox(height: 4),
@@ -186,11 +182,9 @@ class _CustomDrawerState extends State<CustomDrawer> {
               email.isNotEmpty ? email : 'user@example.com',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.8),
-                fontSize: 13,
+                fontSize: 9,
               ),
               textAlign: TextAlign.center,
-              maxLines: 1,
-              // overflow: TextOver,
             ),
 
             const SizedBox(height: 8),

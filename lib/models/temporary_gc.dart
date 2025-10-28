@@ -41,6 +41,10 @@ class TemporaryGC {
   final String? consigneeName;
   final String? consigneeAddress;
   final String? consigneeGst;
+  final String? billTo;
+  final String? billToName;
+  final String? billToAddress;
+  final String? billToGst;
   final String? custInvNo;
   final String? invValue;
   final String? eInv;
@@ -138,6 +142,10 @@ class TemporaryGC {
     this.consigneeName,
     this.consigneeAddress,
     this.consigneeGst,
+    this.billTo,
+    this.billToName,
+    this.billToAddress,
+    this.billToGst,
     this.custInvNo,
     this.invValue,
     this.eInv,
@@ -237,6 +245,10 @@ class TemporaryGC {
       consigneeName: json['ConsigneeName'] as String?,
       consigneeAddress: json['ConsigneeAddress'] as String?,
       consigneeGst: json['ConsigneeGst'] as String?,
+      billTo: json['BillTo'] as String?,
+      billToName: json['BillToName'] as String?,
+      billToAddress: json['BillToAddress'] as String?,
+      billToGst: json['BillToGst'] as String?,
       custInvNo: json['CustInvNo'] as String?,
       invValue: json['InvValue'] as String?,
       eInv: json['EInv'] as String?,
@@ -433,6 +445,10 @@ class TemporaryGC {
       'ConsigneeName': consigneeName,
       'ConsigneeAddress': consigneeAddress,
       'ConsigneeGst': consigneeGst,
+      'BillTo': billTo,
+      'BillToName': billToName,
+      'BillToAddress': billToAddress,
+      'BillToGst': billToGst,
       'CustInvNo': custInvNo,
       'InvValue': invValue,
       'EInv': eInv,

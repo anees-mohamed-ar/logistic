@@ -36,56 +36,59 @@ class TemporaryGCController extends GetxController {
         print('No user ID, denying access');
         return false; // Deny access if no user ID
       }
-      
+
       print('Checking GC access for user: $userId');
-      
+
       try {
         final response = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/gc-management/usage/$userId'),
         );
-        
+
         print('GC access check response: ${response.statusCode}');
-        
+
         // Parse the response body
         final responseBody = jsonDecode(response.body);
-        
+
         // If we get a 200 response with success: true
         if (response.statusCode == 200 && responseBody['success'] == true) {
           final List<dynamic> gcRanges = responseBody['data'] ?? [];
-          
+
           // Check if any range has status 'active' or 'queued'
-          final hasValidRange = gcRanges.any((range) => 
-            range['status'] == 'active' || range['status'] == 'queued'
+          final hasValidRange = gcRanges.any(
+            (range) =>
+                range['status'] == 'active' || range['status'] == 'queued',
           );
-          
+
           if (hasValidRange) {
             print('Access granted - User has active/queued GC ranges');
             return true;
           } else {
             print('Access denied - No active or queued GC ranges found');
-            print('Available ranges: ${gcRanges.map((r) => '${r['fromGC']}-${r['toGC']} (${r['status']})').toList()}');
+            print(
+              'Available ranges: ${gcRanges.map((r) => '${r['fromGC']}-${r['toGC']} (${r['status']})').toList()}',
+            );
             return false;
           }
-        } 
+        }
         // Handle case when no GC ranges found for user
-        else if (response.statusCode == 200 && 
-                responseBody['success'] == false &&
-                responseBody['message'] == 'No GC ranges found for user') {
+        else if (response.statusCode == 200 &&
+            responseBody['success'] == false &&
+            responseBody['message'] == 'No GC ranges found for user') {
           print('Access denied - No GC ranges found for user');
           return false;
         }
-        
+
         // For any other case, log the response and deny access
-        print('GC usage check returned status: ${response.statusCode} - ${response.body}');
+        print(
+          'GC usage check returned status: ${response.statusCode} - ${response.body}',
+        );
         print('Denying access due to unexpected response');
         return false;
-        
       } catch (e) {
         print('Error checking GC access, denying access: $e');
         // On any error, deny access to be safe
         return false;
       }
-      
     } catch (e) {
       print('Unexpected error in checkGCAccess, denying access: $e');
       // Default to false to be safe if there's any error
@@ -108,36 +111,36 @@ class TemporaryGCController extends GetxController {
   // Apply search and filters to the temporary GCs list
   void _applyFilters() {
     var result = temporaryGCs.toList();
-    
+
     // Apply search filter
     if (searchQuery.value.isNotEmpty) {
       final query = searchQuery.value.toLowerCase();
       result = result.where((gc) {
         return (gc.tempGcNumber?.toLowerCase().contains(query) ?? false) ||
-               (gc.truckFrom?.toLowerCase().contains(query) ?? false) ||
-               (gc.truckTo?.toLowerCase().contains(query) ?? false) ||
-               (gc.consignorName?.toLowerCase().contains(query) ?? false) ||
-               (gc.consigneeName?.toLowerCase().contains(query) ?? false) ||
-               (gc.vechileNumber?.toLowerCase().contains(query) ?? false);
+            (gc.truckFrom?.toLowerCase().contains(query) ?? false) ||
+            (gc.truckTo?.toLowerCase().contains(query) ?? false) ||
+            (gc.consignorName?.toLowerCase().contains(query) ?? false) ||
+            (gc.consigneeName?.toLowerCase().contains(query) ?? false) ||
+            (gc.vechileNumber?.toLowerCase().contains(query) ?? false);
       }).toList();
     }
-    
+
     // Apply status filter
     if (currentFilter.value == 'available') {
       result = result.where((gc) => !gc.isLocked).toList();
     } else if (currentFilter.value == 'in_use') {
       result = result.where((gc) => gc.isLocked).toList();
     }
-    
+
     filteredGCs.value = result;
   }
-  
+
   // Update search query and apply filters
   void updateSearchQuery(String query) {
     searchQuery.value = query.trim();
     _applyFilters();
   }
-  
+
   // Update filter and apply
   void updateFilter(String filter) {
     currentFilter.value = filter;
@@ -158,14 +161,18 @@ class TemporaryGCController extends GetxController {
         return;
       }
 
-      final url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/list?companyId=$companyId');
+      final url = Uri.parse(
+        '${ApiConfig.baseUrl}/temporary-gc/list?companyId=$companyId',
+      );
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
           final List<dynamic> gcList = data['data'];
-          temporaryGCs.value = gcList.map((json) => TemporaryGC.fromJson(json)).toList();
+          temporaryGCs.value = gcList
+              .map((json) => TemporaryGC.fromJson(json))
+              .toList();
           _applyFilters();
         } else {
           Fluttertoast.showToast(
@@ -181,10 +188,7 @@ class TemporaryGCController extends GetxController {
       }
     } catch (e) {
       print('Error fetching temporary GCs: $e');
-      Fluttertoast.showToast(
-        msg: 'Error: $e',
-        backgroundColor: Colors.red,
-      );
+      Fluttertoast.showToast(msg: 'Error: $e', backgroundColor: Colors.red);
     } finally {
       isLoading.value = false;
     }
@@ -193,7 +197,9 @@ class TemporaryGCController extends GetxController {
   // Get single temporary GC
   Future<TemporaryGC?> getTemporaryGC(String tempGcNumber) async {
     try {
-      final url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/get/$tempGcNumber');
+      final url = Uri.parse(
+        '${ApiConfig.baseUrl}/temporary-gc/get/$tempGcNumber',
+      );
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -215,7 +221,9 @@ class TemporaryGCController extends GetxController {
       isLocking.value = true;
       final userId = _idController.userId.value;
 
-      final url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/lock/$tempGcNumber');
+      final url = Uri.parse(
+        '${ApiConfig.baseUrl}/temporary-gc/lock/$tempGcNumber',
+      );
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -247,10 +255,7 @@ class TemporaryGCController extends GetxController {
       }
     } catch (e) {
       print('Error locking temporary GC: $e');
-      Fluttertoast.showToast(
-        msg: 'Error: $e',
-        backgroundColor: Colors.red,
-      );
+      Fluttertoast.showToast(msg: 'Error: $e', backgroundColor: Colors.red);
       return false;
     } finally {
       isLocking.value = false;
@@ -262,7 +267,9 @@ class TemporaryGCController extends GetxController {
     try {
       final userId = _idController.userId.value;
 
-      final url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/unlock/$tempGcNumber');
+      final url = Uri.parse(
+        '${ApiConfig.baseUrl}/temporary-gc/unlock/$tempGcNumber',
+      );
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -290,7 +297,9 @@ class TemporaryGCController extends GetxController {
 
       _sseClient = HttpClient();
       _sseClient!.connectionTimeout = const Duration(seconds: 10);
-      final uri = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/stream?companyId=$companyId');
+      final uri = Uri.parse(
+        '${ApiConfig.baseUrl}/temporary-gc/stream?companyId=$companyId',
+      );
       final req = await _sseClient!.getUrl(uri);
       req.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
       final resp = await req.close();
@@ -307,36 +316,41 @@ class TemporaryGCController extends GetxController {
       _sseSub = resp
           .transform(utf8.decoder)
           .transform(const LineSplitter())
-          .listen((line) {
-        if (line.isEmpty) {
-          if (dataBuf.isNotEmpty) {
-            final raw = dataBuf.toString().trimRight();
-            dataBuf.clear();
-            try {
-              final parsed = json.decode(raw);
-              _dispatchSseEvent(currentEvent, parsed);
-            } catch (e) {
-              print('SSE data parse error: $e');
-            }
-          }
-          currentEvent = null;
-          return;
-        }
-        if (line.startsWith(':')) return; // comment/heartbeat
-        if (line.startsWith('event:')) {
-          currentEvent = line.substring(6).trim();
-          return;
-        }
-        if (line.startsWith('data:')) {
-          dataBuf.writeln(line.substring(5).trimLeft());
-          return;
-        }
-      }, onDone: () {
-        if (!_sseClosing) _scheduleReconnect();
-      }, onError: (e) {
-        print('SSE error: $e');
-        if (!_sseClosing) _scheduleReconnect();
-      }, cancelOnError: true);
+          .listen(
+            (line) {
+              if (line.isEmpty) {
+                if (dataBuf.isNotEmpty) {
+                  final raw = dataBuf.toString().trimRight();
+                  dataBuf.clear();
+                  try {
+                    final parsed = json.decode(raw);
+                    _dispatchSseEvent(currentEvent, parsed);
+                  } catch (e) {
+                    print('SSE data parse error: $e');
+                  }
+                }
+                currentEvent = null;
+                return;
+              }
+              if (line.startsWith(':')) return; // comment/heartbeat
+              if (line.startsWith('event:')) {
+                currentEvent = line.substring(6).trim();
+                return;
+              }
+              if (line.startsWith('data:')) {
+                dataBuf.writeln(line.substring(5).trimLeft());
+                return;
+              }
+            },
+            onDone: () {
+              if (!_sseClosing) _scheduleReconnect();
+            },
+            onError: (e) {
+              print('SSE error: $e');
+              if (!_sseClosing) _scheduleReconnect();
+            },
+            cancelOnError: true,
+          );
     } catch (e) {
       print('Error connecting to SSE: $e');
       _scheduleReconnect();
@@ -410,7 +424,9 @@ class TemporaryGCController extends GetxController {
     try {
       final tempGcNumber = data['temp_gc_number'];
       final lockedByUserId = data['locked_by_user_id'];
-      final index = temporaryGCs.indexWhere((g) => g.tempGcNumber == tempGcNumber);
+      final index = temporaryGCs.indexWhere(
+        (g) => g.tempGcNumber == tempGcNumber,
+      );
       if (index >= 0) {
         final updated = temporaryGCs[index].copyWith(
           isLocked: true,
@@ -428,7 +444,9 @@ class TemporaryGCController extends GetxController {
   void _handleGCUnlocked(dynamic data) {
     try {
       final tempGcNumber = data['temp_gc_number'];
-      final index = temporaryGCs.indexWhere((g) => g.tempGcNumber == tempGcNumber);
+      final index = temporaryGCs.indexWhere(
+        (g) => g.tempGcNumber == tempGcNumber,
+      );
       if (index >= 0) {
         final updated = temporaryGCs[index].copyWith(
           isLocked: false,
@@ -457,14 +475,11 @@ class TemporaryGCController extends GetxController {
     try {
       final userId = _idController.userId.value;
       final url = Uri.parse('${ApiConfig.baseUrl}/api/gc-management/submit-gc');
-      
+
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'userId': userId,
-          'gcNumber': gcNumber,
-        }),
+        body: json.encode({'userId': userId, 'gcNumber': gcNumber}),
       );
 
       if (response.statusCode == 200) {
@@ -490,7 +505,9 @@ class TemporaryGCController extends GetxController {
       final userId = _idController.userId.value;
 
       // First convert the temporary GC to a real GC
-      final url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/convert/$tempGcNumber');
+      final url = Uri.parse(
+        '${ApiConfig.baseUrl}/temporary-gc/convert/$tempGcNumber',
+      );
       final body = {
         'userId': userId,
         'actualGcNumber': actualGcNumber,
@@ -508,24 +525,28 @@ class TemporaryGCController extends GetxController {
       if (response.statusCode == 200 && data['success'] == true) {
         // Mark the GC number as used for the current user
         final gcMarked = await _markGCNumberAsUsed(actualGcNumber);
-        
+
         if (!gcMarked) {
           // Log the error but don't fail the operation
-          print('Warning: Failed to mark GC number as used, but conversion was successful');
+          print(
+            'Warning: Failed to mark GC number as used, but conversion was successful',
+          );
         }
-        
+
         Fluttertoast.showToast(
           msg: 'GC created successfully!',
           backgroundColor: Colors.green,
           toastLength: Toast.LENGTH_LONG,
         );
-        
+
         // The list will be updated automatically via SSE
         return true;
       } else if (response.statusCode == 409) {
         // GC number already exists
         Fluttertoast.showToast(
-          msg: data['message'] ?? 'This GC number already exists. Another user may have filled this temporary GC.',
+          msg:
+              data['message'] ??
+              'This GC number already exists. Another user may have filled this temporary GC.',
           backgroundColor: Colors.red,
           toastLength: Toast.LENGTH_LONG,
         );
@@ -539,10 +560,7 @@ class TemporaryGCController extends GetxController {
       }
     } catch (e) {
       print('Error converting temporary GC: $e');
-      Fluttertoast.showToast(
-        msg: 'Error: $e',
-        backgroundColor: Colors.red,
-      );
+      Fluttertoast.showToast(msg: 'Error: $e', backgroundColor: Colors.red);
       return false;
     } finally {
       isConverting.value = false;
@@ -564,10 +582,7 @@ class TemporaryGCController extends GetxController {
       final userId = _idController.userId.value;
 
       final url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/create');
-      final body = {
-        'userId': userId,
-        ...gcData,
-      };
+      final body = {'userId': userId, ...gcData};
 
       final response = await http.post(
         url,
@@ -579,11 +594,12 @@ class TemporaryGCController extends GetxController {
 
       if (response.statusCode == 201 && data['success'] == true) {
         Fluttertoast.showToast(
-          msg: 'Temporary GC created successfully!\nGC Number: ${data['data']['temp_gc_number']}',
+          msg:
+              'Temporary GC created successfully!\nGC Number: ${data['data']['temp_gc_number']}',
           backgroundColor: Colors.green,
           toastLength: Toast.LENGTH_LONG,
         );
-        
+
         // Refresh the list
         await fetchTemporaryGCs();
         return true;
@@ -596,10 +612,7 @@ class TemporaryGCController extends GetxController {
       }
     } catch (e) {
       print('Error creating temporary GC: $e');
-      Fluttertoast.showToast(
-        msg: 'Error: $e',
-        backgroundColor: Colors.red,
-      );
+      Fluttertoast.showToast(msg: 'Error: $e', backgroundColor: Colors.red);
       return false;
     } finally {
       isLoading.value = false;
@@ -607,7 +620,10 @@ class TemporaryGCController extends GetxController {
   }
 
   // Update temporary GC (Admin only)
-  Future<bool> updateTemporaryGC(String tempGcNumber, Map<String, dynamic> updateData) async {
+  Future<bool> updateTemporaryGC(
+    String tempGcNumber,
+    Map<String, dynamic> updateData,
+  ) async {
     try {
       if (!isAdmin) {
         Fluttertoast.showToast(
@@ -620,11 +636,10 @@ class TemporaryGCController extends GetxController {
       isLoading.value = true;
       final userId = _idController.userId.value;
 
-      final url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/update/$tempGcNumber');
-      final body = {
-        'userId': userId,
-        ...updateData,
-      };
+      final url = Uri.parse(
+        '${ApiConfig.baseUrl}/temporary-gc/update/$tempGcNumber',
+      );
+      final body = {'userId': userId, ...updateData};
 
       final response = await http.put(
         url,
@@ -639,7 +654,7 @@ class TemporaryGCController extends GetxController {
           msg: 'Temporary GC updated successfully!',
           backgroundColor: Colors.green,
         );
-        
+
         // Refresh the list
         await fetchTemporaryGCs();
         return true;
@@ -652,10 +667,7 @@ class TemporaryGCController extends GetxController {
       }
     } catch (e) {
       print('Error updating temporary GC: $e');
-      Fluttertoast.showToast(
-        msg: 'Error: $e',
-        backgroundColor: Colors.red,
-      );
+      Fluttertoast.showToast(msg: 'Error: $e', backgroundColor: Colors.red);
       return false;
     } finally {
       isLoading.value = false;
@@ -676,7 +688,9 @@ class TemporaryGCController extends GetxController {
       isLoading.value = true;
       final userId = _idController.userId.value;
 
-      final url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/delete/$tempGcNumber');
+      final url = Uri.parse(
+        '${ApiConfig.baseUrl}/temporary-gc/delete/$tempGcNumber',
+      );
       final response = await http.delete(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -690,7 +704,7 @@ class TemporaryGCController extends GetxController {
           msg: 'Temporary GC deleted successfully!',
           backgroundColor: Colors.green,
         );
-        
+
         // Refresh the list
         await fetchTemporaryGCs();
         return true;
@@ -703,13 +717,67 @@ class TemporaryGCController extends GetxController {
       }
     } catch (e) {
       print('Error deleting temporary GC: $e');
-      Fluttertoast.showToast(
-        msg: 'Error: $e',
-        backgroundColor: Colors.red,
-      );
+      Fluttertoast.showToast(msg: 'Error: $e', backgroundColor: Colors.red);
       return false;
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  // Admin unlock temporary GC (for emergency)
+  Future<bool> adminUnlockTemporaryGC(String tempGcNumber) async {
+    try {
+      if (!isAdmin) {
+        Fluttertoast.showToast(
+          msg: 'Only admins can perform this action',
+          backgroundColor: Colors.red,
+        );
+        return false;
+      }
+
+      final url = Uri.parse(
+        '${ApiConfig.baseUrl}/temporary-gc/force-unlock/$tempGcNumber',
+      );
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'adminUserId': _idController.userId.value}),
+      );
+
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        Fluttertoast.showToast(
+          msg: 'Temporary GC unlocked by admin',
+          backgroundColor: Colors.green,
+        );
+
+        // Update local state
+        final index = temporaryGCs.indexWhere(
+          (g) => g.tempGcNumber == tempGcNumber,
+        );
+        if (index >= 0) {
+          final updated = temporaryGCs[index].copyWith(
+            isLocked: false,
+            lockedByUserId: null,
+            lockedAt: null,
+          );
+          temporaryGCs[index] = updated;
+          temporaryGCs.refresh();
+        }
+
+        return true;
+      } else {
+        Fluttertoast.showToast(
+          msg: data['message'] ?? 'Failed to unlock temporary GC',
+          backgroundColor: Colors.red,
+        );
+        return false;
+      }
+    } catch (e) {
+      print('Error in admin unlock: $e');
+      Fluttertoast.showToast(msg: 'Error: $e', backgroundColor: Colors.red);
+      return false;
     }
   }
 
@@ -720,7 +788,7 @@ class TemporaryGCController extends GetxController {
       final companyId = _idController.companyId.value;
 
       final url = Uri.parse(
-        '${ApiConfig.baseUrl}/temporary-gc/can-edit/$gcNumber?companyId=$companyId&userId=$userId'
+        '${ApiConfig.baseUrl}/temporary-gc/can-edit/$gcNumber?companyId=$companyId&userId=$userId',
       );
       final response = await http.get(url);
 

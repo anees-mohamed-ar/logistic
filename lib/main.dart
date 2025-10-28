@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:logistic/splash_screen.dart'; 
+import 'package:logistic/splash_screen.dart';
+import 'package:logistic/services/network_service.dart';
 
 import 'routes.dart';
 import 'controller/id_controller.dart';
@@ -11,18 +12,23 @@ import 'controller/weight_to_rate_controller.dart';
 import 'controller/login_controller.dart';
 import 'controller/temporary_gc_controller.dart';
 
-void main() async { // Make main async
-  WidgetsFlutterBinding.ensureInitialized(); // Ensure bindings are initialized
-  await GetStorage.init(); // Initialize GetStorage
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await GetStorage.init();
 
+  await Get.putAsync<NetworkService>(() => NetworkService.init());
+  await _initializeApp();
+
+  runApp(const LogisticsGCApp());
+}
+
+Future<void> _initializeApp() async {
   Get.put(IdController());
   Get.put(LocationController());
   Get.put(CustomerController());
   Get.put(WeightToRateController());
-  Get.put(LoginController()); // Ensure LoginController is available globally
-  Get.put(TemporaryGCController()); // Initialize temporary GC controller
-
-  runApp(const LogisticsGCApp());
+  Get.put(LoginController());
+  Get.put(TemporaryGCController());
 }
 
 class LogisticsGCApp extends StatelessWidget {

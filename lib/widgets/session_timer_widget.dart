@@ -10,8 +10,12 @@ class SessionTimerWidget extends StatelessWidget {
     final controller = Get.find<GCFormController>();
     
     return Obx(() {
-      if (!controller.isSessionActive.value) return const SizedBox.shrink();
-      
+      final isFillingTemporary = controller.isFillTemporaryMode.value;
+
+      if (!isFillingTemporary || !controller.isSessionActive.value) {
+        return const SizedBox.shrink();
+      }
+
       final minutes = controller.timeRemaining.value.inMinutes.remainder(60);
       final seconds = controller.timeRemaining.value.inSeconds.remainder(60);
       

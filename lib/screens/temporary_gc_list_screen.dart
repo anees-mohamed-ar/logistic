@@ -790,7 +790,22 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
                         lockedAt: tempGC.lockedAt,
                       ),
                       if (controller.isAdmin) ...[
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 4),
+                        if (tempGC.isLocked)
+                          InkWell(
+                            onTap: () => _showAdminUnlockConfirmation(context),
+                            borderRadius: BorderRadius.circular(8),
+                            child: const Padding(
+                              padding: EdgeInsets.all(6),
+                              child: Icon(
+                                Icons.lock_open_rounded,
+                                size: 20,
+                                color: Colors.orange,
+                                semanticLabel: 'Admin Unlock',
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 4),
                         InkWell(
                           onTap: () => _showDeleteConfirmation(context),
                           borderRadius: BorderRadius.circular(8),
@@ -800,6 +815,7 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
                               Icons.delete_outline_rounded,
                               size: 20,
                               color: Colors.red.shade400,
+                              semanticLabel: 'Delete',
                             ),
                           ),
                         ),
@@ -1078,6 +1094,79 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
         ),
       );
     }
+  }
+
+  void _showAdminUnlockConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.admin_panel_settings_rounded, color: Colors.orange),
+            SizedBox(width: 12),
+            Text('Admin Unlock'),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to force unlock this GC? This action will allow it to be edited by any user.',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              
+              // Show loading indicator
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+              
+              // Call admin unlock
+              final success = await controller.adminUnlockTemporaryGC(tempGC.tempGcNumber);
+              
+              // Close loading indicator
+              Navigator.pop(context);
+              
+              if (success) {
+                // Show success message
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('GC has been unlocked by admin'),
+                      backgroundColor: Colors.green,
+                      behavior: SnackBarBehavior.floating,
+                      margin: EdgeInsets.all(16),
+                    ),
+                  );
+                }
+                
+                // Refresh the list
+                await controller.fetchTemporaryGCs();
+              } else if (context.mounted) {
+                // Show error message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to unlock GC'),
+                    backgroundColor: Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                    margin: EdgeInsets.all(16),
+                  ),
+                );
+              }
+            },
+            child: const Text('UNLOCK', style: TextStyle(color: Colors.orange)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showDeleteConfirmation(BuildContext context) {

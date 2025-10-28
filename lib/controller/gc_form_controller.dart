@@ -44,7 +44,8 @@ class WeightRate {
   }
 
   @override
-  int get hashCode => id.hashCode ^ weight.hashCode ^ below250.hashCode ^ above250.hashCode;
+  int get hashCode =>
+      id.hashCode ^ weight.hashCode ^ below250.hashCode ^ above250.hashCode;
 }
 
 class GCFormController extends GetxController {
@@ -70,7 +71,8 @@ class GCFormController extends GetxController {
   final gcDateCtrl = TextEditingController(); // For UI display of GC Date
   final eDaysCtrl = TextEditingController();
   final deliveryDate = Rxn<DateTime>();
-  final deliveryDateCtrl = TextEditingController(); // For UI display of Delivery Date
+  final deliveryDateCtrl =
+      TextEditingController(); // For UI display of Delivery Date
   final poNumberCtrl = TextEditingController();
   final truckTypeCtrl = TextEditingController();
   final fromCtrl = TextEditingController();
@@ -82,12 +84,16 @@ class GCFormController extends GetxController {
   final selectedBranchCode = ''.obs;
   final branchesLoading = false.obs;
   final branches = <String>['Select Branch'].obs;
-  final branchCodeMap = <String, String>{}.obs; // Maps branch name to branch code
+  final branchCodeMap =
+      <String, String>{}.obs; // Maps branch name to branch code
   final trucks = <String>['Select Truck'].obs;
   final selectedTruck = 'Select Truck'.obs;
   final trucksLoading = false.obs;
-  final truckNumberCtrl = TextEditingController(); // To hold selected truck number for submission
-  final truckNumbers = <String>['Select Truck'].obs; // For truck numbers dropdown
+  final truckNumberCtrl =
+      TextEditingController(); // To hold selected truck number for submission
+  final truckNumbers = <String>[
+    'Select Truck',
+  ].obs; // For truck numbers dropdown
   final selectedBroker = 'Select Broker'.obs;
   final brokersLoading = false.obs;
   final brokers = <String>['Select Broker'].obs;
@@ -132,19 +138,25 @@ class GCFormController extends GetxController {
   final driversLoading = false.obs;
   final driversError = RxnString();
   final drivers = <Map<String, dynamic>>[].obs; // Raw driver data from API
-  final driverInfo = <String, Map<String, dynamic>>{}; // Map driver name -> details
-  final consignorInfo = <String, Map<String, String>>{}; // Map consignor name -> details
-  final consigneeInfo = <String, Map<String, String>>{}; // Map consignee name -> details
-  final billToInfo = <String, Map<String, String>>{}; // Map bill to name -> details
+  final driverInfo =
+      <String, Map<String, dynamic>>{}; // Map driver name -> details
+  final consignorInfo =
+      <String, Map<String, String>>{}; // Map consignor name -> details
+  final consigneeInfo =
+      <String, Map<String, String>>{}; // Map consignee name -> details
+  final billToInfo =
+      <String, Map<String, String>>{}; // Map bill to name -> details
 
   // Goods Tab Controllers
   final customInvoiceCtrl = TextEditingController();
   final invValueCtrl = TextEditingController();
   final ewayBillCtrl = TextEditingController();
   final ewayBillDate = Rxn<DateTime>();
-  final ewayBillDateCtrl = TextEditingController(); // For UI display of Eway Bill Date
+  final ewayBillDateCtrl =
+      TextEditingController(); // For UI display of Eway Bill Date
   final ewayExpired = Rxn<DateTime>();
-  final ewayExpiredCtrl = TextEditingController(); // For UI display of Eway Expired Date
+  final ewayExpiredCtrl =
+      TextEditingController(); // For UI display of Eway Expired Date
   final packagesCtrl = TextEditingController();
   final natureGoodsCtrl = TextEditingController();
   final methodPackageCtrl = TextEditingController();
@@ -152,30 +164,35 @@ class GCFormController extends GetxController {
   final kmCtrl = TextEditingController();
   final rateCtrl = TextEditingController();
   final remarksCtrl = TextEditingController();
-  final fromLocationCtrl = TextEditingController(); // Used for KM lookup input (if separate from 'fromCtrl')
-  final toLocationCtrl = TextEditingController();   // Used for KM lookup input (if separate from 'toCtrl')
+  final fromLocationCtrl =
+      TextEditingController(); // Used for KM lookup input (if separate from 'fromCtrl')
+  final toLocationCtrl =
+      TextEditingController(); // Used for KM lookup input (if separate from 'toCtrl')
 
   // Goods Tab Observables
   final isLoadingRates = false.obs;
   final weightRates = <WeightRate>[].obs;
   final RxString weightRatesError = RxString('');
   final selectedWeight = Rxn<WeightRate>();
-  final RxString calculatedGoodsTotal = ''.obs; // Reactive total (rate * km) for Goods tab
-  final RxList<KMLocation> kmLocations = <KMLocation>[].obs; // For KM data from API
-  final RxBool isKmEditable = true.obs; // Controls if KM field can be edited manually
-  final paymentOptions = ['To be billed','Paid','To pay'];
+  final RxString calculatedGoodsTotal =
+      ''.obs; // Reactive total (rate * km) for Goods tab
+  final RxList<KMLocation> kmLocations =
+      <KMLocation>[].obs; // For KM data from API
+  final RxBool isKmEditable =
+      true.obs; // Controls if KM field can be edited manually
+  final paymentOptions = ['To be billed', 'Paid', 'To pay'];
   final serviceOptions = ['Express', 'Standard', 'Pickup'];
   final packageMethods = ['Boxes', 'Cartons', 'Pallets', 'Bags', 'Barrels'];
   final selectedPayment = 'To be billed'.obs;
   final selectedService = 'Express'.obs;
   final selectedPackageMethod = 'Boxes'.obs;
 
-
   // Charges Tab Controllers
   final hireAmountCtrl = TextEditingController();
   final advanceAmountCtrl = TextEditingController();
   final deliveryAddressCtrl = TextEditingController();
-  final freightChargeCtrl = TextEditingController(); // Represents total freight (auto-calculated)
+  final freightChargeCtrl =
+      TextEditingController(); // Represents total freight (auto-calculated)
   final billingAddressCtrl = TextEditingController();
   final deliveryInstructionsCtrl = TextEditingController();
 
@@ -210,20 +227,44 @@ class GCFormController extends GetxController {
   // Charges Tab Observables
   final RxString balanceAmount = '0.00'.obs; // Reactive balance amount
   final gstPayerOptions = ['Consignor', 'Consignee', 'Transporter'];
-  final selectedGstPayer = 'Consignor'.obs; // Default value for GST Payer
+  final selectedGstPayer = ''.obs; // Holds the currently selected GST payer
+
+  String _normalizeGstPayerValue(String? value) {
+    print('Normalizing GST payer: "$value" → "$value"');
+    if (value == null) return '';
+    final trimmed = value.trim();
+    print('Normalizing GST payer: "$value" → "$trimmed"');
+    if (trimmed.isEmpty) return '';
+
+    final lower = trimmed.toLowerCase();
+    print('Normalizing GST payer: "$value" → "$trimmed" → "$lower"');
+    if (lower.startsWith('select')) {
+      return '';
+    }
+
+    for (final option in gstPayerOptions) {
+      if (option.toLowerCase() == lower) {
+        print('Normalization result: "$option"');
+        return option;
+      }
+    }
+
+    return '';
+  }
 
   // Method to update GST Payer
   void onGstPayerSelected(String? newValue) {
-    if (newValue != null && newValue.isNotEmpty) {
-      selectedGstPayer.value = newValue;
-    }
+    print('Raw GST payer selection: $newValue');
+    final normalized = _normalizeGstPayerValue(newValue);
+    print('Normalized GST payer: $normalized');
+    selectedGstPayer.value = normalized;
   }
 
   // Edit Mode Variables
   final isEditMode = false.obs;
   final editingGcNumber = ''.obs;
   final editingCompanyId = ''.obs;
-  
+
   // Format time for display
   String formatTime(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
@@ -232,17 +273,19 @@ class GCFormController extends GetxController {
     final seconds = twoDigits(duration.inSeconds.remainder(60));
     return '$hours:$minutes:$seconds';
   }
-  
+
   // Temporary GC Mode
   final isTemporaryMode = false.obs; // When true, save as temporary GC
   final isFillTemporaryMode = false.obs; // When true, filling a temporary GC
   final tempGcNumber = ''.obs; // Store temp GC number when filling
   final tempGcPreview = ''.obs;
   final Rx<DateTime?> lockedAt = Rx<DateTime?>(null);
-  
+
   // Timer related variables for temporary GC lock
   static const Duration lockDuration = Duration(minutes: 10);
   final Rx<Duration> remainingTime = Duration.zero.obs;
+  final RxBool isSessionActive = false.obs;
+  final RxInt extensionCountdown = 10.obs;
   Timer? _timer;
   Timer? _confirmationTimer;
   bool _isShowingDialog = false;
@@ -251,75 +294,100 @@ class GCFormController extends GetxController {
   void startLockTimer() {
     _timer?.cancel();
     _confirmationTimer?.cancel();
-    
-    if (lockedAt.value == null) {
+
+    if (!isFillTemporaryMode.value || lockedAt.value == null) {
       print('No lockedAt timestamp found, cannot start timer');
+      isSessionActive.value = false;
       return;
     }
-    
+
     void updateTimer() {
       final now = DateTime.now();
       final expiry = lockedAt.value!.add(lockDuration);
-      remainingTime.value = expiry.isAfter(now) 
-          ? expiry.difference(now) 
+      remainingTime.value = expiry.isAfter(now)
+          ? expiry.difference(now)
           : Duration.zero;
-      
+
+      isSessionActive.value = remainingTime.value > Duration.zero;
+
       if (remainingTime.value <= Duration.zero) {
         _timer?.cancel();
+        isSessionActive.value = false;
         _showTimeExtensionDialog();
       }
     }
-    
+
     updateTimer();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => updateTimer());
   }
-  
-  // Show time extension dialog with auto-close after 5 seconds
+
+  // Show time extension dialog with auto-close after 10 seconds
   Future<void> _showTimeExtensionDialog() async {
     if (_isShowingDialog) return;
+    if (!isFillTemporaryMode.value) return;
     _isShowingDialog = true;
-    
-    // Start 5-second confirmation timer
+
     bool userResponded = false;
-    _confirmationTimer = Timer(const Duration(seconds: 5), () {
-      if (!userResponded) {
+    extensionCountdown.value = 10;
+
+    _confirmationTimer?.cancel();
+    _confirmationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!isFillTemporaryMode.value) {
+        timer.cancel();
+        return;
+      }
+
+      if (extensionCountdown.value > 0) {
+        extensionCountdown.value--;
+      }
+
+      if (extensionCountdown.value <= 0 && !userResponded) {
+        timer.cancel();
         _isShowingDialog = false;
-        Get.back(); // Close form automatically
+        if (Get.isDialogOpen ?? false) {
+          Get.back(); // Close form automatically when timer elapses
+        }
       }
     });
-    
-    final result = await Get.dialog<bool>(
-      WillPopScope(
-        onWillPop: () async => false, // Prevent back button
-        child: AlertDialog(
-          title: const Text('Time Expired'),
-          content: const Text('Your time is up! Would you like to extend your session?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                userResponded = true;
-                _confirmationTimer?.cancel();
-                Get.back(result: false);
-              },
-              child: const Text('No'),
+
+    final result =
+        await Get.dialog<bool>(
+          WillPopScope(
+            onWillPop: () async => false, // Prevent back button
+            child: AlertDialog(
+              title: const Text('Time Expired'),
+              content: const Text(
+                'Your time is up! Would you like to extend your session?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    userResponded = true;
+                    _confirmationTimer?.cancel();
+                    extensionCountdown.value = 0;
+                    Get.back(result: false);
+                  },
+                  child: Obx(() => Text('No (${extensionCountdown.value}s)')),
+                ),
+                TextButton(
+                  onPressed: () {
+                    userResponded = true;
+                    _confirmationTimer?.cancel();
+                    extensionCountdown.value = 0;
+                    Get.back(result: true);
+                  },
+                  child: const Text('Yes'),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () {
-                userResponded = true;
-                _confirmationTimer?.cancel();
-                Get.back(result: true);
-              },
-              child: const Text('Yes'),
-            ),
-          ],
-        ),
-      ),
-      barrierDismissible: false,
-    ) ?? false;
-    
+          ),
+          barrierDismissible: false,
+        ) ??
+        false;
+
     _isShowingDialog = false;
     _confirmationTimer?.cancel();
-    
+
     if (result) {
       // Extend time - attempt to lock again and restart timer from server timestamp
       await _extendTemporaryGcLock();
@@ -362,8 +430,14 @@ class GCFormController extends GetxController {
   }
 
   String _generateTempGcNumber() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase();
-    final randomValue = _random.nextInt(0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase();
+    final timestamp = DateTime.now().millisecondsSinceEpoch
+        .toRadixString(36)
+        .toUpperCase();
+    final randomValue = _random
+        .nextInt(0xFFFFFF)
+        .toRadixString(16)
+        .padLeft(6, '0')
+        .toUpperCase();
     return 'TEMP-$timestamp-$randomValue';
   }
 
@@ -378,7 +452,8 @@ class GCFormController extends GetxController {
   void loadTemporaryGc(TemporaryGC tempGC) {
     // Branch
     if (tempGC.branch != null) selectedBranch.value = tempGC.branch!;
-    if (tempGC.branchCode != null) selectedBranchCode.value = tempGC.branchCode!;
+    if (tempGC.branchCode != null)
+      selectedBranchCode.value = tempGC.branchCode!;
 
     // GC date
     if (tempGC.gcDate != null) {
@@ -443,6 +518,29 @@ class GCFormController extends GetxController {
       consigneeGstCtrl.text = tempGC.consigneeGst ?? '';
     }
 
+    // Bill To details
+    final billToName = tempGC.billToName ?? '';
+    if (billToName.isNotEmpty) {
+      selectedBillTo.value = billToName;
+      billToNameCtrl.text = billToName;
+      billToGstCtrl.text = tempGC.billToGst ?? '';
+      billToAddressCtrl.text = tempGC.billToAddress ?? '';
+
+      // Ensure dropdown data includes this bill-to entry even if not in fetched list yet
+      billToInfo[billToName] = {
+        'gst': billToGstCtrl.text,
+        'address': billToAddressCtrl.text,
+      };
+      if (!billTos.contains(billToName)) {
+        billTos.add(billToName);
+      }
+    } else {
+      selectedBillTo.value = 'Select Bill To';
+      billToNameCtrl.clear();
+      billToGstCtrl.clear();
+      billToAddressCtrl.clear();
+    }
+
     // Goods info
     if (tempGC.goodContain != null) {
       natureGoodsCtrl.text = tempGC.goodContain!;
@@ -477,18 +575,19 @@ class GCFormController extends GetxController {
     if (tempGC.freightCharge != null) {
       freightChargeCtrl.text = tempGC.freightCharge!;
     }
-    if (tempGC.serviceTax != null) {
-      selectedGstPayer.value = tempGC.serviceTax!;
-    }
-
+    print('Raw GST payer from DB: ${tempGC.serviceTax}');
+    selectedGstPayer.value = _normalizeGstPayerValue(tempGC.serviceTax);
+    print('Normalized GST payer after load: ${selectedGstPayer.value}');
     if (tempGC.custInvNo != null) customInvoiceCtrl.text = tempGC.custInvNo!;
     if (tempGC.invValue != null) invValueCtrl.text = tempGC.invValue!;
     if (tempGC.poNumber != null) poNumberCtrl.text = tempGC.poNumber!;
     if (tempGC.tripId != null) tripIdCtrl.text = tempGC.tripId!;
-    if (tempGC.deliveryAddress != null) deliveryAddressCtrl.text = tempGC.deliveryAddress!;
-    if (tempGC.deliveryFromSpecial != null) deliveryInstructionsCtrl.text = tempGC.deliveryFromSpecial!;
+    if (tempGC.deliveryAddress != null)
+      deliveryAddressCtrl.text = tempGC.deliveryAddress!;
+    if (tempGC.deliveryFromSpecial != null)
+      deliveryInstructionsCtrl.text = tempGC.deliveryFromSpecial!;
     if (tempGC.privateMark != null) remarksCtrl.text = tempGC.privateMark!;
-    
+
     // Set lockedAt timestamp for timer
     if (tempGC.lockedAt != null) {
       try {
@@ -498,18 +597,18 @@ class GCFormController extends GetxController {
         lockedAt.value = DateTime.now(); // Fallback to current time
       }
     } else {
-      lockedAt.value = DateTime.now(); // Default to current time if not provided
+      lockedAt.value =
+          DateTime.now(); // Default to current time if not provided
     }
   }
 
-    // Cancel all timers
+  // Cancel all timers
   void _cancelTimers() {
     _timer?.cancel();
     _confirmationTimer?.cancel();
     _timer = null;
     _confirmationTimer = null;
   }
-  
 
   @override
   void onInit() {
@@ -517,18 +616,33 @@ class GCFormController extends GetxController {
 
     // Attach listeners
     kmCtrl.addListener(calculateRate);
-    fromCtrl.addListener(_handleLocationChange); // Listen to changes in 'From' field for KM lookup
-    toCtrl.addListener(_handleLocationChange);   // Listen to changes in 'To' field for KM lookup
-    hireAmountCtrl.addListener(_updateBalanceAmount); // Listen for hire amount changes
-    advanceAmountCtrl.addListener(_updateBalanceAmount); // Listen for advance amount changes
-    
+    fromCtrl.addListener(
+      _handleLocationChange,
+    ); // Listen to changes in 'From' field for KM lookup
+    toCtrl.addListener(
+      _handleLocationChange,
+    ); // Listen to changes in 'To' field for KM lookup
+    hireAmountCtrl.addListener(
+      _updateBalanceAmount,
+    ); // Listen for hire amount changes
+    advanceAmountCtrl.addListener(
+      _updateBalanceAmount,
+    ); // Listen for advance amount changes
+
+    // Add GST payer normalization for all GCs
+    ever(selectedGstPayer, (value) {
+      if (value.isNotEmpty) {
+        selectedGstPayer.value = _normalizeGstPayerValue(value);
+      }
+    });
+
     // Start timer only in temporary mode
     ever<bool>(isTemporaryMode, (isTemp) {
       if (isTemp && lockedAt.value != null) {
         startLockTimer();
       }
     });
-    
+
     ever<bool>(isFillTemporaryMode, (isFillTemp) {
       if (isFillTemp && lockedAt.value != null) {
         startLockTimer();
@@ -558,7 +672,7 @@ class GCFormController extends GetxController {
     toCtrl.removeListener(_handleLocationChange);
     hireAmountCtrl.removeListener(_updateBalanceAmount);
     advanceAmountCtrl.removeListener(_updateBalanceAmount);
-    
+
     // Cancel timers
     _cancelTimers();
 
@@ -621,10 +735,14 @@ class GCFormController extends GetxController {
         if (context.mounted) {
           final double estimatedTabWidth = 120.0;
           final double screenWidth = MediaQuery.of(context).size.width;
-          double offset = (estimatedTabWidth * index) - (screenWidth / 2) + (estimatedTabWidth / 2);
+          double offset =
+              (estimatedTabWidth * index) -
+              (screenWidth / 2) +
+              (estimatedTabWidth / 2);
 
           if (tabScrollController.hasClients) {
-            final double maxScroll = tabScrollController.position.maxScrollExtent;
+            final double maxScroll =
+                tabScrollController.position.maxScrollExtent;
             offset = offset.clamp(0.0, maxScroll);
             tabScrollController.animateTo(
               offset,
@@ -670,19 +788,20 @@ class GCFormController extends GetxController {
     }
   }
 
-
   void selectDate(
-      BuildContext context,
-      Rxn<DateTime> targetDate, {
-        TextEditingController? textController,
-        bool restrictToToday = false, // New parameter to control date restriction
-      }) async {
+    BuildContext context,
+    Rxn<DateTime> targetDate, {
+    TextEditingController? textController,
+    bool restrictToToday = false, // New parameter to control date restriction
+  }) async {
     final now = DateTime.now();
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: now,
       firstDate: DateTime(2000),
-      lastDate: restrictToToday ? DateTime(now.year, now.month, now.day) : DateTime(2030), // Only restrict if specified
+      lastDate: restrictToToday
+          ? DateTime(now.year, now.month, now.day)
+          : DateTime(2030), // Only restrict if specified
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: const ColorScheme.light(
@@ -719,7 +838,6 @@ class GCFormController extends GetxController {
     }
   }
 
-
   // API Call Methods
 
   // Handle branch selection
@@ -751,8 +869,10 @@ class GCFormController extends GetxController {
 
           // Process each branch
           for (var branch in decoded) {
-            final name = (branch['branchName'] ?? branch['BranchName'] ?? '').toString();
-            final code = (branch['branchCode'] ?? branch['BranchCode'] ?? '').toString();
+            final name = (branch['branchName'] ?? branch['BranchName'] ?? '')
+                .toString();
+            final code = (branch['branchCode'] ?? branch['BranchCode'] ?? '')
+                .toString();
 
             if (name.isNotEmpty && code.isNotEmpty) {
               branches.add(name);
@@ -761,7 +881,8 @@ class GCFormController extends GetxController {
           }
 
           // Remove duplicates and sort
-          branches.value = branches.toSet().toList()..sort((a, b) => a == 'Select Branch' ? -1 : a.compareTo(b));
+          branches.value = branches.toSet().toList()
+            ..sort((a, b) => a == 'Select Branch' ? -1 : a.compareTo(b));
         }
       }
     } catch (e) {
@@ -782,7 +903,10 @@ class GCFormController extends GetxController {
         final dynamic decoded = jsonDecode(response.body);
         if (decoded is List) {
           final list = decoded
-              .map((e) => (e['vechileNumber'] ?? e['vehicleNumber'] ?? '').toString())
+              .map(
+                (e) =>
+                    (e['vechileNumber'] ?? e['vehicleNumber'] ?? '').toString(),
+              )
               .where((s) => s.isNotEmpty)
               .toSet()
               .toList();
@@ -830,7 +954,8 @@ class GCFormController extends GetxController {
             ..clear()
             ..addAll(['Select Broker', ...names]);
           if (!brokers.contains(selectedBroker.value)) {
-            selectedBroker.value = 'Select Broker'; // Reset if old value not found
+            selectedBroker.value =
+                'Select Broker'; // Reset if old value not found
           }
         } else {
           brokersError.value = 'Unexpected brokers response format';
@@ -879,7 +1004,6 @@ class GCFormController extends GetxController {
         if (driverNames.isEmpty) {
           driversError.value = 'No drivers found';
         }
-
       } else {
         final errorMsg = 'Failed to load drivers: Tap to retry.';
         driversError.value = errorMsg;
@@ -931,7 +1055,8 @@ class GCFormController extends GetxController {
             ..clear()
             ..addAll(['Select Consignor', ...names.toList()]);
           if (!consignors.contains(selectedConsignor.value)) {
-            selectedConsignor.value = 'Select Consignor'; // Reset if old value not found
+            selectedConsignor.value =
+                'Select Consignor'; // Reset if old value not found
           }
           if (names.isEmpty) {
             consignorsError.value = 'No consignors found';
@@ -972,7 +1097,8 @@ class GCFormController extends GetxController {
             ..clear()
             ..addAll(['Select Consignee', ...names.toList()]);
           if (!consignees.contains(selectedConsignee.value)) {
-            selectedConsignee.value = 'Select Consignee'; // Reset if old value not found
+            selectedConsignee.value =
+                'Select Consignee'; // Reset if old value not found
           }
           if (names.isEmpty) {
             consigneesError.value = 'No consignees found';
@@ -1009,11 +1135,23 @@ class GCFormController extends GetxController {
               'location': (e['location'] ?? '').toString(),
             };
           }
+          final currentBillTo = billToNameCtrl.text.trim();
+          if (currentBillTo.isNotEmpty && currentBillTo != 'Select Bill To') {
+            names.add(currentBillTo);
+            billToInfo.putIfAbsent(
+              currentBillTo,
+              () => {
+                'gst': billToGstCtrl.text,
+                'address': billToAddressCtrl.text,
+              },
+            );
+          }
           billTos
             ..clear()
             ..addAll(['Select Bill To', ...names.toList()]);
           if (!billTos.contains(selectedBillTo.value)) {
-            selectedBillTo.value = 'Select Bill To'; // Reset if old value not found
+            selectedBillTo.value =
+                'Select Bill To'; // Reset if old value not found
           }
           if (names.isEmpty) {
             billTosError.value = 'No bill to entries found';
@@ -1085,10 +1223,12 @@ class GCFormController extends GetxController {
     try {
       isLoadingRates.value = true;
       weightRatesError.value = '';
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/weight_to_rate/search'),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(const Duration(seconds: 8));
+      final response = await http
+          .get(
+            Uri.parse('${ApiConfig.baseUrl}/weight_to_rate/search'),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -1118,13 +1258,15 @@ class GCFormController extends GetxController {
 
   Future<void> fetchKMLocations() async {
     try {
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/km/search'),
-      ).timeout(const Duration(seconds: 8));
+      final response = await http
+          .get(Uri.parse('${ApiConfig.baseUrl}/km/search'))
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        kmLocations.assignAll(data.map((json) => KMLocation.fromJson(json)).toList());
+        kmLocations.assignAll(
+          data.map((json) => KMLocation.fromJson(json)).toList(),
+        );
       } else {
         _showToast(
           'Failed to load KM locations: ${response.statusCode}',
@@ -1160,8 +1302,9 @@ class GCFormController extends GetxController {
 
   void updateKM(String from, String to) {
     final match = kmLocations.firstWhereOrNull(
-            (loc) => loc.from.toLowerCase() == from.toLowerCase() &&
-            loc.to.toLowerCase() == to.toLowerCase()
+      (loc) =>
+          loc.from.toLowerCase() == from.toLowerCase() &&
+          loc.to.toLowerCase() == to.toLowerCase(),
     );
 
     if (match != null) {
@@ -1231,7 +1374,9 @@ class GCFormController extends GetxController {
 
   WeightRate? pickWeightRateForActualWeight(String weightStr) {
     final cleanedInput = weightStr.trim().toLowerCase();
-    final actualRaw = double.tryParse(cleanedInput.replaceAll(RegExp(r'[^0-9\.]'), ''));
+    final actualRaw = double.tryParse(
+      cleanedInput.replaceAll(RegExp(r'[^0-9\.]'), ''),
+    );
 
     WeightRate? exactTextMatch;
     WeightRate? containsTextMatch;
@@ -1257,7 +1402,9 @@ class GCFormController extends GetxController {
           actualRaw * 1000.0,
         };
 
-        final labelNum = double.tryParse(label.replaceAll(RegExp(r'[^0-9\.]'), ''));
+        final labelNum = double.tryParse(
+          label.replaceAll(RegExp(r'[^0-9\.]'), ''),
+        );
         if (labelNum != null) {
           for (final actual in candidates) {
             if ((labelNum - actual).abs() < 0.0001) {
@@ -1336,7 +1483,9 @@ class GCFormController extends GetxController {
   Future<String?> fetchNextGCNumber(String userId) async {
     try {
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/gc-management/next-gc-number?userId=$userId'),
+        Uri.parse(
+          '${ApiConfig.baseUrl}/gc-management/next-gc-number?userId=$userId',
+        ),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -1358,7 +1507,9 @@ class GCFormController extends GetxController {
       isLoadingAccess.value = true;
 
       final activeRangesResponse = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/gc-management/check-active-ranges/$userId'),
+        Uri.parse(
+          '${ApiConfig.baseUrl}/gc-management/check-active-ranges/$userId',
+        ),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -1380,8 +1531,12 @@ class GCFormController extends GetxController {
       if (usageResponse.statusCode == 200) {
         final usageData = jsonDecode(usageResponse.body);
         if (usageData['success'] == true) {
-          final ranges = List<Map<String, dynamic>>.from(usageData['data'] ?? []);
-          final hasQueuedRange = ranges.any((range) => range['status'] == 'queued');
+          final ranges = List<Map<String, dynamic>>.from(
+            usageData['data'] ?? [],
+          );
+          final hasQueuedRange = ranges.any(
+            (range) => range['status'] == 'queued',
+          );
 
           if (hasQueuedRange) {
             hasAccess.value = true;
@@ -1393,7 +1548,8 @@ class GCFormController extends GetxController {
       }
 
       hasAccess.value = false;
-      accessMessage.value = 'No active or queued GC ranges found. Please contact admin.';
+      accessMessage.value =
+          'No active or queued GC ranges found. Please contact admin.';
       return false;
     } catch (e) {
       hasAccess.value = false;
@@ -1461,7 +1617,7 @@ class GCFormController extends GetxController {
     selectedBillTo.value = 'Select Bill To';
     selectedPayment.value = 'To be billed';
     selectedService.value = 'Express';
-    selectedGstPayer.value = 'Consignor';
+    selectedGstPayer.value = '';
     selectedPackageMethod.value = 'Boxes';
 
     selectedWeight.value = null;
@@ -1484,7 +1640,9 @@ class GCFormController extends GetxController {
     }
 
     try {
-      final url = Uri.parse('${ApiConfig.baseUrl}/gc-management/gc-usage?userId=$userId');
+      final url = Uri.parse(
+        '${ApiConfig.baseUrl}/gc-management/gc-usage?userId=$userId',
+      );
       debugPrint('Fetching GC usage from: $url');
 
       final response = await http.get(url);
@@ -1499,23 +1657,29 @@ class GCFormController extends GetxController {
           final usageList = data['data'] as List;
 
           final activeRange = usageList.cast<Map<String, dynamic>>().firstWhere(
-                (item) => item['status']?.toString().toLowerCase() == 'active',
+            (item) => item['status']?.toString().toLowerCase() == 'active',
             orElse: () => <String, dynamic>{},
           );
 
           if (activeRange.isNotEmpty) {
             final remaining = (activeRange['remainingGCs'] ?? 0) as int;
-            final hasQueuedRange = usageList.any((item) => item['status'] == 'queued');
+            final hasQueuedRange = usageList.any(
+              (item) => item['status'] == 'queued',
+            );
 
             if (remaining <= 5 && !hasQueuedRange) {
-              final message = 'Warning: Only $remaining GCs remaining in your current range (${activeRange['fromGC']}-${activeRange['toGC']}).\n\n'
+              final message =
+                  'Warning: Only $remaining GCs remaining in your current range (${activeRange['fromGC']}-${activeRange['toGC']}).\n\n'
                   '⚠️ No queued GC range available. Please contact admin to assign a new range.\n\n'
                   'Please request a new range soon!';
 
               if (Get.isDialogOpen != true) {
                 Get.dialog(
                   AlertDialog(
-                    title: const Text('Low GC Balance', style: TextStyle(color: Colors.orange)),
+                    title: const Text(
+                      'Low GC Balance',
+                      style: TextStyle(color: Colors.orange),
+                    ),
                     content: Text(message),
                     actions: [
                       TextButton(
@@ -1550,27 +1714,27 @@ class GCFormController extends GetxController {
         final String? lockedByUserId = data['lockedByUserId']?.toString();
         final String currentUserId = _idController.userId.value;
         final bool isLockedByCurrentUser = lockedByUserId == currentUserId;
-        
+
         debugPrint('Lock status check:');
         debugPrint('- isLocked: $isLocked');
         debugPrint('- lockedByUserId: $lockedByUserId');
         debugPrint('- currentUserId: $currentUserId');
         debugPrint('- isLockedByCurrentUser: $isLockedByCurrentUser');
-        
+
         // If locked by current user, allow editing
         if (isLockedByCurrentUser) {
           debugPrint('GC is locked by current user - allowing edit');
           return {
             'canEdit': true,
-            'isLocked': false, 
+            'isLocked': false,
             'lockedBy': 'You',
             'lockedByUserId': lockedByUserId,
             'currentUserId': currentUserId,
             'lockedAt': data['lockedAt'],
-            'lockedAgo': data['lockedAgo']
+            'lockedAgo': data['lockedAgo'],
           };
         }
-        
+
         // If locked by someone else
         if (isLocked) {
           debugPrint('GC is locked by another user');
@@ -1581,10 +1745,10 @@ class GCFormController extends GetxController {
             'lockedByUserId': lockedByUserId,
             'currentUserId': currentUserId,
             'lockedAt': data['lockedAt'],
-            'lockedAgo': data['lockedAgo']
+            'lockedAgo': data['lockedAgo'],
           };
         }
-        
+
         // Not locked at all
         debugPrint('GC is not locked');
         return {
@@ -1594,15 +1758,17 @@ class GCFormController extends GetxController {
           'lockedByUserId': null,
           'currentUserId': currentUserId,
           'lockedAt': null,
-          'lockedAgo': null
+          'lockedAgo': null,
         };
       }
-      
+
       // If we can't determine the lock status, be permissive
       return {
         'canEdit': true, // Allow editing if we can't check lock status
         'isLocked': false,
-        'error': response.statusCode == 404 ? 'Temporary GC not found' : 'Failed to check lock status'
+        'error': response.statusCode == 404
+            ? 'Temporary GC not found'
+            : 'Failed to check lock status',
       };
     } catch (e) {
       debugPrint('Error checking lock status: $e');
@@ -1610,7 +1776,7 @@ class GCFormController extends GetxController {
       return {
         'canEdit': true,
         'isLocked': false,
-        'error': 'Connection error: $e'
+        'error': 'Connection error: $e',
       };
     }
   }
@@ -1622,18 +1788,20 @@ class GCFormController extends GetxController {
     if (isFillTemporaryMode.value && tempGcNumber.value.isNotEmpty) {
       debugPrint('Checking lock status for GC: ${tempGcNumber.value}');
       final lockStatus = await _checkLockStatus(tempGcNumber.value);
-      
+
       // Debug log the lock status
       debugPrint('Lock status for submission:');
       lockStatus.forEach((key, value) {
         debugPrint('  $key: $value');
       });
-      
+
       // Only block submission if explicitly told we can't edit
       if (lockStatus['canEdit'] == false) {
         final lockedBy = lockStatus['lockedBy'] ?? 'another user';
-        final lockedAgo = lockStatus['lockedAgo'] != null ? ' (${lockStatus['lockedAgo']})' : '';
-        
+        final lockedAgo = lockStatus['lockedAgo'] != null
+            ? ' (${lockStatus['lockedAgo']})'
+            : '';
+
         _showToast(
           'Cannot submit: The GC is currently in use by $lockedBy$lockedAgo',
           toastLength: Toast.LENGTH_LONG,
@@ -1643,9 +1811,11 @@ class GCFormController extends GetxController {
         );
         return;
       }
-      
+
       // If we get here, we can proceed with submission
-      debugPrint('Proceeding with form submission - lock status allows editing');
+      debugPrint(
+        'Proceeding with form submission - lock status allows editing',
+      );
       debugPrint('Current user ID: ${lockStatus['currentUserId']}');
       debugPrint('Locked by user ID: ${lockStatus['lockedByUserId']}');
     }
@@ -1680,9 +1850,15 @@ class GCFormController extends GetxController {
       'ConsigneeAddress': consigneeAddressCtrl.text,
       'ConsigneeGst': consigneeGstCtrl.text,
       'BillTo': selectedBillTo.value,
-      'BillToName': selectedBillTo.value,
-      'BillToAddress': billToAddressCtrl.text,
-      'BillToGst': billToGstCtrl.text,
+      'BillToName': selectedBillTo.value == 'Select Bill To'
+          ? ''
+          : selectedBillTo.value,
+      'BillToAddress': selectedBillTo.value == 'Select Bill To'
+          ? ''
+          : billToAddressCtrl.text,
+      'BillToGst': selectedBillTo.value == 'Select Bill To'
+          ? ''
+          : billToGstCtrl.text,
       'CustInvNo': customInvoiceCtrl.text,
       'InvValue': invValueCtrl.text,
       'EInv': ewayBillCtrl.text,
@@ -1700,7 +1876,12 @@ class GCFormController extends GetxController {
       'TripId': tripIdCtrl.text,
       'DeliveryFromSpecial': deliveryInstructionsCtrl.text,
       'DeliveryAddress': deliveryAddressCtrl.text,
-      'ServiceTax': selectedGstPayer.value,
+      // Ensure the GST Payer value is properly capitalized for the backend
+      'ServiceTax': () {
+        final normalizedGstPayer =
+            _normalizeGstPayerValue(selectedGstPayer.value);
+        return normalizedGstPayer.isNotEmpty ? normalizedGstPayer : 'Consignor';
+      }(),
       'TotalRate': rateCtrl.text,
       'TotalWeight': actualWeightCtrl.text,
       'HireAmount': hireAmountCtrl.text,
@@ -1716,7 +1897,7 @@ class GCFormController extends GetxController {
       final Uri url;
       final http.Response response;
       final userId = _idController.userId.value;
-      
+
       if (userId.isEmpty) {
         throw Exception('User ID not found. Please login again.');
       }
@@ -1725,7 +1906,7 @@ class GCFormController extends GetxController {
       if (isTemporaryMode.value) {
         data['userId'] = userId;
         data['CompanyId'] = _idController.companyId.value;
-        
+
         url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/create');
         response = await http.post(
           url,
@@ -1738,47 +1919,54 @@ class GCFormController extends GetxController {
         try {
           data['userId'] = userId;
           data['actualGcNumber'] = gcNumberCtrl.text;
-          
+
           // Double-check lock status right before submission
           final lockStatus = await _checkLockStatus(tempGcNumber.value);
           if (lockStatus['isLocked'] == true) {
             throw Exception('Lost lock on the temporary GC. Please try again.');
           }
-          
+
           // Convert the temporary GC to a real GC
-          url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/convert/${tempGcNumber.value}');
+          url = Uri.parse(
+            '${ApiConfig.baseUrl}/temporary-gc/convert/${tempGcNumber.value}',
+          );
           response = await http.post(
             url,
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(data),
           );
-          
+
           if (response.statusCode != 200) {
-            throw Exception('Failed to convert temporary GC: ${response.statusCode}');
+            throw Exception(
+              'Failed to convert temporary GC: ${response.statusCode}',
+            );
           }
-          
+
           final responseData = jsonDecode(response.body);
           if (responseData['success'] != true) {
-            throw Exception(responseData['message'] ?? 'Failed to convert temporary GC');
+            throw Exception(
+              responseData['message'] ?? 'Failed to convert temporary GC',
+            );
           }
           // The submit-gc endpoint is already called in the backend during conversion
           // No need to call it again from the frontend
           // Release the lock after successful conversion
-          await http.post(
-            Uri.parse('${ApiConfig.baseUrl}/temporary-gc/release-lock'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'gcNumber': tempGcNumber.value,
-              'userId': userId,
-              'force': true, // Add force flag to ensure release
-            }),
-          ).catchError((e) {
-            debugPrint('Error releasing lock: $e');
-            // Return a dummy response to satisfy the type system
-            // The actual response doesn't matter since we're in an error case
-            return http.Response('', 200);
-          });
-          
+          await http
+              .post(
+                Uri.parse('${ApiConfig.baseUrl}/temporary-gc/release-lock'),
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({
+                  'gcNumber': tempGcNumber.value,
+                  'userId': userId,
+                  'force': true, // Add force flag to ensure release
+                }),
+              )
+              .catchError((e) {
+                debugPrint('Error releasing lock: $e');
+                // Return a dummy response to satisfy the type system
+                // The actual response doesn't matter since we're in an error case
+                return http.Response('', 200);
+              });
         } catch (e) {
           // Attempt to release the lock on error
           try {
@@ -1799,7 +1987,9 @@ class GCFormController extends GetxController {
       }
       // Handle regular GC edit
       else if (isEditMode.value && editingGcNumber.value.isNotEmpty) {
-        url = Uri.parse('${ApiConfig.baseUrl}/gc/updateGC/${editingGcNumber.value}');
+        url = Uri.parse(
+          '${ApiConfig.baseUrl}/gc/updateGC/${editingGcNumber.value}',
+        );
         response = await http.put(
           url,
           headers: {'Content-Type': 'application/json'},
@@ -1822,7 +2012,8 @@ class GCFormController extends GetxController {
         String message;
         if (isTemporaryMode.value) {
           final responseData = jsonDecode(response.body);
-          final tempGcNum = responseData['data']?['temp_gc_number'] ?? 'Unknown';
+          final tempGcNum =
+              responseData['data']?['temp_gc_number'] ?? 'Unknown';
           message = 'Temporary GC created: $tempGcNum';
         } else if (isFillTemporaryMode.value) {
           message = 'GC created successfully from template!';
@@ -1846,7 +2037,7 @@ class GCFormController extends GetxController {
         }
 
         clearForm();
-        
+
         // Reset temporary modes
         isTemporaryMode.value = false;
         isFillTemporaryMode.value = false;

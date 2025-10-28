@@ -646,7 +646,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 ),
               const SizedBox(height: 16),
               Text(
-                'Vehicle Details',
+                'Vehicle & Driver Details',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 16),
@@ -697,143 +697,26 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   onChanged: (_) {},
                 ),
               const SizedBox(height: 16),
-              // Truck Type below Truck Number
-              TextFormField(
-                controller: controller.truckTypeCtrl,
-                decoration: _inputDecoration('Truck Type', Icons.local_shipping),
-                validator: null,
-                onChanged: (_) {},
-              ),
-              const SizedBox(height: 16),
-              // From / To after PO Number
+              // Truck Type and Driver Name row
               Row(
                 children: [
                   Expanded(
                     child: TextFormField(
-                      controller: controller.fromCtrl,
-                      readOnly: true,
-                      decoration: _inputDecoration(
-                        'From',
-                        Icons.location_on,
-                        hintText: 'Select a consignor to auto-fill',
-                      ),
+                      controller: controller.truckTypeCtrl,
+                      decoration: _inputDecoration('Truck Type', Icons.local_shipping, compact: isSmallScreen),
+                      validator: null,
+                      onChanged: (_) {},
                     ),
-                  ),
-                  if (!isSmallScreen) const SizedBox(width: 16),
-                  if (!isSmallScreen)
-                    Expanded(
-                      child: TextFormField(
-                        controller: controller.toCtrl,
-                        readOnly: true,
-                        decoration: _inputDecoration(
-                          'To',
-                          Icons.location_on,
-                          hintText: 'Select a consignee to auto-fill',
-                        ),
-                        validator: (value) =>
-                        value == null || value.isEmpty ? 'Required' : null,
-                      ),
-                    ),
-                ],
-              ),
-              if (isSmallScreen) const SizedBox(height: 16),
-              if (isSmallScreen)
-                TextFormField(
-                  controller: controller.toCtrl,
-                  readOnly: true,
-                  decoration: _inputDecoration(
-                    'To',
-                    Icons.location_on,
-                    hintText: 'Select a consignee to auto-fill',
-                  ),
-                ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: controller.tripIdCtrl,
-                decoration: _inputDecoration('Trip ID', Icons.route),
-                validator: null,
-                onChanged: (_) {},
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPartiesTab(
-      BuildContext context,
-      GCFormController controller,
-      bool isSmallScreen,
-      ) {
-    return SingleChildScrollView(
-      key: const ValueKey(1),
-      child: Card(
-        elevation: 1,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Broker & Driver Details',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 16),
-              // Broker and Driver row
-              Row(
-                children: [
-                  Expanded(
-                    child: Obx(() {
-                      // Get the list of brokers, ensuring no empty or null names
-                      final brokerList = controller.brokers
-                          .where((b) => b != null && b.isNotEmpty)
-                          .toList();
-                          
-                      // If the selected broker is not in the list, clear it
-                      final selectedBroker = controller.selectedBroker.value;
-                      if (selectedBroker.isNotEmpty && !brokerList.contains(selectedBroker)) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          controller.selectedBroker.value = '';
-                          controller.brokerNameCtrl.clear();
-                        });
-                      }
-                      
-                      return _buildDropdownField(
-                        context: context,
-                        label: 'Broker Name',
-                        value: brokerList.contains(selectedBroker) ? selectedBroker : '',
-                        items: brokerList,
-                        onChanged: (value) {
-                          if (value != null) {
-                            controller.selectedBroker.value = value;
-                            controller.brokerNameCtrl.text = value;
-                          } else {
-                            controller.selectedBroker.value = '';
-                            controller.brokerNameCtrl.clear();
-                          }
-                        },
-                        validator: null,
-                        compact: true,
-                        searchable: true,
-                        isLoading: controller.brokersLoading.value,
-                        error: controller.brokersError.value,
-                        onRetry: () => controller.fetchBrokers(),
-                      );
-                    }),
                   ),
                   if (!isSmallScreen) const SizedBox(width: 16),
                   if (!isSmallScreen)
                     Expanded(
                       child: Obx(() {
-                        // Get the list of driver names, ensuring no empty or null names
                         final driverNames = controller.drivers
                             .map((d) => d['driverName']?.toString() ?? '')
                             .where((name) => name.isNotEmpty)
                             .toList();
                             
-                        // If the selected driver is not in the list, clear it
                         final selectedDriver = controller.selectedDriver.value;
                         if (selectedDriver.isNotEmpty && !driverNames.contains(selectedDriver)) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -858,7 +741,6 @@ class _GCFormScreenState extends State<GCFormScreen> {
                                 controller.driverNameCtrl.text = value;
                                 controller.driverPhoneCtrl.text = driver['phoneNumber']?.toString() ?? '';
                               } catch (e) {
-                                // If driver not found, clear the fields
                                 controller.selectedDriver.value = '';
                                 controller.driverNameCtrl.clear();
                                 controller.driverPhoneCtrl.clear();
@@ -883,13 +765,11 @@ class _GCFormScreenState extends State<GCFormScreen> {
               if (isSmallScreen) const SizedBox(height: 16),
               if (isSmallScreen)
                 Obx(() {
-                  // Get the list of driver names, ensuring no empty or null names
                   final driverNames = controller.drivers
                       .map((d) => d['driverName']?.toString() ?? '')
                       .where((name) => name.isNotEmpty)
                       .toList();
                       
-                  // If the selected driver is not in the list, clear it
                   final selectedDriver = controller.selectedDriver.value;
                   if (selectedDriver.isNotEmpty && !driverNames.contains(selectedDriver)) {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -914,7 +794,6 @@ class _GCFormScreenState extends State<GCFormScreen> {
                           controller.driverNameCtrl.text = value;
                           controller.driverPhoneCtrl.text = driver['phoneNumber']?.toString() ?? '';
                         } catch (e) {
-                          // If driver not found, clear the fields
                           controller.selectedDriver.value = '';
                           controller.driverNameCtrl.clear();
                           controller.driverPhoneCtrl.clear();
@@ -951,6 +830,78 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 readOnly: true,
                 validator: (value) => value == null || value.isEmpty ? 'Required' : null,
               ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: controller.tripIdCtrl,
+                decoration: _inputDecoration('Trip ID', Icons.route),
+                validator: null,
+                onChanged: (_) {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPartiesTab(
+      BuildContext context,
+      GCFormController controller,
+      bool isSmallScreen,
+      ) {
+    return SingleChildScrollView(
+      key: const ValueKey(1),
+      child: Card(
+        elevation: 1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Broker Details',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 16),
+              // Broker field only
+              Obx(() {
+                // Get the list of brokers, ensuring no empty or null names
+                final brokerList = controller.brokers
+                    .where((b) => b != null && b.isNotEmpty)
+                    .toList();
+                    
+                // If the selected broker is not in the list, clear it
+                final selectedBroker = controller.selectedBroker.value;
+                if (selectedBroker.isNotEmpty && !brokerList.contains(selectedBroker)) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    controller.selectedBroker.value = '';
+                    controller.brokerNameCtrl.clear();
+                  });
+                }
+                
+                return _buildDropdownField(
+                  context: context,
+                  label: 'Broker Name',
+                  value: brokerList.contains(selectedBroker) ? selectedBroker : '',
+                  items: brokerList,
+                  onChanged: (value) {
+                    if (value != null) {
+                      controller.selectedBroker.value = value;
+                      controller.brokerNameCtrl.text = value;
+                    } else {
+                      controller.selectedBroker.value = '';
+                      controller.brokerNameCtrl.clear();
+                    }
+                  },
+                  validator: null,
+                  compact: true,
+                  searchable: true,
+                  isLoading: controller.brokersLoading.value,
+                  error: controller.brokersError.value,
+                  onRetry: () => controller.fetchBrokers(),
+                );
+              }),
               const SizedBox(height: 24),
               Text(
                 'Consignor Details',
@@ -1161,6 +1112,33 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 validator: null,
                 onChanged: (_) {},
               ),
+              const SizedBox(height: 16),
+              // From / To fields
+              Text(
+                'Route Details',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: controller.fromCtrl,
+                readOnly: true,
+                decoration: _inputDecoration(
+                  'From',
+                  Icons.location_on,
+                  hintText: 'Select a consignor to auto-fill',
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: controller.toCtrl,
+                readOnly: true,
+                decoration: _inputDecoration(
+                  'To',
+                  Icons.location_on,
+                  hintText: 'Select a consignee to auto-fill',
+                ),
+                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+              ),
             ],
           ),
         ),
@@ -1323,6 +1301,19 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     'Package Method',
                     Icons.inventory_2_outlined,
                   ),
+                  validator: null,
+                  onChanged: (_) {},
+                ),
+                const SizedBox(height: 16),
+                // Delivery Special Instructions
+                TextFormField(
+                  controller: controller.deliveryInstructionsCtrl,
+                  decoration: _inputDecoration(
+                    'Delivery Special Instructions',
+                    Icons.delivery_dining,
+                    hintText: 'Enter any special delivery instructions',
+                  ),
+                  maxLines: 3,
                   validator: null,
                   onChanged: (_) {},
                 ),
@@ -1545,18 +1536,26 @@ class _GCFormScreenState extends State<GCFormScreen> {
               const SizedBox(height: 16),
               
               // GST Payer dropdown
-              Obx(() => _buildDropdownField(
-                context: context,
-                label: 'GST Payer',
-                value: controller.selectedGstPayer.value,
-                items: controller.gstPayerOptions,
-                onChanged: (value) {
-                  controller.selectedGstPayer.value = value!;
-                },
-                validator: null,
-                compact: true,
-                searchable: false,
-              )),
+              Obx(() {
+                // Debug print to check the current selected value
+                debugPrint('Current GST Payer in UI: ${controller.selectedGstPayer.value}');
+                debugPrint('Available options: ${controller.gstPayerOptions}');
+                
+                return _buildDropdownField(
+                  context: context,
+                  label: 'GST Payer',
+                  value: controller.selectedGstPayer.value,
+                  items: controller.gstPayerOptions,
+                  onChanged: (value) {
+                    if (value != null) {
+                      controller.onGstPayerSelected(value);
+                    }
+                  },
+                  validator: null,
+                  compact: true,
+                  searchable: false,
+                );
+              }),
               
               const SizedBox(height: 16),
               
