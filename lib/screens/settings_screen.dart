@@ -39,6 +39,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           'userId': _idController.userId.value,
           'oldPassword': _oldPasswordController.text,
           'newPassword': _newPasswordController.text,
+          'companyId': _idController.companyId.value,
         }),
       );
 
@@ -46,7 +47,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
       if (response.statusCode == 200) {
         setState(() {
-          _successMessage = responseData['message'] ?? 'Password changed successfully';
+          _successMessage =
+              responseData['message'] ?? 'Password changed successfully';
           _oldPasswordController.clear();
           _newPasswordController.clear();
           _confirmPasswordController.clear();
@@ -89,7 +91,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Card(
-              elevation: 2,
+              elevation: 5,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

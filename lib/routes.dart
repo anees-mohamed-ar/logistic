@@ -27,6 +27,7 @@ import 'package:logistic/views/weight_rate/weight_rate_list_page.dart';
 import 'package:logistic/views/weight_rate/add_edit_weight_rate_page.dart';
 import 'package:logistic/screens/settings_menu_screen.dart';
 import 'package:logistic/screens/settings_screen.dart';
+import 'package:logistic/screens/profile_picture_screen.dart';
 import 'package:logistic/views/truck/truck_list_page.dart';
 import 'package:logistic/views/truck/truck_form_page.dart';
 import 'package:logistic/bindings/truck_binding.dart';
@@ -51,6 +52,7 @@ class AppRoutes {
   static const String kmList = '/km_list';
   static const String settings = '/settings';
   static const String changePassword = '/settings/change-password';
+  static const String profilePicture = '/settings/profile-picture';
   static const String kmForm = '/km_form';
   static const String locationList = '/location_list';
   static const String locationForm = '/location_form';
@@ -108,6 +110,11 @@ class AppRoutes {
     GetPage(
       name: changePassword,
       page: () => const ChangePasswordScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: profilePicture,
+      page: () => const ProfilePictureScreen(),
       transition: Transition.rightToLeft,
     ),
     GetPage(

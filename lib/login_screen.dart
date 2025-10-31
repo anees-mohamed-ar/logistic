@@ -256,7 +256,7 @@ class LoginScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Get.put(IdController());
-    final controller = Get.put(LoginController());
+    final controller = Get.find<LoginController>();
     final emailFocus = FocusNode();
     final passwordFocus = FocusNode();
     void _submitForm() {

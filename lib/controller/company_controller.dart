@@ -42,6 +42,21 @@ class Company {
       contactPerson: json['contactPerson'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'companyName': companyName,
+      'address': address,
+      'phoneNumber': phoneNumber,
+      'email': email,
+      'gst': gst,
+      'state': state,
+      'country': country,
+      'website': website,
+      'contactPerson': contactPerson,
+    };
+  }
 }
 
 class CompanyController extends GetxController {

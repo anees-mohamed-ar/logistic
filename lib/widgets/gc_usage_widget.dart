@@ -4,7 +4,6 @@ import 'package:dio/dio.dart';
 import 'package:logistic/api_config.dart';
 import 'package:logistic/controller/id_controller.dart';
 
-
 class GCUsageWidget extends StatefulWidget {
   const GCUsageWidget({super.key});
 
@@ -28,7 +27,9 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
     _fetchGCUsage();
 
     // Listen for changes in _idController.gcDataNeedsRefresh
-    _gcDataRefreshWorker = ever(_idController.gcDataNeedsRefresh, (bool needsRefresh) {
+    _gcDataRefreshWorker = ever(_idController.gcDataNeedsRefresh, (
+      bool needsRefresh,
+    ) {
       if (needsRefresh) {
         _fetchGCUsage(); // Re-fetch data
         _idController.gcDataNeedsRefresh.value = false; // Reset the flag
@@ -38,7 +39,8 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
 
   @override
   void dispose() {
-    _gcDataRefreshWorker.dispose(); // Dispose the worker to prevent memory leaks
+    _gcDataRefreshWorker
+        .dispose(); // Dispose the worker to prevent memory leaks
     super.dispose();
   }
 
@@ -60,13 +62,23 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
       }
 
       final dio = Dio(BaseOptions(baseUrl: ApiConfig.baseUrl));
-      final response = await dio.get('/gc-management/usage/$userId');
+      final queryParameters = {
+        'companyId': _idController.companyId.value,
+      };
+      final branchId = _idController.branchId.value;
+      if (branchId.isNotEmpty) {
+        queryParameters['branchId'] = branchId;
+      }
 
+      final response = await dio.get(
+        '/gc-management/usage/$userId',
+        queryParameters: queryParameters,
+      );
       if (response.statusCode == 200 && response.data != null) {
         final responseData = response.data as Map<String, dynamic>;
-        
+
         // Handle case when no GC ranges found for user
-        if (responseData['success'] == false && 
+        if (responseData['success'] == false &&
             responseData['message'] == 'No GC ranges found for user') {
           setState(() {
             _usageData = [];
@@ -75,24 +87,38 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
           });
           return;
         }
-        
-        if (responseData['success'] == true && responseData['data'] != null) {
-          final List<dynamic> data = responseData['data'];
 
-          // Filter for active and queued status only
-          // Filter and sort data to show active first, then queued by assignment time
-          final filteredData = data
-              .where((item) => item['status'] == 'active' || item['status'] == 'queued')
-              .map((item) => GCUsageData.fromJson(item))
-              .toList()
-              ..sort((a, b) {
-                // Sort active items first
-                if (a.status == 'active' && b.status != 'active') return -1;
-                if (a.status != 'active' && b.status == 'active') return 1;
-                
-                // For items with the same status, sort by assignedAt (oldest first)
-                return a.assignedAt.compareTo(b.assignedAt);
-              });
+        if (responseData['success'] == true && responseData['data'] != null) {
+          final rawData = responseData['data'];
+          Iterable<Map<String, dynamic>> items;
+
+          if (rawData is List) {
+            items = rawData.whereType<Map<String, dynamic>>();
+          } else if (rawData is Map) {
+            items = rawData.values
+                .whereType<Map>()
+                .map((value) => value.cast<String, dynamic>());
+          } else {
+            items = const Iterable.empty();
+          }
+
+          final filteredData =
+              items
+                  .where(
+                    (item) =>
+                        item['status'] == 'active' ||
+                        item['status'] == 'queued',
+                  )
+                  .map(GCUsageData.fromJson)
+                  .toList()
+                ..sort((a, b) {
+                  // Sort active items first
+                  if (a.status == 'active' && b.status != 'active') return -1;
+                  if (a.status != 'active' && b.status == 'active') return 1;
+
+                  // For items with the same status, sort by assignedAt (oldest first)
+                  return a.assignedAt.compareTo(b.assignedAt);
+                });
 
           setState(() {
             _usageData = filteredData;
@@ -108,7 +134,8 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
         }
       } else {
         setState(() {
-          _errorMessage = 'Failed to fetch data. Status code: ${response.statusCode}';
+          _errorMessage =
+              'Failed to fetch data. Status code: ${response.statusCode}';
           _isLoading = false;
         });
       }
@@ -167,7 +194,11 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
                     color: Colors.blue.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.info_outline, color: Colors.blue, size: 24.0),
+                  child: const Icon(
+                    Icons.info_outline,
+                    color: Colors.blue,
+                    size: 24.0,
+                  ),
                 ),
                 const SizedBox(width: 16.0),
                 Expanded(
@@ -207,7 +238,10 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.blue.shade800,
                     side: BorderSide(color: Colors.blue.shade300),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8.0),
                     ),
@@ -287,9 +321,7 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
           ),
         ],
       ),
-      child: const Center(
-        child: CircularProgressIndicator(),
-      ),
+      child: const Center(child: CircularProgressIndicator()),
     );
   }
 
@@ -301,195 +333,192 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
     final statusText = usage.status == 'active' ? 'Active' : 'Queued';
 
     return ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: 280,
-          maxWidth: 400,
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: statusColor.withOpacity(0.3),
-              width: 2,
+      constraints: const BoxConstraints(minWidth: 280, maxWidth: 400),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: statusColor.withOpacity(0.3), width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: statusColor.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: statusColor.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header with status badge
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Icon(
-                        usage.status == 'active'
-                            ? Icons.assignment_turned_in_outlined
-                            : Icons.schedule_outlined,
-                        color: statusColor,
-                        size: 14,
-                      ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with status badge
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                    child: Icon(
+                      usage.status == 'active'
+                          ? Icons.assignment_turned_in_outlined
+                          : Icons.schedule_outlined,
+                      color: statusColor,
+                      size: 14,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'GC: ${usage.fromGC}-${usage.toGC}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E2A44),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (usage.status == 'active')
+                          usage.percentageUsed > 0
+                              ? Text(
+                                  'Last used: ${usage.currentGC}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey[600],
+                                    height: 1.2,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : Text(
+                                  'New GC Series',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.green[600],
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.2,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                        else if (usage.status == 'queued')
                           Text(
-                            'GC: ${usage.fromGC}-${usage.toGC}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E2A44),
+                            'Next in queue',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.blue[600],
+                              fontStyle: FontStyle.italic,
+                              height: 1.2,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          if (usage.status == 'active')
-                            usage.percentageUsed > 0
-                                ? Text(
-                                    'Last used: ${usage.currentGC}',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey[600],
-                                      height: 1.2,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  )
-                                : Text(
-                                    'New GC Series',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.green[600],
-                                      fontWeight: FontWeight.w500,
-                                      height: 1.2,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  )
-                          else if (usage.status == 'queued')
-                            Text(
-                              'Next in queue',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.blue[600],
-                                fontStyle: FontStyle.italic,
-                                height: 1.2,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        statusText,
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          color: statusColor,
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // Usage Stats
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildStatBox(
-                      'Total',
-                      usage.totalGCs.toString(),
-                      Icons.format_list_numbered,
-                      const Color(0xFF4A90E2),
-                    ),
-                    _buildStatBox(
-                      'Used',
-                      usage.usedGCs.toString(),
-                      Icons.check_circle_outline,
-                      const Color(0xFF34A853),
-                    ),
-                    _buildStatBox(
-                      'Remaining',
-                      usage.remainingGCs.toString(),
-                      Icons.pending_outlined,
-                      const Color(0xFFFBBC05),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // Progress Bar
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'Usage Progress',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[700],
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${usage.percentageUsed.toStringAsFixed(1)}%',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: statusColor,
-                          ),
-                        ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: usage.percentageUsed / 100,
-                        backgroundColor: Colors.grey[200],
-                        valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-                        minHeight: 6,
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: statusColor,
+                        height: 1.2,
                       ),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Usage Stats
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildStatBox(
+                    'Total',
+                    usage.totalGCs.toString(),
+                    Icons.format_list_numbered,
+                    const Color(0xFF4A90E2),
+                  ),
+                  _buildStatBox(
+                    'Used',
+                    usage.usedGCs.toString(),
+                    Icons.check_circle_outline,
+                    const Color(0xFF34A853),
+                  ),
+                  _buildStatBox(
+                    'Remaining',
+                    usage.remainingGCs.toString(),
+                    Icons.pending_outlined,
+                    const Color(0xFFFBBC05),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Progress Bar
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Usage Progress',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${usage.percentageUsed.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: usage.percentageUsed / 100,
+                      backgroundColor: Colors.grey[200],
+                      valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        )
+        ),
+      ),
     );
   }
 
@@ -500,10 +529,7 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
       decoration: BoxDecoration(
         color: color.withOpacity(0.05),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: color.withOpacity(0.2),
-          width: 1,
-        ),
+        border: Border.all(color: color.withOpacity(0.2), width: 1),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -523,11 +549,7 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
           ),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 8,
-              color: Colors.grey[600],
-              height: 1.1,
-            ),
+            style: TextStyle(fontSize: 8, color: Colors.grey[600], height: 1.1),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),

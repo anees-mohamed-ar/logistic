@@ -40,9 +40,24 @@ class TemporaryGCController extends GetxController {
       print('Checking GC access for user: $userId');
 
       try {
-        final response = await http.get(
-          Uri.parse('${ApiConfig.baseUrl}/gc-management/usage/$userId'),
-        );
+        final companyId = _idController.companyId.value;
+        final branchId = _idController.branchId.value;
+
+        if (companyId.isEmpty) {
+          print('No company ID found, denying access');
+          return false;
+        }
+
+        final usageUri =
+            Uri.parse(
+              '${ApiConfig.baseUrl}/gc-management/usage/$userId',
+            ).replace(
+              queryParameters: {
+                'companyId': companyId,
+                if (branchId.isNotEmpty) 'branchId': branchId,
+              },
+            );
+        final response = await http.get(usageUri);
 
         print('GC access check response: ${response.statusCode}');
 
@@ -51,7 +66,26 @@ class TemporaryGCController extends GetxController {
 
         // If we get a 200 response with success: true
         if (response.statusCode == 200 && responseBody['success'] == true) {
-          final List<dynamic> gcRanges = responseBody['data'] ?? [];
+          final rawData = responseBody['data'];
+          Iterable<Map<String, dynamic>> gcRanges = [];
+
+          if (rawData is List) {
+            gcRanges = rawData.whereType<Map<String, dynamic>>();
+          } else if (rawData is Map) {
+            // For the Map response format
+            gcRanges = rawData.entries
+                .where(
+                  (entry) =>
+                      entry.key is String &&
+                      (entry.key as String).isNotEmpty &&
+                      entry.key != 'companyId' &&
+                      entry.key != 'branchId' &&
+                      entry.value is Map<String, dynamic>,
+                )
+                .map((entry) => entry.value as Map<String, dynamic>);
+          } else {
+            gcRanges = const Iterable.empty();
+          }
 
           // Check if any range has status 'active' or 'queued'
           final hasValidRange = gcRanges.any(
@@ -153,7 +187,7 @@ class TemporaryGCController extends GetxController {
       isLoading.value = true;
       final companyId = _idController.companyId.value;
 
-      if (companyId.isEmpty) {
+      if (companyId == null || companyId.isEmpty || companyId == 'undefined') {
         Fluttertoast.showToast(
           msg: 'Company ID not found',
           backgroundColor: Colors.red,
@@ -197,9 +231,10 @@ class TemporaryGCController extends GetxController {
   // Get single temporary GC
   Future<TemporaryGC?> getTemporaryGC(String tempGcNumber) async {
     try {
+      final companyId = _idController.companyId.value;
       final url = Uri.parse(
         '${ApiConfig.baseUrl}/temporary-gc/get/$tempGcNumber',
-      );
+      ).replace(queryParameters: {'companyId': companyId});
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -220,6 +255,8 @@ class TemporaryGCController extends GetxController {
     try {
       isLocking.value = true;
       final userId = _idController.userId.value;
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
 
       final url = Uri.parse(
         '${ApiConfig.baseUrl}/temporary-gc/lock/$tempGcNumber',
@@ -227,10 +264,15 @@ class TemporaryGCController extends GetxController {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'userId': userId}),
+        body: json.encode({
+          'userId': userId,
+          'companyId': companyId,
+          if (branchId.isNotEmpty) 'branchId': branchId,
+        }),
       );
 
       final data = json.decode(response.body);
+      print(data);
 
       if (response.statusCode == 200 && data['success'] == true) {
         Fluttertoast.showToast(
@@ -266,6 +308,8 @@ class TemporaryGCController extends GetxController {
   Future<void> unlockTemporaryGC(String tempGcNumber) async {
     try {
       final userId = _idController.userId.value;
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
 
       final url = Uri.parse(
         '${ApiConfig.baseUrl}/temporary-gc/unlock/$tempGcNumber',
@@ -273,7 +317,11 @@ class TemporaryGCController extends GetxController {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'userId': userId}),
+        body: json.encode({
+          'userId': userId,
+          'companyId': companyId,
+          if (branchId.isNotEmpty) 'branchId': branchId,
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -291,6 +339,7 @@ class TemporaryGCController extends GetxController {
   Future<void> _connectToLiveUpdates() async {
     try {
       final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
       if (companyId.isEmpty) return;
 
       _disconnectFromLiveUpdates();
@@ -298,7 +347,7 @@ class TemporaryGCController extends GetxController {
       _sseClient = HttpClient();
       _sseClient!.connectionTimeout = const Duration(seconds: 10);
       final uri = Uri.parse(
-        '${ApiConfig.baseUrl}/temporary-gc/stream?companyId=$companyId',
+        '${ApiConfig.baseUrl}/temporary-gc/stream?companyId=$companyId${branchId.isNotEmpty ? '&branchId=$branchId' : ''}',
       );
       final req = await _sseClient!.getUrl(uri);
       req.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
@@ -479,7 +528,13 @@ class TemporaryGCController extends GetxController {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'userId': userId, 'gcNumber': gcNumber}),
+        body: json.encode({
+          'userId': userId,
+          'gcNumber': gcNumber,
+          'companyId': _idController.companyId.value,
+          if (_idController.branchId.value.isNotEmpty)
+            'branchId': _idController.branchId.value,
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -503,6 +558,8 @@ class TemporaryGCController extends GetxController {
     try {
       isConverting.value = true;
       final userId = _idController.userId.value;
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
 
       // First convert the temporary GC to a real GC
       final url = Uri.parse(
@@ -511,6 +568,8 @@ class TemporaryGCController extends GetxController {
       final body = {
         'userId': userId,
         'actualGcNumber': actualGcNumber,
+        'companyId': companyId,
+        if (branchId.isNotEmpty) 'branchId': branchId,
         ...additionalData,
       };
 
@@ -569,6 +628,7 @@ class TemporaryGCController extends GetxController {
 
   // Create temporary GC (Admin only)
   Future<bool> createTemporaryGC(Map<String, dynamic> gcData) async {
+    print("hello this is inside create Temporary gc");
     try {
       if (!isAdmin) {
         Fluttertoast.showToast(
@@ -580,9 +640,27 @@ class TemporaryGCController extends GetxController {
 
       isLoading.value = true;
       final userId = _idController.userId.value;
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+      print('Company Id : $companyId');
+      print('Branch Id : $branchId');
+
+      if (companyId == null || companyId.isEmpty || companyId == 'undefined') {
+        Fluttertoast.showToast(
+          msg: 'Company ID not found',
+          backgroundColor: Colors.red,
+        );
+        return false;
+      }
 
       final url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/create');
-      final body = {'userId': userId, ...gcData};
+      final body = {
+        'userId': userId,
+        'companyId': companyId,
+        if (branchId.isNotEmpty) 'branchId': branchId,
+        ...gcData,
+      };
+      print('Body: $body');
 
       final response = await http.post(
         url,
@@ -635,11 +713,18 @@ class TemporaryGCController extends GetxController {
 
       isLoading.value = true;
       final userId = _idController.userId.value;
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
 
       final url = Uri.parse(
         '${ApiConfig.baseUrl}/temporary-gc/update/$tempGcNumber',
       );
-      final body = {'userId': userId, ...updateData};
+      final body = {
+        'userId': userId,
+        'companyId': companyId,
+        if (branchId.isNotEmpty) 'branchId': branchId,
+        ...updateData,
+      };
 
       final response = await http.put(
         url,
@@ -687,6 +772,8 @@ class TemporaryGCController extends GetxController {
 
       isLoading.value = true;
       final userId = _idController.userId.value;
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
 
       final url = Uri.parse(
         '${ApiConfig.baseUrl}/temporary-gc/delete/$tempGcNumber',
@@ -694,7 +781,11 @@ class TemporaryGCController extends GetxController {
       final response = await http.delete(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'userId': userId}),
+        body: json.encode({
+          'userId': userId,
+          'companyId': companyId,
+          if (branchId.isNotEmpty) 'branchId': branchId,
+        }),
       );
 
       final data = json.decode(response.body);
@@ -741,7 +832,12 @@ class TemporaryGCController extends GetxController {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'adminUserId': _idController.userId.value}),
+        body: json.encode({
+          'adminUserId': _idController.userId.value,
+          'companyId': _idController.companyId.value,
+          if (_idController.branchId.value.isNotEmpty)
+            'branchId': _idController.branchId.value,
+        }),
       );
 
       final data = json.decode(response.body);
@@ -786,9 +882,10 @@ class TemporaryGCController extends GetxController {
     try {
       final userId = _idController.userId.value;
       final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
 
       final url = Uri.parse(
-        '${ApiConfig.baseUrl}/temporary-gc/can-edit/$gcNumber?companyId=$companyId&userId=$userId',
+        '${ApiConfig.baseUrl}/temporary-gc/can-edit/$gcNumber?companyId=$companyId&userId=$userId${branchId.isNotEmpty ? '&branchId=$branchId' : ''}',
       );
       final response = await http.get(url);
 

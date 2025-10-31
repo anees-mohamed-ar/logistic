@@ -21,6 +21,12 @@ class SettingsMenuScreen extends StatelessWidget {
             title: 'Change Password',
             onTap: () => Get.toNamed(AppRoutes.changePassword),
           ),
+          _buildMenuItem(
+            context,
+            icon: Icons.photo_camera_outlined,
+            title: 'Profile Picture',
+            onTap: () => Get.toNamed(AppRoutes.profilePicture),
+          ),
           // // _buildSectionHeader('Appearance'),
           // // _buildMenuItem(
           // //   context,

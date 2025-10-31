@@ -120,7 +120,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
       final userRole = idController.userRole.value;
       final hasImage = userId.isNotEmpty;
       final imageUrl = hasImage
-          ? '${ApiConfig.baseUrl}/profile/profile-picture/$userId'
+          ? '${ApiConfig.baseUrl}/profile/profile-picture/$userId?t=${idController.profilePictureTimestamp.value}'
           : '';
 
       return Container(

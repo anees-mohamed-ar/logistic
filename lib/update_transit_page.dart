@@ -8,6 +8,7 @@ import 'package:printing/printing.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'api_config.dart'; // Assuming ApiConfig file with baseUrl
+import 'package:logistic/controller/id_controller.dart';
 
 class UpdateTransitPage extends StatefulWidget {
   const UpdateTransitPage({Key? key}) : super(key: key);
@@ -48,6 +49,8 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
   bool isReceiptTimeEditable = true;
   bool isReceiptRemarksEditable = true;
 
+  final IdController _idController = Get.find<IdController>();
+
   // Theme constants
   static const Color primaryColor = Color(0xFF1E2A44);
   static const Color secondaryColor = Color(0xFF2E3A59);
@@ -69,9 +72,21 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       isLoadingGc = true;
     });
     try {
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/gc/gcList/search'),
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+
+      if (companyId.isEmpty) {
+        _showErrorSnackbar('Company not selected. Please login again.');
+        return;
+      }
+
+      final uri = Uri.parse('${ApiConfig.baseUrl}/gc/gcList/search').replace(
+        queryParameters: {
+          'companyId': companyId,
+          if (branchId.isNotEmpty) 'branchId': branchId,
+        },
       );
+      final response = await http.get(uri);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List<dynamic>;
         setState(() {
@@ -104,8 +119,23 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
     try {
       print('Fetching GC details for: $gcNumber');
 
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+
+      if (companyId.isEmpty) {
+        throw Exception('Company not selected.');
+      }
+
+      final queryParameters = {
+        'GcNumber': gcNumber,
+        'companyId': companyId,
+        if (branchId.isNotEmpty) 'branchId': branchId,
+      };
+
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/gc/search?GcNumber=$gcNumber'),
+        Uri.parse('${ApiConfig.baseUrl}/gc/search').replace(
+          queryParameters: queryParameters,
+        ),
       );
 
       if (response.statusCode == 200) {
@@ -130,7 +160,12 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
         if (responseData is List && responseData.isNotEmpty && responseData[0]['Id'] != null) {
           final gcId = responseData[0]['Id'];
           final detailResponse = await http.get(
-            Uri.parse('${ApiConfig.baseUrl}/gc/search/$gcId'),
+            Uri.parse('${ApiConfig.baseUrl}/gc/search/$gcId').replace(
+              queryParameters: {
+                'companyId': companyId,
+                if (branchId.isNotEmpty) 'branchId': branchId,
+              },
+            ),
           );
 
           if (detailResponse.statusCode == 200) {

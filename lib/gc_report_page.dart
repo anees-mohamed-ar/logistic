@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'dart:math' as math;
 import 'package:logistic/api_config.dart';
 import 'dart:convert';
+import 'package:get/get.dart';
+import 'package:logistic/controller/id_controller.dart';
 
 class GCReportPage extends StatefulWidget {
   const GCReportPage({Key? key}) : super(key: key);
@@ -22,6 +24,7 @@ class _GCReportPageState extends State<GCReportPage>
       _totalHireAnim,
       _totalAdvanceAnim,
       _totalFreightAnim;
+  late final IdController _idController;
 
   // Search and filter
   final TextEditingController _searchController = TextEditingController();
@@ -46,6 +49,7 @@ class _GCReportPageState extends State<GCReportPage>
   @override
   void initState() {
     super.initState();
+    _idController = Get.find<IdController>();
     fetchGCList();
     _controller = AnimationController(
       vsync: this,
@@ -125,8 +129,15 @@ class _GCReportPageState extends State<GCReportPage>
       error = null;
     });
     try {
-      final url = Uri.parse('${ApiConfig.baseUrl}/gc/search');
-      final response = await http.get(url);
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+      final uri = Uri.parse('${ApiConfig.baseUrl}/gc/search').replace(
+        queryParameters: {
+          'companyId': companyId,
+          if (branchId.isNotEmpty) 'branchId': branchId,
+        },
+      );
+      final response = await http.get(uri);
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         setState(() {

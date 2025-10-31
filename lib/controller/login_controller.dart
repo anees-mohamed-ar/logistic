@@ -8,6 +8,8 @@ import 'package:get_storage/get_storage.dart';
 import 'package:logistic/api_config.dart';
 import 'package:logistic/routes.dart';
 import 'package:logistic/controller/id_controller.dart';
+import 'package:logistic/controller/company_controller.dart';
+import 'package:logistic/models/location_model.dart';
 
 class LoginController extends GetxController {
   final formKey = GlobalKey<FormState>();
@@ -20,6 +22,8 @@ class LoginController extends GetxController {
 
   var userId = ''.obs;
   var companyId = ''.obs;
+  var selectedCompany = Rx<Company?>(null);
+  var selectedBranch = Rx<Location?>(null);
 
   final _box = GetStorage();
 
@@ -32,6 +36,24 @@ class LoginController extends GetxController {
       ipController.text = savedIp;
       ApiConfig.baseUrl = savedIp;
     }
+    // Set default company
+    _setDefaultCompany();
+  }
+
+  void _setDefaultCompany() {
+    // Set default company ID 6 (Sri Krishna Carrying Corporation)
+    selectedCompany.value = Company(
+      id: 6,
+      companyName: 'Sri Krishna Carrying Corporation',
+      address: null,
+      phoneNumber: null,
+      email: null,
+      gst: null,
+      state: null,
+      country: null,
+      website: null,
+      contactPerson: null,
+    );
   }
 
   void togglePasswordVisibility() {
@@ -70,10 +92,21 @@ class LoginController extends GetxController {
       _box.write('backend_ip', ip); // Save the IP
 
       try {
-        final response = await http.get(
-          Uri.parse(
-              '${ApiConfig.baseUrl}/profile/search?userEmail=${emailController.text.trim()}&password=${passwordController.text.trim()}'),
-        ).timeout(const Duration(seconds: 10));
+        // Build query parameters
+        final queryParams = {
+          'userEmail': emailController.text.trim(),
+          'password': passwordController.text.trim(),
+          'companyId': selectedCompany.value!.id.toString(),
+        };
+
+        // Add branchId only if selected (optional)
+        if (selectedBranch.value != null) {
+          queryParams['branchId'] = selectedBranch.value!.id.toString();
+        }
+
+        final uri = Uri.parse('${ApiConfig.baseUrl}/profile/search?userEmail=${emailController.text.trim()}&password=${passwordController.text.trim()}&companyId=${selectedCompany.value!.id.toString()}');
+
+        final response = await http.get(uri).timeout(const Duration(seconds: 10));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
@@ -81,8 +114,16 @@ class LoginController extends GetxController {
 
           final idController = Get.find<IdController>();
           idController.setAllUserData(userData);
+          idController.setCompanyId(selectedCompany.value!.id.toString());
+          if (selectedBranch.value != null) {
+            idController.setBranchId(selectedBranch.value!.id.toString());
+          }
 
           await _box.write('userData', userData);
+          await _box.write('selectedCompany', selectedCompany.value!.toJson());
+          if (selectedBranch.value != null) {
+            await _box.write('selectedBranch', selectedBranch.value!.toJson());
+          }
 
           Fluttertoast.showToast(msg: "Login Successful!");
           Get.offNamed(AppRoutes.home);
@@ -117,9 +158,19 @@ class LoginController extends GetxController {
   void tryAutoLogin() {
     if (isLoggedIn()) {
       final userData = _box.read('userData');
+      final savedCompany = _box.read('selectedCompany');
+      final savedBranch = _box.read('selectedBranch');
       if (userData != null) {
         final idController = Get.find<IdController>();
         idController.setAllUserData(userData);
+        if (savedCompany != null) {
+          selectedCompany.value = Company.fromJson(savedCompany);
+          idController.setCompanyId(selectedCompany.value!.id.toString());
+        }
+        if (savedBranch != null) {
+          selectedBranch.value = Location.fromJson(savedBranch);
+          idController.setBranchId(selectedBranch.value!.id.toString());
+        }
         Get.offNamed(AppRoutes.home);
       }
     } else {

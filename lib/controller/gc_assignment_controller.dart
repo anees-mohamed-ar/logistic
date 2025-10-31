@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:logistic/api_config.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'dart:convert';
+import 'package:logistic/controller/id_controller.dart';
 
 class GCAssignmentController extends GetxController {
   //Form controllers
@@ -33,6 +34,8 @@ class GCAssignmentController extends GetxController {
   final loadingUsage = false.obs;
   final usageError = RxnString();
 
+  final IdController _idController = Get.find<IdController>();
+
   @override
   void onInit() {
     super.onInit();
@@ -53,7 +56,10 @@ class GCAssignmentController extends GetxController {
     try {
       usersLoading.value = true;
       usersError.value = null;
-      final url = Uri.parse('${ApiConfig.baseUrl}/profile/user/search');
+      final url = Uri.parse('${ApiConfig.baseUrl}/profile/user/search')
+          .replace(queryParameters: {
+        'companyId': _idController.companyId.value,
+      });
       final response = await http.get(url).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
@@ -114,7 +120,13 @@ class GCAssignmentController extends GetxController {
       }
       
       // If no queued ranges, check for active ranges
-      final url = Uri.parse('${ApiConfig.baseUrl}/gc-management/check-active-ranges/$userId');
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+      final url = Uri.parse('${ApiConfig.baseUrl}/gc-management/check-active-ranges/$userId')
+          .replace(queryParameters: {
+        'companyId': companyId,
+        if (branchId.isNotEmpty) 'branchId': branchId,
+      });
       final response = await http.get(url).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
@@ -176,20 +188,37 @@ class GCAssignmentController extends GetxController {
     try {
       loadingUsage.value = true;
       usageError.value = null;
-      final url = Uri.parse('${ApiConfig.baseUrl}/gc-management/usage/$userId');
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+      final url = Uri.parse('${ApiConfig.baseUrl}/gc-management/usage/$userId')
+          .replace(queryParameters: {
+        'companyId': companyId,
+        if (branchId.isNotEmpty) 'branchId': branchId,
+      });
       final response = await http.get(url).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         if (responseData['success'] == true && responseData['data'] != null) {
-          final List<dynamic> allData = responseData['data'];
+          final rawData = responseData['data'];
+          Iterable<Map<String, dynamic>> allData;
+
+          if (rawData is List) {
+            allData = rawData.whereType<Map<String, dynamic>>();
+          } else if (rawData is Map) {
+            allData = rawData.values
+                .whereType<Map>()
+                .map((value) => value.cast<String, dynamic>());
+          } else {
+            allData = const Iterable.empty();
+          }
 
           // Filter only active and queued ranges
           final activeAndQueued = allData.where((item) =>
-          item['status'] == 'active' || item['status'] == 'queued'
+            item['status'] == 'active' || item['status'] == 'queued'
           ).toList();
 
-          userUsageData.assignAll(activeAndQueued.cast<Map<String, dynamic>>());
+          userUsageData.assignAll(activeAndQueued);
         } else {
           userUsageData.clear();
         }
@@ -238,6 +267,9 @@ class GCAssignmentController extends GetxController {
         "fromGC": int.parse(fromGcCtrl.text.trim()),
         "count": int.parse(countCtrl.text.trim()),
         "status": statusCtrl.text.trim(),
+        "companyId": _idController.companyId.value,
+        if (_idController.branchId.value.isNotEmpty)
+          "branchId": _idController.branchId.value,
       };
 
       final url = Uri.parse('${ApiConfig.baseUrl}/gc-management/ranges');

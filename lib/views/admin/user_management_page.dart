@@ -7,7 +7,7 @@ import 'package:logistic/controller/company_controller.dart';
 import 'package:logistic/widgets/main_layout.dart';
 import 'package:logistic/widgets/custom_app_bar.dart';
 import 'package:logistic/api_config.dart';
-import 'package:search_choices/search_choices.dart';
+import 'package:logistic/models/branch.dart';
 
 class UserManagementPage extends StatefulWidget {
   const UserManagementPage({Key? key}) : super(key: key);
@@ -27,6 +27,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
   String _selectedRole = 'user';
   final CompanyController _companyController = Get.put(CompanyController());
   Company? _selectedCompany;
+  final IdController _idController = Get.find<IdController>();
+  
+  List<Branch> branches = [];
+  Branch? _selectedBranch;
   
   List<dynamic> users = [];
   bool isLoading = true;
@@ -44,7 +48,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
   Future<void> _fetchUsers() async {
     setState(() => isLoading = true);
     try {
-      final response = await http.get(Uri.parse('$baseUrl/user/search'));
+      final response = await http.get(Uri.parse('$baseUrl/user/search')
+          .replace(queryParameters: {
+        'companyId': _idController.companyId.value,
+      }));
       if (response.statusCode == 200) {
         setState(() {
           users = json.decode(response.body);
@@ -56,6 +63,23 @@ class _UserManagementPageState extends State<UserManagementPage> {
       Get.snackbar('Error', 'An error occurred: $e');
     } finally {
       setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _fetchBranchesForCompany(int companyId) async {
+    try {
+      final response = await http.get(Uri.parse('${ApiConfig.baseUrl}/branch/company/$companyId'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as List;
+        setState(() {
+          branches = data.map((json) => Branch.fromJson(json)).toList();
+          _selectedBranch = null; // Reset selection when company changes
+        });
+      } else {
+        Get.snackbar('Error', 'Failed to load branches');
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'An error occurred: $e');
     }
   }
 
@@ -98,6 +122,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
         requestBody['companyId'] = _selectedCompany!.id.toString();
       }
       
+      // Add branch info if available
+      if (_selectedBranch != null) {
+        requestBody['branch_id'] = _selectedBranch!.branchId.toString();
+      }
+      
       // Add optional fields if they have values
       final phoneNumber = _phoneController.text.trim();
       if (phoneNumber.isNotEmpty) requestBody['phoneNumber'] = phoneNumber;
@@ -117,6 +146,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       // Determine the URL and method
       final url = isEditing && editingUserId != null
           ? Uri.parse('$baseUrl/user/update/$editingUserId')
+              .replace(queryParameters: {'companyId': _idController.companyId.value})
           : Uri.parse('$baseUrl/user/add');
           
       print('Sending request to: ${url.toString()}');
@@ -296,6 +326,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                   setState(() {
                                     _selectedCompany = company;
                                   });
+                                  if (company.id != 0) {
+                                    _fetchBranchesForCompany(company.id);
+                                  }
                                 }
                               },
                               isError: isError,
@@ -305,6 +338,26 @@ class _UserManagementPageState extends State<UserManagementPage> {
                         );
                       }),
                       const SizedBox(height: 8),
+                      if (_selectedCompany != null) ...[
+                        _buildSearchableBranchField(
+                          context: context,
+                          label: 'Branch (Optional)',
+                          value: _selectedBranch?.branchName ?? '',
+                          items: branches.map((b) => b.branchName).toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              final branch = branches.firstWhere(
+                                (b) => b.branchName == value,
+                                orElse: () => _selectedBranch ?? Branch(branchId: 0, branchName: '', branchCode: '', companyId: 0, companyName: '', status: 'active'),
+                              );
+                              setState(() {
+                                _selectedBranch = branch;
+                              });
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                       TextFormField(
                         controller: _phoneController,
                         decoration: const InputDecoration(labelText: 'Phone Number (Optional)'),
@@ -585,6 +638,64 @@ class _UserManagementPageState extends State<UserManagementPage> {
       ),
     );
   }
+  
+  Widget _buildSearchableBranchField({
+    required BuildContext context,
+    required String label,
+    required String value,
+    required List<String> items,
+    required Function(String?) onChanged,
+  }) {
+    final theme = Theme.of(context);
+    final searchCtrl = TextEditingController();
+    
+    return GestureDetector(
+      onTap: () async {
+        final selected = await _showSearchPicker(
+          context: context,
+          title: label,
+          items: items,
+          current: value,
+        );
+        if (selected != null) {
+          onChanged(selected);
+        }
+      },
+      child: AbsorbPointer(
+        child: TextFormField(
+          controller: TextEditingController(text: value.isEmpty ? 'Select $label' : value),
+          readOnly: true,
+          decoration: InputDecoration(
+            labelText: label,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: theme.dividerColor,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: theme.dividerColor,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: theme.primaryColor,
+                width: 2,
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            suffixIcon: const Icon(Icons.search),
+          ),
+          style: value.isEmpty 
+              ? theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)
+              : theme.textTheme.bodyMedium,
+        ),
+      ),
+    );
+  }
 
   Future<String?> _showSearchPicker({
     required BuildContext context,
@@ -695,6 +806,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       _phoneController.clear();
       _bloodGroupController.clear();
       _selectedCompany = null;
+      _selectedBranch = null;
       _selectedRole = 'user';
       isEditing = false;
       editingUserId = null;
@@ -719,6 +831,21 @@ class _UserManagementPageState extends State<UserManagementPage> {
           _selectedCompany = _companyController.companies.firstWhere(
             (c) => c.id == companyId,
             orElse: () => _selectedCompany ?? Company(id: 0, companyName: ''),
+          );
+          // Load branches for the company if not already loaded
+          if (_selectedCompany!.id != 0 && branches.isEmpty) {
+            _fetchBranchesForCompany(_selectedCompany!.id);
+          }
+        }
+      }
+      
+      // Set branch if available
+      if (user['branch_id'] != null && branches.isNotEmpty) {
+        final branchId = int.tryParse(user['branch_id'].toString());
+        if (branchId != null) {
+          _selectedBranch = branches.firstWhere(
+            (b) => b.branchId == branchId,
+            orElse: () => _selectedBranch ?? Branch(branchId: 0, branchName: '', branchCode: '', companyId: 0, companyName: '', status: 'active'),
           );
         }
       }
@@ -772,7 +899,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
     print('Proceeding with deletion of user: $userId');
     
     try {
-      final url = Uri.parse('$baseUrl/user/delete/$userId');
+      final url = Uri.parse('$baseUrl/user/delete/$userId')
+          .replace(queryParameters: {'companyId': _idController.companyId.value});
       print('Sending DELETE request to: $url');
       
       final headers = {

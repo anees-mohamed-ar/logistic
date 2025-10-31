@@ -1482,10 +1482,21 @@ class GCFormController extends GetxController {
 
   Future<String?> fetchNextGCNumber(String userId) async {
     try {
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+      final nextGcUri =
+          Uri.parse(
+            '${ApiConfig.baseUrl}/gc-management/next-gc-number',
+          ).replace(
+            queryParameters: {
+              'userId': userId,
+              'companyId': companyId,
+              if (branchId.isNotEmpty) 'branchId': branchId,
+            },
+          );
+
       final response = await http.get(
-        Uri.parse(
-          '${ApiConfig.baseUrl}/gc-management/next-gc-number?userId=$userId',
-        ),
+        nextGcUri,
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -1506,9 +1517,17 @@ class GCFormController extends GetxController {
     try {
       isLoadingAccess.value = true;
 
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+
       final activeRangesResponse = await http.get(
         Uri.parse(
           '${ApiConfig.baseUrl}/gc-management/check-active-ranges/$userId',
+        ).replace(
+          queryParameters: {
+            'companyId': companyId,
+            if (branchId.isNotEmpty) 'branchId': branchId,
+          },
         ),
         headers: {'Content-Type': 'application/json'},
       );
@@ -1523,17 +1542,40 @@ class GCFormController extends GetxController {
         }
       }
 
+      final usageUri =
+          Uri.parse('${ApiConfig.baseUrl}/gc-management/usage/$userId').replace(
+            queryParameters: {
+              'companyId': companyId,
+              if (branchId.isNotEmpty) 'branchId': branchId,
+            },
+          );
       final usageResponse = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/gc-management/usage/$userId'),
+        usageUri,
         headers: {'Content-Type': 'application/json'},
       );
 
       if (usageResponse.statusCode == 200) {
         final usageData = jsonDecode(usageResponse.body);
         if (usageData['success'] == true) {
-          final ranges = List<Map<String, dynamic>>.from(
-            usageData['data'] ?? [],
-          );
+          final rawData = usageData['data'];
+          Iterable<Map<String, dynamic>> ranges = const [];
+
+          if (rawData is List) {
+            ranges = rawData.whereType<Map<String, dynamic>>();
+          } else if (rawData is Map) {
+            ranges = rawData.entries
+                .where(
+                  (entry) =>
+                      entry.key is String &&
+                      (entry.key as String).isNotEmpty &&
+                      entry.key != 'companyId' &&
+                      entry.key != 'branchId' &&
+                      entry.value is Map,
+                )
+                .map((entry) =>
+                    (entry.value as Map).cast<String, dynamic>());
+          }
+
           final hasQueuedRange = ranges.any(
             (range) => range['status'] == 'queued',
           );
@@ -1640,9 +1682,16 @@ class GCFormController extends GetxController {
     }
 
     try {
-      final url = Uri.parse(
-        '${ApiConfig.baseUrl}/gc-management/gc-usage?userId=$userId',
-      );
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+      final url = Uri.parse('${ApiConfig.baseUrl}/gc-management/gc-usage')
+          .replace(
+            queryParameters: {
+              'userId': userId,
+              'companyId': companyId,
+              if (branchId.isNotEmpty) 'branchId': branchId,
+            },
+          );
       debugPrint('Fetching GC usage from: $url');
 
       final response = await http.get(url);
@@ -1878,8 +1927,9 @@ class GCFormController extends GetxController {
       'DeliveryAddress': deliveryAddressCtrl.text,
       // Ensure the GST Payer value is properly capitalized for the backend
       'ServiceTax': () {
-        final normalizedGstPayer =
-            _normalizeGstPayerValue(selectedGstPayer.value);
+        final normalizedGstPayer = _normalizeGstPayerValue(
+          selectedGstPayer.value,
+        );
         return normalizedGstPayer.isNotEmpty ? normalizedGstPayer : 'Consignor';
       }(),
       'TotalRate': rateCtrl.text,
@@ -1890,6 +1940,7 @@ class GCFormController extends GetxController {
       'FreightCharge': freightChargeCtrl.text,
       'Charges': 'FTL',
       'CompanyId': _idController.companyId.value,
+      'branch_id': _idController.branchId.value,
       'isTemporary': isTemporaryMode.value,
     };
 
@@ -1897,16 +1948,26 @@ class GCFormController extends GetxController {
       final Uri url;
       final http.Response response;
       final userId = _idController.userId.value;
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+
+      print('GC Form Debug - userId: $userId');
+      print('GC Form Debug - companyId: $companyId');
+      print('GC Form Debug - branchId: $branchId');
 
       if (userId.isEmpty) {
         throw Exception('User ID not found. Please login again.');
       }
 
+      if (companyId == null || companyId.isEmpty || companyId == 'undefined') {
+        throw Exception('Company ID not found. Please login again.');
+      }
+
       // Handle temporary GC creation (Admin creates partial GC)
       if (isTemporaryMode.value) {
         data['userId'] = userId;
-        data['CompanyId'] = _idController.companyId.value;
-
+        data['companyId'] = companyId;
+        data['branchId'] = branchId;
         url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/create');
         response = await http.post(
           url,
@@ -1917,8 +1978,10 @@ class GCFormController extends GetxController {
       // Handle filling temporary GC (User completes and converts)
       else if (isFillTemporaryMode.value && tempGcNumber.value.isNotEmpty) {
         try {
-          data['userId'] = userId;
           data['actualGcNumber'] = gcNumberCtrl.text;
+          data['userId'] = userId;
+          data['companyId'] = companyId;
+          data['branchId'] = branchId;
 
           // Double-check lock status right before submission
           final lockStatus = await _checkLockStatus(tempGcNumber.value);
@@ -1993,12 +2056,25 @@ class GCFormController extends GetxController {
         response = await http.put(
           url,
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(data),
+          body: jsonEncode({
+            ...data,
+            'companyId': _idController.companyId.value,
+            if (_idController.branchId.value.isNotEmpty)
+              'branchId': _idController.branchId.value,
+          }),
         );
       }
       // Handle regular GC creation
       else {
-        url = Uri.parse('${ApiConfig.baseUrl}/gc/add?userId=$userId');
+        final url = Uri.parse('${ApiConfig.baseUrl}/gc/add').replace(
+          queryParameters: {
+            'userId': userId,
+            'companyId': _idController.companyId.value,
+            if (_idController.branchId.value.isNotEmpty)
+              'branchId': _idController.branchId.value,
+          },
+        );
+
         response = await http.post(
           url,
           headers: {'Content-Type': 'application/json'},

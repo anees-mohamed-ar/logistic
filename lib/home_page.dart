@@ -30,10 +30,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       _totalHireAnim,
       _totalAdvanceAnim,
       _totalFreightAnim;
+  late final IdController _idController;
 
   @override
   void initState() {
     super.initState();
+    _idController = Get.find<IdController>();
     _fetchSummaryData();
     _animationController = AnimationController(
       vsync: this,
@@ -95,8 +97,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       _summaryError = null;
     });
     try {
-      final url = Uri.parse('${ApiConfig.baseUrl}/gc/search');
-      final response = await http.get(url);
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+      final uri = Uri.parse('${ApiConfig.baseUrl}/gc/search').replace(
+        queryParameters: {
+          'companyId': companyId,
+          if (branchId.isNotEmpty) 'branchId': branchId,
+        },
+      );
+      final response = await http.get(uri);
       if (response.statusCode == 200) {
         if (!mounted) return;
         final List<dynamic> data = jsonDecode(response.body);
