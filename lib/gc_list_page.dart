@@ -1277,6 +1277,9 @@ class _GCListPageState extends State<GCListPage> {
     gcController.editingGcNumber.value = gc['GcNumber']?.toString() ?? '';
     gcController.editingCompanyId.value = companyId;
 
+    // Initialize edit mode which will fetch existing attachments
+    await gcController.initializeEditMode(gc['GcNumber']?.toString() ?? '', companyId);
+
     if (gcController.weightRates.isEmpty) {
       gcController.fetchWeightRates().then((_) {
         _populateFormWithGCData(gcController, gc, companyId);

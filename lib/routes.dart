@@ -3,6 +3,8 @@ import 'package:logistic/splash_screen.dart';
 import 'package:logistic/home_page.dart';
 import 'package:logistic/models/truck.dart';
 import 'package:logistic/update_transit_page.dart';
+import 'package:logistic/views/broker/add_edit_broker_page.dart';
+import 'package:logistic/views/broker/broker_list_page.dart';
 import 'package:logistic/views/consignor/consignor_list_page.dart';
 import 'package:logistic/views/consignee/consignee_list_page.dart';
 import 'package:logistic/views/admin/user_management_page.dart';
@@ -21,8 +23,8 @@ import 'package:logistic/views/customer/customer_form_page.dart';
 import 'package:logistic/views/supplier/supplier_form_page.dart';
 import 'package:logistic/views/supplier/supplier_list_page.dart';
 import 'package:logistic/views/gst/gst_list_page.dart';
-import 'package:logistic/views/broker/broker_list_page.dart';
-import 'package:logistic/views/broker/add_edit_broker_page.dart';
+import 'package:logistic/views/branch/branch_list_page.dart';
+import 'package:logistic/views/branch/add_edit_branch_page.dart';
 import 'package:logistic/views/weight_rate/weight_rate_list_page.dart';
 import 'package:logistic/views/weight_rate/add_edit_weight_rate_page.dart';
 import 'package:logistic/screens/settings_menu_screen.dart';
@@ -64,6 +66,8 @@ class AppRoutes {
   static const String gstForm = '/gst_form';
   static const String brokerList = '/broker_list';
   static const String brokerForm = '/broker_form';
+  static const String branchList = '/branch_list';
+  static const String branchForm = '/branch_form';
   static const String weightRateList = '/weight_rate_list';
   static const String weightRateForm = '/weight_rate_form';
   static const String weightRateEdit = '/weight_rate_edit';
@@ -176,6 +180,16 @@ class AppRoutes {
     GetPage(
       name: brokerForm, 
       page: () => AddEditBrokerPage(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: branchList,
+      page: () => const BranchListPage(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: branchForm,
+      page: () => const AddEditBranchPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(

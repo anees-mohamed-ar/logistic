@@ -10,7 +10,9 @@ import 'controller/location_controller.dart';
 import 'controller/customer_controller.dart';
 import 'controller/weight_to_rate_controller.dart';
 import 'controller/login_controller.dart';
+import 'controller/branch_controller.dart';
 import 'controller/temporary_gc_controller.dart';
+import 'controller/broker_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +30,8 @@ Future<void> _initializeApp() async {
   Get.put(CustomerController());
   Get.put(WeightToRateController());
   Get.put(LoginController());
+  Get.put(BranchController());
+  Get.put(BrokerController());
   Get.put(TemporaryGCController());
 }
 

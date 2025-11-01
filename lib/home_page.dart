@@ -9,7 +9,7 @@ import 'routes.dart';
 import 'package:logistic/widgets/gc_usage_widget.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:logistic/api_config.dart'; // Assuming you have this file
+import 'package:logistic/api_config.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -53,39 +53,61 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   void _setupAnimations() {
     // Initialize with default empty tweens
     _totalGCsAnim = Tween<double>(begin: 0, end: 0).animate(
-        CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic));
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
+    );
     _totalHireAnim = Tween<double>(begin: 0, end: 0).animate(
-        CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic));
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
+    );
     _totalAdvanceAnim = Tween<double>(begin: 0, end: 0).animate(
-        CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic));
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
+    );
     _totalFreightAnim = Tween<double>(begin: 0, end: 0).animate(
-        CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic));
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
+    );
   }
 
   void _updateAnimations() {
     final totalGCs = _gcList.length.toDouble();
-    final totalHireAmount =
-    _gcList.fold(0.0, (sum, gc) => sum + _parseDouble(gc['HireAmount']));
-    final totalAdvanceAmount =
-    _gcList.fold(0.0, (sum, gc) => sum + _parseDouble(gc['AdvanceAmount']));
-    final totalFreightCharge =
-    _gcList.fold(0.0, (sum, gc) => sum + _parseDouble(gc['FreightCharge']));
+    final totalHireAmount = _gcList.fold(
+      0.0,
+          (sum, gc) => sum + _parseDouble(gc['HireAmount']),
+    );
+    final totalAdvanceAmount = _gcList.fold(
+      0.0,
+          (sum, gc) => sum + _parseDouble(gc['AdvanceAmount']),
+    );
+    final totalFreightCharge = _gcList.fold(
+      0.0,
+          (sum, gc) => sum + _parseDouble(gc['FreightCharge']),
+    );
 
     setState(() {
       _totalGCsAnim = Tween<double>(begin: 0, end: totalGCs).animate(
-          CurvedAnimation(
-              parent: _animationController, curve: Curves.easeOutCubic));
+        CurvedAnimation(
+          parent: _animationController,
+          curve: Curves.easeOutCubic,
+        ),
+      );
       _totalHireAnim = Tween<double>(begin: 0, end: totalHireAmount).animate(
-          CurvedAnimation(
-              parent: _animationController, curve: Curves.easeOutCubic));
-      _totalAdvanceAnim =
-          Tween<double>(begin: 0, end: totalAdvanceAmount).animate(
-              CurvedAnimation(
-                  parent: _animationController, curve: Curves.easeOutCubic));
-      _totalFreightAnim =
-          Tween<double>(begin: 0, end: totalFreightCharge).animate(
-              CurvedAnimation(
-                  parent: _animationController, curve: Curves.easeOutCubic));
+        CurvedAnimation(
+          parent: _animationController,
+          curve: Curves.easeOutCubic,
+        ),
+      );
+      _totalAdvanceAnim = Tween<double>(begin: 0, end: totalAdvanceAmount)
+          .animate(
+        CurvedAnimation(
+          parent: _animationController,
+          curve: Curves.easeOutCubic,
+        ),
+      );
+      _totalFreightAnim = Tween<double>(begin: 0, end: totalFreightCharge)
+          .animate(
+        CurvedAnimation(
+          parent: _animationController,
+          curve: Curves.easeOutCubic,
+        ),
+      );
     });
     _animationController.forward(from: 0);
   }
@@ -229,7 +251,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   // Initialize controllers
   final GCFormController gcFormController = Get.put(GCFormController());
   final IdController idController = Get.find<IdController>();
-  
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -244,10 +266,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFF8FAFF),
-              Color(0xFFF1F5FE),
-            ],
+            colors: [Color(0xFFF8FAFF), Color(0xFFF1F5FE)],
           ),
         ),
         child: RefreshIndicator(
@@ -261,75 +280,70 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-              // Welcome Section
-              _buildWelcomeSection(context, isSmallScreen),
-              const SizedBox(height: 32),
+                // Welcome Section
+                _buildWelcomeSection(context, isSmallScreen),
+                const SizedBox(height: 24),
 
-              // Summary Cards
-              if (isAdmin) ...[
-                _buildSummaryCards(isSmallScreen)
-                  .animate()
-                  .slideX(duration: 600.ms, begin: -0.2)
-                  .fadeIn(duration: 800.ms),
-              const SizedBox(height: 32)
-              ],
+                // Summary Cards
+                if (isAdmin) ...[
+                  _buildSummaryCards(isSmallScreen)
+                      .animate()
+                      .slideX(duration: 600.ms, begin: -0.2)
+                      .fadeIn(duration: 800.ms),
+                  const SizedBox(height: 24),
+                ],
 
-              // Show GC Usage widget for all users when they don't have active/queued GC ranges
-              Obx(() {
-                return FutureBuilder<bool>(
-                  future: gcFormController.checkGCAccess(idController.userId.value),
-                  builder: (context, snapshot) {
-                    // If we're still checking access, show a loading indicator
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    
-                    // Show GCUsageWidget for all users
-                    return const Column(
-                      children: [
-                        SizedBox(height: 32),
-                        GCUsageWidget(),
-                      ],
-                    );
-                  },
-                );
-              }),
+                // GC Usage Widget
+                Obx(() {
+                  return FutureBuilder<bool>(
+                    future: gcFormController.checkGCAccess(
+                      idController.userId.value,
+                    ),
+                    builder: (context, snapshot) {
+                      // If we're still checking access, show a loading indicator
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const SizedBox.shrink();
+                      }
 
-              // Quick Actions Section
-              _buildQuickActionsSection(context, isSmallScreen, isAdmin),
-              const SizedBox(height: 32),
+                      // Show GCUsageWidget for all users
+                      return const GCUsageWidget();
+                    },
+                  );
+                }),
+                const SizedBox(height: 24),
 
-              // Dashboard Content Row
-              if (!isSmallScreen)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        children: [
-                          _buildNotificationsSection(),
-                          const SizedBox(height: 24),
-                          _buildRecentActivitySection(),
-                        ],
+                // Quick Actions Section
+                _buildQuickActionsSection(context, isSmallScreen, isAdmin),
+                const SizedBox(height: 24),
+
+                // Dashboard Content Row
+                if (!isSmallScreen)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          children: [
+                            _buildNotificationsSection(),
+                            const SizedBox(height: 24),
+                            _buildRecentActivitySection(),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 24),
-                    Expanded(
-                      flex: 1,
-                      child: _buildQuickStatsSection(),
-                    ),
-                  ],
-                )
-              else ...[
-                _buildNotificationsSection(),
-                const SizedBox(height: 24),
-                _buildQuickStatsSection(),
-                const SizedBox(height: 24),
-                _buildRecentActivitySection(),
+                      const SizedBox(width: 24),
+                      Expanded(flex: 1, child: _buildQuickStatsSection()),
+                    ],
+                  )
+                else ...[
+                  _buildNotificationsSection(),
+                  const SizedBox(height: 24),
+                  _buildQuickStatsSection(),
+                  const SizedBox(height: 24),
+                  _buildRecentActivitySection(),
+                ],
               ],
-            ],
-          ),
+            ),
           ),
         ),
       ),
@@ -389,11 +403,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(15),
               ),
-              child: const Icon(
-                Icons.dashboard,
-                color: Colors.white,
-                size: 32,
-              ),
+              child: const Icon(Icons.dashboard, color: Colors.white, size: 32),
             ),
         ],
       ),
@@ -460,19 +470,23 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         height: 140,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.zero,
           itemCount: cards.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 16),
+          separatorBuilder: (_, __) => const SizedBox(width: 12),
           itemBuilder: (_, index) => SizedBox(width: 180, child: cards[index]),
         ),
       );
     } else {
       return Row(
         children: cards
-            .map((card) => Expanded(
+            .map(
+              (card) => Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: card,
-            )))
+            ),
+          ),
+        )
             .toList(),
       );
     }
@@ -503,13 +517,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.all(6), // Reduced from 8 to 6
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child:
-              Icon(icon, color: color, size: 18), // Reduced from 20 to 18
+              child: Icon(
+                icon,
+                color: color,
+                size: 18,
+              ),
             ),
             const SizedBox(height: 16),
             AnimatedBuilder(
@@ -520,10 +537,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       ? animation.value.toInt().toString()
                       : _formatCurrency(animation.value),
                   style: const TextStyle(
-                    fontSize: 22, // Reduced from 24 to 22
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF1E2A44),
-                    height: 1.1, // Added to reduce line height
+                    height: 1.1,
                   ),
                 );
               },
@@ -532,10 +549,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             Text(
               title,
               style: TextStyle(
-                fontSize: 11, // Reduced from 12 to 11
+                fontSize: 11,
                 color: Colors.grey[600],
                 fontWeight: FontWeight.w500,
-                height: 1.1, // Added to reduce line height
+                height: 1.1,
               ),
             ),
           ],
@@ -545,7 +562,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildQuickActionsSection(
-      BuildContext context, bool isSmallScreen, bool isAdmin) {
+      BuildContext context,
+      bool isSmallScreen,
+      bool isAdmin,
+      ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -566,8 +586,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   _showAllActions = !_showAllActions;
                 });
               },
-              icon: Icon(_showAllActions ? Icons.view_list : Icons.grid_view,
-                  size: 16),
+              icon: Icon(
+                _showAllActions ? Icons.view_list : Icons.grid_view,
+                size: 16,
+              ),
               label: Text(_showAllActions ? 'Show Less' : 'View All'),
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFF4A90E2),
@@ -582,7 +604,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildActionGrid(
-      BuildContext context, bool isSmallScreen, bool isAdmin) {
+      BuildContext context,
+      bool isSmallScreen,
+      bool isAdmin,
+      ) {
     final primaryActions = [
       _ActionData(
         icon: Icons.note_add_outlined,
@@ -674,10 +699,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         onTap: () => Get.toNamed(AppRoutes.driverManagement),
       ),
       _ActionData(
-        icon: Icons.business_outlined,
+        icon: Icons.business_center_outlined,
         title: 'Consignors',
         subtitle: 'Consignor management',
-        color: const Color(0xFF7B1FA2),
+        color: const Color(0xFFFF7043),
         onTap: () => Get.toNamed(AppRoutes.consignorList),
       ),
       _ActionData(
@@ -688,11 +713,25 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         onTap: () => Get.toNamed(AppRoutes.consigneeList),
       ),
       _ActionData(
+        icon: Icons.business_outlined,
+        title: 'Branch Management',
+        subtitle: 'Manage branches',
+        color: const Color(0xFF9C27B0),
+        onTap: () => Get.toNamed(AppRoutes.branchList),
+      ),
+      _ActionData(
         icon: Icons.assignment_ind_outlined,
         title: 'Broker Management',
         subtitle: 'Broker operations',
         color: const Color(0xFF9C27B0),
         onTap: () => Get.toNamed(AppRoutes.brokerList),
+      ),
+      _ActionData(
+        icon: Icons.people_alt_outlined,
+        title: 'User Management',
+        subtitle: 'User administration',
+        color: const Color(0xFF8BC34A),
+        onTap: () => Get.toNamed(AppRoutes.userManagement),
       ),
       _ActionData(
         icon: Icons.scale_outlined,
@@ -727,8 +766,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     ];
 
     // Show limited actions initially
-    final actionsToShow =
-    _showAllActions ? [...primaryActions, ...managementActions] : primaryActions;
+    final actionsToShow = _showAllActions
+        ? [...primaryActions, ...managementActions]
+        : primaryActions;
 
     return Column(
       children: [
@@ -799,11 +839,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     color: action.color.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    action.icon,
-                    size: 24,
-                    color: action.color,
-                  ),
+                  child: Icon(action.icon, size: 24, color: action.color),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -818,10 +854,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 const SizedBox(height: 4),
                 Text(
                   action.subtitle,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -906,8 +939,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ],
             ),
             const SizedBox(height: 16),
-            ...notifications
-                .map((notification) => _buildNotificationItem(notification)),
+            ...notifications.map(
+                  (notification) => _buildNotificationItem(notification),
+            ),
           ],
         ),
       ),
@@ -935,11 +969,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               color: notification.color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              notification.icon,
-              color: notification.color,
-              size: 20,
-            ),
+            child: Icon(notification.icon, color: notification.color, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -957,20 +987,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 const SizedBox(height: 2),
                 Text(
                   notification.message,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
             ),
           ),
           Text(
             notification.time,
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(fontSize: 10, color: Colors.grey[500]),
           ),
         ],
       ),
@@ -1005,20 +1029,41 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 16),
             _buildStatItem(
-                'Active Routes', '24', Icons.route, const Color(0xFF4A90E2)),
-            _buildStatItem('Drivers Available', '18', Icons.person,
-                const Color(0xFF34A853)),
-            _buildStatItem('Fuel Efficiency', '12.5 km/L',
-                Icons.local_gas_station, const Color(0xFFFF9800)),
-            _buildStatItem('On-Time Delivery', '94.2%', Icons.schedule,
-                const Color(0xFF9C27B0)),
+              'Active Routes',
+              '24',
+              Icons.route,
+              const Color(0xFF4A90E2),
+            ),
+            _buildStatItem(
+              'Drivers Available',
+              '18',
+              Icons.person,
+              const Color(0xFF34A853),
+            ),
+            _buildStatItem(
+              'Fuel Efficiency',
+              '12.5 km/L',
+              Icons.local_gas_station,
+              const Color(0xFFFF9800),
+            ),
+            _buildStatItem(
+              'On-Time Delivery',
+              '94.2%',
+              Icons.schedule,
+              const Color(0xFF9C27B0),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatItem(String title, String value, IconData icon, Color color) {
+  Widget _buildStatItem(
+      String title,
+      String value,
+      IconData icon,
+      Color color,
+      ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -1038,10 +1083,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
                 Text(
                   value,
@@ -1137,11 +1179,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               color: activity.color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              activity.icon,
-              color: activity.color,
-              size: 20,
-            ),
+            child: Icon(activity.icon, color: activity.color, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1172,17 +1210,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 const SizedBox(height: 4),
                 Text(
                   activity.route,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: activity.color.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
@@ -1202,8 +1239,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         child: LinearProgressIndicator(
                           value: activity.progress,
                           backgroundColor: Colors.grey[200],
-                          valueColor:
-                          AlwaysStoppedAnimation<Color>(activity.color),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            activity.color,
+                          ),
                         ),
                       ),
                   ],

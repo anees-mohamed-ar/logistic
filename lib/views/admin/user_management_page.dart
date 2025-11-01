@@ -3,11 +3,11 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:logistic/controller/id_controller.dart';
-import 'package:logistic/controller/company_controller.dart';
 import 'package:logistic/widgets/main_layout.dart';
 import 'package:logistic/widgets/custom_app_bar.dart';
 import 'package:logistic/api_config.dart';
 import 'package:logistic/models/branch.dart';
+import 'package:logistic/config/company_config.dart';
 
 class UserManagementPage extends StatefulWidget {
   const UserManagementPage({Key? key}) : super(key: key);
@@ -24,9 +24,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _bloodGroupController = TextEditingController();
-  String _selectedRole = 'user';
-  final CompanyController _companyController = Get.put(CompanyController());
-  Company? _selectedCompany;
+  String _selectedRole = CompanyConfig.defaultUserRole;
+  
+  // Use CompanyConfig for company values
   final IdController _idController = Get.find<IdController>();
   
   List<Branch> branches = [];
@@ -42,7 +42,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   void initState() {
     super.initState();
     _fetchUsers();
-    // No need for the listener since we're managing state directly
+    _fetchBranchesForCompany(CompanyConfig.companyId); // Fetch branches for hardcoded company
   }
 
   Future<void> _fetchUsers() async {
@@ -89,12 +89,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       return;
     }
 
-    // Check if company is selected
-    if (_selectedCompany == null) {
-      Get.snackbar('Error', 'Please select a company');
-      return;
-    }
-
+    // Always use hardcoded company
     setState(() => isAddingUser = true);
     
     try {
@@ -114,13 +109,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
         requestBody['password'] = password;
       }
       
-      // Add company info if available
-      if (_selectedCompany != null) {
-        if (_selectedCompany!.companyName.isNotEmpty) {
-          requestBody['companyName'] = _selectedCompany!.companyName;
-        }
-        requestBody['companyId'] = _selectedCompany!.id.toString();
-      }
+      // Add hardcoded company info
+      requestBody['companyName'] = CompanyConfig.companyName;
+      requestBody['companyId'] = CompanyConfig.companyId.toString();
       
       // Add branch info if available
       if (_selectedBranch != null) {
@@ -243,102 +234,41 @@ class _UserManagementPageState extends State<UserManagementPage> {
                         validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                       ),
                       const SizedBox(height: 8),
-                      Obx(() {
-                        final theme = Theme.of(context);
-                        final isError = _selectedCompany == null;
-                        
-                        // Show loading indicator
-                        if (_companyController.isLoading.value) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                        
-                        // Show error with retry button
-                        if (_companyController.error.isNotEmpty) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Company *',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: theme.colorScheme.error),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.error_outline, color: Colors.red),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'Failed to load companies',
-                                        style: theme.textTheme.bodyMedium?.copyWith(
-                                          color: theme.colorScheme.error,
-                                        ),
-                                      ),
-                                    ),
-                                    TextButton.icon(
-                                      onPressed: _companyController.fetchCompanies,
-                                      icon: const Icon(Icons.refresh, size: 16),
-                                      label: const Text('Retry'),
-                                      style: TextButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        minimumSize: Size.zero,
-                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
-                        }
-                        
-                        // Show company dropdown
-                        return Column(
+
+                      // Company Name (Read-only display)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFD1D5DB)),
+                        ),
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // const Text(
-                            //   'Company *',
-                            //   style: TextStyle(
-                            //     fontSize: 14,
-                            //     color: Colors.black54,
-                            //   ),
-                            // ),
+                            Text(
+                              'Company',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                             const SizedBox(height: 4),
-                            _buildSearchableCompanyField(
-                              context: context,
-                              label: 'Company',
-                              value: _selectedCompany?.companyName ?? '',
-                              items: _companyController.companies.map((c) => c.companyName).toList(),
-                              onChanged: (value) {
-                                if (value != null) {
-                                  final company = _companyController.companies.firstWhere(
-                                    (c) => c.companyName == value,
-                                    orElse: () => _selectedCompany ?? Company(id: 0, companyName: ''),
-                                  );
-                                  setState(() {
-                                    _selectedCompany = company;
-                                  });
-                                  if (company.id != 0) {
-                                    _fetchBranchesForCompany(company.id);
-                                  }
-                                }
-                              },
-                              isError: isError,
-                              errorText: isError ? 'Please select a company' : null,
+                            Text(
+                              CompanyConfig.companyName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF1E2A44),
+                              ),
                             ),
                           ],
-                        );
-                      }),
+                        ),
+                      ),
                       const SizedBox(height: 8),
-                      if (_selectedCompany != null) ...[
+                      const SizedBox(height: 8),
+                      if (branches.isNotEmpty) ...[
                         _buildSearchableBranchField(
                           context: context,
                           label: 'Branch (Optional)',
@@ -805,9 +735,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
       _passwordController.clear();
       _phoneController.clear();
       _bloodGroupController.clear();
-      _selectedCompany = null;
       _selectedBranch = null;
-      _selectedRole = 'user';
+      _selectedRole = CompanyConfig.defaultUserRole;
       isEditing = false;
       editingUserId = null;
     });
@@ -822,23 +751,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
       _passwordController.clear(); // Clear password for security
       _phoneController.text = user['phoneNumber'] ?? '';
       _bloodGroupController.text = user['bloodGroup'] ?? '';
-      _selectedRole = user['user_role']?.toString().toLowerCase() ?? 'user';
-      
-      // Set company if available
-      if (user['companyId'] != null) {
-        final companyId = int.tryParse(user['companyId'].toString());
-        if (companyId != null) {
-          _selectedCompany = _companyController.companies.firstWhere(
-            (c) => c.id == companyId,
-            orElse: () => _selectedCompany ?? Company(id: 0, companyName: ''),
-          );
-          // Load branches for the company if not already loaded
-          if (_selectedCompany!.id != 0 && branches.isEmpty) {
-            _fetchBranchesForCompany(_selectedCompany!.id);
-          }
-        }
-      }
-      
+      _selectedRole = user['user_role']?.toString().toLowerCase() ?? CompanyConfig.defaultUserRole;
+
+      // Company is hardcoded, no need to set it
+
       // Set branch if available
       if (user['branch_id'] != null && branches.isNotEmpty) {
         final branchId = int.tryParse(user['branch_id'].toString());
@@ -988,7 +904,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
     _passwordController.dispose();
     _phoneController.dispose();
     _bloodGroupController.dispose();
-    Get.delete<CompanyController>();
     super.dispose();
   }
 }

@@ -28,8 +28,8 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
 
     // Listen for changes in _idController.gcDataNeedsRefresh
     _gcDataRefreshWorker = ever(_idController.gcDataNeedsRefresh, (
-      bool needsRefresh,
-    ) {
+        bool needsRefresh,
+        ) {
       if (needsRefresh) {
         _fetchGCUsage(); // Re-fetch data
         _idController.gcDataNeedsRefresh.value = false; // Reset the flag
@@ -103,22 +103,22 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
           }
 
           final filteredData =
-              items
-                  .where(
-                    (item) =>
-                        item['status'] == 'active' ||
-                        item['status'] == 'queued',
-                  )
-                  .map(GCUsageData.fromJson)
-                  .toList()
-                ..sort((a, b) {
-                  // Sort active items first
-                  if (a.status == 'active' && b.status != 'active') return -1;
-                  if (a.status != 'active' && b.status == 'active') return 1;
+          items
+              .where(
+                (item) =>
+            item['status'] == 'active' ||
+                item['status'] == 'queued',
+          )
+              .map(GCUsageData.fromJson)
+              .toList()
+            ..sort((a, b) {
+              // Sort active items first
+              if (a.status == 'active' && b.status != 'active') return -1;
+              if (a.status != 'active' && b.status == 'active') return 1;
 
-                  // For items with the same status, sort by assignedAt (oldest first)
-                  return a.assignedAt.compareTo(b.assignedAt);
-                });
+              // For items with the same status, sort by assignedAt (oldest first)
+              return a.assignedAt.compareTo(b.assignedAt);
+            });
 
           setState(() {
             _usageData = filteredData;
@@ -135,7 +135,7 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
       } else {
         setState(() {
           _errorMessage =
-              'Failed to fetch data. Status code: ${response.statusCode}';
+          'Failed to fetch data. Status code: ${response.statusCode}';
           _isLoading = false;
         });
       }
@@ -378,7 +378,7 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
                         Text(
                           'GC: ${usage.fromGC}-${usage.toGC}',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF1E2A44),
                           ),
@@ -388,31 +388,31 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
                         if (usage.status == 'active')
                           usage.percentageUsed > 0
                               ? Text(
-                                  'Last used: ${usage.currentGC}',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey[600],
-                                    height: 1.2,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                )
+                            'Last used: ${usage.currentGC}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                              height: 1.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )
                               : Text(
-                                  'New GC Series',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.green[600],
-                                    fontWeight: FontWeight.w500,
-                                    height: 1.2,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                )
+                            'New GC Series',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.green[600],
+                              fontWeight: FontWeight.w500,
+                              height: 1.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )
                         else if (usage.status == 'queued')
                           Text(
                             'Next in queue',
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 12,
                               color: Colors.blue[600],
                               fontStyle: FontStyle.italic,
                               height: 1.2,
@@ -436,7 +436,7 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
                     child: Text(
                       statusText,
                       style: TextStyle(
-                        fontSize: 9,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: statusColor,
                         height: 1.2,
@@ -485,7 +485,7 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
                         child: Text(
                           'Usage Progress',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: Colors.grey[700],
                           ),
@@ -496,7 +496,7 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
                       Text(
                         '${usage.percentageUsed.toStringAsFixed(1)}%',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: statusColor,
                         ),
@@ -524,8 +524,8 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
 
   Widget _buildStatBox(String label, String value, IconData icon, Color color) {
     return Container(
-      width: 72,
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      width: 90,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
       decoration: BoxDecoration(
         color: color.withOpacity(0.05),
         borderRadius: BorderRadius.circular(8),
@@ -534,12 +534,12 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 14),
+          Icon(icon, color: color, size: 16),
           const SizedBox(height: 2),
           Text(
             value,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: color,
               height: 1.1,
@@ -549,7 +549,7 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
           ),
           Text(
             label,
-            style: TextStyle(fontSize: 8, color: Colors.grey[600], height: 1.1),
+            style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.1, fontWeight: FontWeight.bold),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),

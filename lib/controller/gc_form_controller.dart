@@ -10,6 +10,13 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'dart:math';
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher_string.dart';
+import 'package:flutter/services.dart';
+import 'dart:io' show Platform, Directory;
+import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:dio/dio.dart';
 
 class WeightRate {
   final int id;
@@ -52,6 +59,278 @@ class GCFormController extends GetxController {
   // NEW: Get an instance of IdController to trigger refreshes
   final IdController _idController = Get.find<IdController>();
   final Random _random = Random();
+
+  // Preview attachment file
+  Future<void> previewAttachment(String filename, BuildContext context) async {
+    final url = '${ApiConfig.baseUrl}/gc/files/$filename';
+
+    try {
+      // Validate URL format
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        throw Exception('Invalid URL format: $url');
+      }
+
+      debugPrint('Attempting to preview attachment: $url');
+
+      // Try url_launcher to open in external browser
+      final canLaunch = await canLaunchUrlString(url);
+      if (canLaunch) {
+        await launchUrlString(url, mode: LaunchMode.externalApplication);
+        debugPrint('Successfully launched URL with url_launcher');
+        return;
+      } else {
+        throw Exception('URL cannot be launched: $url');
+      }
+
+    } catch (e) {
+      debugPrint('Failed to preview attachment: $e');
+
+      // Show error dialog with copy URL option
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Preview Failed'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Unable to open the attachment.'),
+                const SizedBox(height: 8),
+                Text(
+                  'Error: ${e.toString()}',
+                  style: const TextStyle(fontSize: 12, color: Colors.red),
+                ),
+                const SizedBox(height: 16),
+                const Text('Try copying the URL and opening it manually in your browser.'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final url = '${ApiConfig.baseUrl}/gc/files/$filename';
+                  await Clipboard.setData(ClipboardData(text: url));
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('URL copied to clipboard')),
+                    );
+                  }
+                },
+                child: const Text('Copy URL'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  // Download attachment file to local storage
+  Future<void> downloadAttachment(String filename, BuildContext context) async {
+    Directory? downloadDir;
+
+    try {
+      final url = '${ApiConfig.baseUrl}/gc/files/$filename';
+
+      // Validate URL format
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        throw Exception('Invalid URL format: $url');
+      }
+
+      debugPrint('Attempting to download attachment: $url');
+
+      // Request storage permissions
+      if (Platform.isAndroid) {
+        debugPrint('Checking Android storage permission...');
+
+        // First show explanation dialog
+        final shouldRequest = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Storage Permission Required'),
+            content: const Text(
+              'This app needs storage permission to download and save files to your device. '
+              'Files will be saved to your Downloads folder.'
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldRequest != true) {
+          debugPrint('User cancelled permission request');
+          return;
+        }
+
+        // Directly request permission - this will show the system permission dialog
+        PermissionStatus status = await Permission.storage.request();
+
+        debugPrint('WRITE_EXTERNAL_STORAGE permission result: $status');
+
+        // If WRITE_EXTERNAL_STORAGE is denied, try MANAGE_EXTERNAL_STORAGE for Android 11+
+        if (!status.isGranted) {
+          debugPrint('WRITE_EXTERNAL_STORAGE denied, trying MANAGE_EXTERNAL_STORAGE...');
+          status = await Permission.manageExternalStorage.request();
+          debugPrint('MANAGE_EXTERNAL_STORAGE permission result: $status');
+        }
+
+        debugPrint('Final permission granted: ${status.isGranted}');
+        debugPrint('Final permission denied: ${status.isDenied}');
+        debugPrint('Final permission permanently denied: ${status.isPermanentlyDenied}');
+
+        if (!status.isGranted) {
+          debugPrint('Permission not granted, showing snackbar...');
+          if (context.mounted) {
+            // Check if permanently denied
+            final permanentlyDenied = status.isPermanentlyDenied;
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  permanentlyDenied
+                      ? 'Storage permission is required to download files. Please enable it in app settings.'
+                      : 'Storage permission is required to download files.',
+                ),
+                action: permanentlyDenied
+                    ? SnackBarAction(
+                        label: 'Settings',
+                        onPressed: () async {
+                          await openAppSettings();
+                        },
+                      )
+                    : SnackBarAction(
+                        label: 'Retry',
+                        onPressed: () async {
+                          // Retry download after user potentially grants permission
+                          await downloadAttachment(filename, context);
+                        },
+                      ),
+                duration: const Duration(seconds: 8),
+              ),
+            );
+          }
+          return;
+        } else {
+          debugPrint('Permission granted, proceeding with download...');
+        }
+      }
+
+      // Get download directory
+      if (Platform.isAndroid) {
+        // Try Downloads folder first (Android 10 and below, or with MANAGE_EXTERNAL_STORAGE)
+        downloadDir = Directory('/storage/emulated/0/Download');
+
+        if (!await downloadDir.exists()) {
+          // Fallback to external storage directory
+          downloadDir = await getExternalStorageDirectory();
+
+          if (downloadDir == null || !await downloadDir.exists()) {
+            // Final fallback: app documents directory
+            downloadDir = await getApplicationDocumentsDirectory();
+          }
+        }
+
+        // Create Download subfolder in app documents if using app directory
+        if (downloadDir != null && downloadDir.path.contains('app_flutter')) {
+          downloadDir = Directory('${downloadDir.path}/Downloads');
+          if (!await downloadDir.exists()) {
+            await downloadDir.create(recursive: true);
+          }
+        }
+      } else {
+        // iOS and other platforms
+        downloadDir = await getApplicationDocumentsDirectory();
+        downloadDir = Directory('${downloadDir.path}/Downloads');
+        if (!await downloadDir.exists()) {
+          await downloadDir.create(recursive: true);
+        }
+      }
+
+      if (downloadDir == null) {
+        throw Exception('Could not access download directory');
+      }
+
+      // Create full file path
+      final fileName = filename.split('/').last;
+      final filePath = '${downloadDir.path}/$fileName';
+
+      debugPrint('Downloading to: $filePath');
+
+      // Show download progress dialog
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => const AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Downloading file...'),
+              ],
+            ),
+          ),
+        );
+      }
+
+      // Download file using Dio
+      final dio = Dio();
+      await dio.download(
+        url,
+        filePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            debugPrint('Download progress: ${(received / total * 100).toStringAsFixed(0)}%');
+          }
+        },
+      );
+
+      // Close progress dialog
+      if (context.mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      // Show success message
+      if (context.mounted) {
+        final location = downloadDir.path.contains('Download') || downloadDir.path.contains('Downloads')
+            ? 'Downloads folder'
+            : 'app storage';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('File downloaded successfully to $location: $fileName')),
+        );
+      }
+
+      debugPrint('Successfully downloaded file: $filePath');
+
+    } catch (e) {
+      debugPrint('Failed to download attachment: $e');
+
+      // Close progress dialog if open
+      if (context.mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      // Show error message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: ${e.toString()}')),
+        );
+      }
+    }
+  }
 
   // General Form State
   final formKey = GlobalKey<FormState>();
@@ -290,6 +569,16 @@ class GCFormController extends GetxController {
   Timer? _confirmationTimer;
   bool _isShowingDialog = false;
 
+  // File attachment variables
+  final RxList<Map<String, dynamic>> attachedFiles = <Map<String, dynamic>>[].obs;
+  final RxBool isPickingFiles = false.obs;
+
+  // Existing attachments variables (for editing GCs)
+  final RxList<Map<String, dynamic>> existingAttachments = <Map<String, dynamic>>[].obs;
+  final RxBool isLoadingAttachments = false.obs;
+  final RxString attachmentsError = ''.obs;
+
+  // ... rest of the code remains the same ...
   // Start the lock timer based on lockedAt timestamp
   void startLockTimer() {
     _timer?.cancel();
@@ -770,7 +1059,7 @@ class GCFormController extends GetxController {
   }
 
   void navigateToNextTab() {
-    if (currentTab.value < 2) {
+    if (currentTab.value < 3) {
       currentTab.value++;
     } else {
       // Validate only when submitting on the last tab
@@ -1669,6 +1958,21 @@ class GCFormController extends GetxController {
     editingCompanyId.value = '';
 
     calculatedGoodsTotal.value = '';
+
+    // Clear attached files and existing attachments
+    attachedFiles.clear();
+    existingAttachments.clear();
+    attachmentsError.value = '';
+  }
+
+  // Initialize editing mode for a GC
+  Future<void> initializeEditMode(String gcNumber, String companyId) async {
+    isEditMode.value = true;
+    editingGcNumber.value = gcNumber;
+    editingCompanyId.value = companyId;
+
+    // Fetch existing attachments for this GC
+    await fetchExistingAttachments(gcNumber);
   }
 
   String formatDate(DateTime date) {
@@ -1963,123 +2267,197 @@ class GCFormController extends GetxController {
         throw Exception('Company ID not found. Please login again.');
       }
 
-      // Handle temporary GC creation (Admin creates partial GC)
-      if (isTemporaryMode.value) {
-        data['userId'] = userId;
-        data['companyId'] = companyId;
-        data['branchId'] = branchId;
-        url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/create');
-        response = await http.post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(data),
-        );
-      }
-      // Handle filling temporary GC (User completes and converts)
-      else if (isFillTemporaryMode.value && tempGcNumber.value.isNotEmpty) {
-        try {
-          data['actualGcNumber'] = gcNumberCtrl.text;
+      // Check if we have attached files
+      final hasFiles = attachedFiles.isNotEmpty;
+
+      if (isEditMode.value && editingGcNumber.value.isNotEmpty) {
+        // Handle GC update (with or without files)
+        if (hasFiles) {
+          final request = http.MultipartRequest('PUT', Uri.parse('${ApiConfig.baseUrl}/gc/updateGC/${editingGcNumber.value}').replace(
+            queryParameters: {
+              'userId': userId,
+              'companyId': _idController.companyId.value,
+              if (_idController.branchId.value.isNotEmpty)
+                'branchId': _idController.branchId.value,
+            },
+          ));
+          data.forEach((key, value) {
+            if (value != null) {
+              request.fields[key] = value.toString();
+            }
+          });
+
+          // Add files
+          for (int i = 0; i < attachedFiles.length; i++) {
+            final file = attachedFiles[i];
+            final filePath = file['path'];
+            if (filePath != null && filePath is String && filePath.isNotEmpty) {
+              request.files.add(
+                await http.MultipartFile.fromPath(
+                  'attachments',
+                  filePath,
+                  filename: file['name'],
+                ),
+              );
+            }
+          }
+
+          final streamedResponse = await request.send();
+          response = await http.Response.fromStream(streamedResponse);
+        } else {
+          url = Uri.parse(
+            '${ApiConfig.baseUrl}/gc/updateGC/${editingGcNumber.value}',
+          ).replace(
+            queryParameters: {
+              'userId': userId,
+              'companyId': _idController.companyId.value,
+              if (_idController.branchId.value.isNotEmpty)
+                'branchId': _idController.branchId.value,
+            },
+          );
+          response = await http.put(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(data),
+          );
+        }
+      } else {
+        // Handle GC creation (with or without files)
+        if (hasFiles) {
+          final request = http.MultipartRequest('POST', Uri.parse('${ApiConfig.baseUrl}/gc/add').replace(
+            queryParameters: {
+              'userId': userId,
+              'companyId': _idController.companyId.value,
+              if (_idController.branchId.value.isNotEmpty)
+                'branchId': _idController.branchId.value,
+            },
+          ));
+
+          // Add form data
+          data.forEach((key, value) {
+            if (value != null) {
+              request.fields[key] = value.toString();
+            }
+          });
+
+          // Add files
+          for (int i = 0; i < attachedFiles.length; i++) {
+            final file = attachedFiles[i];
+            final filePath = file['path'];
+            if (filePath != null && filePath is String && filePath.isNotEmpty) {
+              request.files.add(
+                await http.MultipartFile.fromPath(
+                  'attachments',
+                  filePath,
+                  filename: file['name'],
+                ),
+              );
+            }
+          }
+
+          final streamedResponse = await request.send();
+          response = await http.Response.fromStream(streamedResponse);
+        } else if (isTemporaryMode.value) {
           data['userId'] = userId;
           data['companyId'] = companyId;
           data['branchId'] = branchId;
-
-          // Double-check lock status right before submission
-          final lockStatus = await _checkLockStatus(tempGcNumber.value);
-          if (lockStatus['isLocked'] == true) {
-            throw Exception('Lost lock on the temporary GC. Please try again.');
-          }
-
-          // Convert the temporary GC to a real GC
-          url = Uri.parse(
-            '${ApiConfig.baseUrl}/temporary-gc/convert/${tempGcNumber.value}',
-          );
+          url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/create');
           response = await http.post(
             url,
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(data),
           );
+        }
+        // Handle filling temporary GC (User completes and converts)
+        else if (isFillTemporaryMode.value && tempGcNumber.value.isNotEmpty) {
+          try {
+            data['actualGcNumber'] = gcNumberCtrl.text;
+            data['userId'] = userId;
+            data['companyId'] = companyId;
+            data['branchId'] = branchId;
 
-          if (response.statusCode != 200) {
-            throw Exception(
-              'Failed to convert temporary GC: ${response.statusCode}',
-            );
-          }
+            // Double-check lock status right before submission
+            final lockStatus = await _checkLockStatus(tempGcNumber.value);
+            if (lockStatus['isLocked'] == true) {
+              throw Exception('Lost lock on the temporary GC. Please try again.');
+            }
 
-          final responseData = jsonDecode(response.body);
-          if (responseData['success'] != true) {
-            throw Exception(
-              responseData['message'] ?? 'Failed to convert temporary GC',
+            // Convert the temporary GC to a real GC
+            url = Uri.parse(
+              '${ApiConfig.baseUrl}/temporary-gc/convert/${tempGcNumber.value}',
             );
-          }
-          // The submit-gc endpoint is already called in the backend during conversion
-          // No need to call it again from the frontend
-          // Release the lock after successful conversion
-          await http
-              .post(
+            response = await http.post(
+              url,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode(data),
+            );
+
+            if (response.statusCode != 200) {
+              throw Exception(
+                'Failed to convert temporary GC: ${response.statusCode}',
+              );
+            }
+
+            final responseData = jsonDecode(response.body);
+            if (responseData['success'] != true) {
+              throw Exception(
+                responseData['message'] ?? 'Failed to convert temporary GC',
+              );
+            }
+            // The submit-gc endpoint is already called in the backend during conversion
+            // No need to call it again from the frontend
+            // Release the lock after successful conversion
+            await http
+                .post(
+                  Uri.parse('${ApiConfig.baseUrl}/temporary-gc/release-lock'),
+                  headers: {'Content-Type': 'application/json'},
+                  body: jsonEncode({
+                    'gcNumber': tempGcNumber.value,
+                    'userId': userId,
+                    'force': true, // Add force flag to ensure release
+                  }),
+                )
+                .catchError((e) {
+                  debugPrint('Error releasing lock: $e');
+                  // Return a dummy response to satisfy the type system
+                  // The actual response doesn't matter since we're in an error case
+                  return http.Response('', 200);
+                });
+          } catch (e) {
+            // Attempt to release the lock on error
+            try {
+              await http.post(
                 Uri.parse('${ApiConfig.baseUrl}/temporary-gc/release-lock'),
                 headers: {'Content-Type': 'application/json'},
                 body: jsonEncode({
                   'gcNumber': tempGcNumber.value,
                   'userId': userId,
-                  'force': true, // Add force flag to ensure release
+                  'force': true,
                 }),
-              )
-              .catchError((e) {
-                debugPrint('Error releasing lock: $e');
-                // Return a dummy response to satisfy the type system
-                // The actual response doesn't matter since we're in an error case
-                return http.Response('', 200);
-              });
-        } catch (e) {
-          // Attempt to release the lock on error
-          try {
-            await http.post(
-              Uri.parse('${ApiConfig.baseUrl}/temporary-gc/release-lock'),
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({
-                'gcNumber': tempGcNumber.value,
-                'userId': userId,
-                'force': true,
-              }),
-            );
-          } catch (releaseError) {
-            debugPrint('Error releasing lock after error: $releaseError');
+              );
+            } catch (releaseError) {
+              debugPrint('Error releasing lock after error: $releaseError');
+            }
+            rethrow; // Re-throw the original error
           }
-          rethrow; // Re-throw the original error
         }
-      }
-      // Handle regular GC edit
-      else if (isEditMode.value && editingGcNumber.value.isNotEmpty) {
-        url = Uri.parse(
-          '${ApiConfig.baseUrl}/gc/updateGC/${editingGcNumber.value}',
-        );
-        response = await http.put(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            ...data,
-            'companyId': _idController.companyId.value,
-            if (_idController.branchId.value.isNotEmpty)
-              'branchId': _idController.branchId.value,
-          }),
-        );
-      }
-      // Handle regular GC creation
-      else {
-        final url = Uri.parse('${ApiConfig.baseUrl}/gc/add').replace(
-          queryParameters: {
-            'userId': userId,
-            'companyId': _idController.companyId.value,
-            if (_idController.branchId.value.isNotEmpty)
-              'branchId': _idController.branchId.value,
-          },
-        );
+        // Handle regular GC creation
+        else {
+          final url = Uri.parse('${ApiConfig.baseUrl}/gc/add').replace(
+            queryParameters: {
+              'userId': userId,
+              'companyId': _idController.companyId.value,
+              if (_idController.branchId.value.isNotEmpty)
+                'branchId': _idController.branchId.value,
+            },
+          );
 
-        response = await http.post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(data),
-        );
+          response = await http.post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(data),
+          );
+        }
       }
 
       isLoading.value = false;
@@ -2135,4 +2513,201 @@ class GCFormController extends GetxController {
       );
     }
   }
+
+  // File attachment methods
+  Future<void> pickFiles(BuildContext context) async {
+    try {
+      isPickingFiles.value = true;
+
+      // First try multiple file selection
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: true,
+        withData: false,
+        withReadStream: false,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        int addedCount = 0;
+        for (final file in result.files) {
+          if (file.size > 10 * 1024 * 1024) { // 10MB limit
+            _showToast(
+              'File "${file.name}" is too large. Maximum size is 10MB.',
+              backgroundColor: Colors.red,
+            );
+            continue;
+          }
+
+          // Check if file already exists
+          final existingIndex = attachedFiles.indexWhere(
+            (f) => f['name'] == file.name && f['size'] == file.size
+          );
+
+          if (existingIndex >= 0) {
+            _showToast(
+              'File "${file.name}" is already attached.',
+              backgroundColor: Colors.orange,
+            );
+            continue;
+          }
+
+          attachedFiles.add({
+            'name': file.name,
+            'path': file.path,
+            'size': file.size,
+            'extension': file.extension,
+            'bytes': file.bytes,
+          });
+          addedCount++;
+        }
+
+        if (addedCount > 0) {
+          _showToast(
+            'Added $addedCount file(s) successfully.',
+            backgroundColor: Colors.green,
+          );
+        }
+      }
+    } catch (e) {
+      print('Multiple file selection failed: $e');
+
+      // Check if this is the specific dart:io error
+      if (e.toString().contains('dart io') || e.toString().contains('multiple file')) {
+        // Fall back to single file selection
+        try {
+          final result = await FilePicker.platform.pickFiles(
+            type: FileType.any,
+            allowMultiple: false,
+            withData: false,
+            withReadStream: false,
+          );
+
+          if (result != null && result.files.isNotEmpty) {
+            final file = result.files.first;
+
+            if (file.size > 10 * 1024 * 1024) {
+              _showToast(
+                'File "${file.name}" is too large. Maximum size is 10MB.',
+                backgroundColor: Colors.red,
+              );
+              return;
+            }
+
+            // Check if file already exists
+            final existingIndex = attachedFiles.indexWhere(
+              (f) => f['name'] == file.name && f['size'] == file.size
+            );
+
+            if (existingIndex >= 0) {
+              _showToast(
+                'File "${file.name}" is already attached.',
+                backgroundColor: Colors.orange,
+              );
+              return;
+            }
+
+            attachedFiles.add({
+              'name': file.name,
+              'path': file.path,
+              'size': file.size,
+              'extension': file.extension,
+              'bytes': file.bytes,
+            });
+
+            _showToast(
+              'Added "${file.name}" successfully.',
+              backgroundColor: Colors.green,
+            );
+          }
+        } catch (fallbackError) {
+          print('Single file selection also failed: $fallbackError');
+          _showToast(
+            'Failed to pick files. This platform may not support file selection.',
+            backgroundColor: Colors.red,
+          );
+        }
+      } else {
+        // Some other error occurred
+        _showToast(
+          'Failed to pick files. Please try again.',
+          backgroundColor: Colors.red,
+        );
+      }
+    } finally {
+      isPickingFiles.value = false;
+    }
+  }
+
+  void removeFile(int index) {
+    if (index >= 0 && index < attachedFiles.length) {
+      final fileName = attachedFiles[index]['name'];
+      attachedFiles.removeAt(index);
+      _showToast(
+        'Removed "$fileName"',
+        backgroundColor: Colors.blue,
+      );
+    }
+  }
+
+  void clearAllFiles() {
+    final count = attachedFiles.length;
+    attachedFiles.clear();
+    if (count > 0) {
+      _showToast(
+        'Removed all $count file(s)',
+        backgroundColor: Colors.blue,
+      );
+    }
+  }
+
+  // Fetch existing attachments for editing GCs
+  Future<void> fetchExistingAttachments(String gcNumber) async {
+    try {
+      isLoadingAttachments.value = true;
+      attachmentsError.value = '';
+      existingAttachments.clear();
+
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+
+      if (companyId.isEmpty) {
+        attachmentsError.value = 'Company ID not found';
+        return;
+      }
+
+      final url = Uri.parse('${ApiConfig.baseUrl}/gc/attachments/$gcNumber').replace(
+        queryParameters: {
+          'companyId': companyId,
+          if (branchId.isNotEmpty) 'branchId': branchId,
+        },
+      );
+
+      final response = await http.get(url, headers: {'Content-Type': 'application/json'});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final attachments = data['data']['attachments'] as List<dynamic>? ?? [];
+          existingAttachments.assignAll(
+            attachments.map((attachment) => {
+              'name': attachment['originalName']?.toString() ?? 'Unknown',
+              'filename': attachment['filename']?.toString() ?? '',
+              'size': attachment['size'] ?? 0,
+              'type': attachment['mimeType']?.toString() ?? 'unknown',
+              'uploadedAt': attachment['uploadDate']?.toString() ?? '',
+              'uploadedBy': attachment['uploadedBy']?.toString() ?? '',
+            }).toList(),
+          );
+        }
+      } else {
+        attachmentsError.value = 'Failed to fetch attachments';
+      }
+    } catch (e) {
+      attachmentsError.value = 'Error fetching attachments: $e';
+      debugPrint('Error fetching attachments: $e');
+    } finally {
+      isLoadingAttachments.value = false;
+    }
+  }
+
 }

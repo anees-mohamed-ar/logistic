@@ -126,9 +126,9 @@ class _GCFormScreenState extends State<GCFormScreen> {
     final theme = Theme.of(context);
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
 
-    // Ensure the tab index stays within the available range (0-2)
-    if (controller.currentTab.value > 2) {
-      controller.currentTab.value = 2;
+    // Ensure the tab index stays within the available range (0-3)
+    if (controller.currentTab.value > 3) {
+      controller.currentTab.value = 3;
     } else if (controller.currentTab.value < 0) {
       controller.currentTab.value = 0;
     }
@@ -278,7 +278,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: List.generate(
-                        3,
+                        4,
                             (index) => GestureDetector(
                           onTap: () {
                             controller.changeTab(index);
@@ -305,6 +305,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                                     Icons.local_shipping,
                                     Icons.group,
                                     Icons.inventory,
+                                    Icons.attach_file,
                                   ][index],
                                   size: 16,
                                   color: controller.currentTab.value == index
@@ -317,6 +318,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                                     'Shipment',
                                     'Parties',
                                     'Goods',
+                                    'Attachments',
                                   ][index],
                                   style: theme.textTheme.labelLarge?.copyWith(
                                     color: controller.currentTab.value == index
@@ -346,7 +348,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         _buildShipmentTab(context, controller, isSmallScreen),
                         _buildPartiesTab(context, controller, isSmallScreen),
                         _buildGoodsTab(context, controller, isSmallScreen),
-                      ][controller.currentTab.value.clamp(0, 2).toInt()],
+                        _buildAttachmentsTab(context, controller, isSmallScreen),
+                      ][controller.currentTab.value.clamp(0, 3).toInt()],
                     ),
                   ),
                 ),
@@ -405,7 +408,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                             ),
                           if (controller.currentTab.value > 0)
                             const SizedBox(width: 12),
-                          if (controller.currentTab.value < 2)
+                          if (controller.currentTab.value < 3)
                             Expanded(
                               flex: controller.currentTab.value > 0 ? 1 : 2,
                               child: ElevatedButton(
@@ -438,7 +441,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                                 ),
                               ),
                             ),
-                          if (controller.currentTab.value == 2)
+                          if (controller.currentTab.value == 3)
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: controller.isLoading.value
@@ -1529,7 +1532,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   Icons.scale,
                   isOptional: true,
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: TextInputType.text,
                 onChanged: (_) {},
               ),
               
@@ -1597,11 +1600,334 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   Icons.monetization_on_outlined,
                 ),
               ),
+
+              const SizedBox(height: 24),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildAttachmentsTab(
+      BuildContext context,
+      GCFormController controller,
+      bool isSmallScreen,
+      ) {
+    return SingleChildScrollView(
+      key: const ValueKey(3),
+      child: Card(
+        elevation: 1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'GC Attachments',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Attach supporting documents for this GC. You can add documents to existing GCs or attach files before submission.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // File Attachments Section
+              _buildFileAttachmentsSection(context, controller),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFileAttachmentsSection(BuildContext context, GCFormController controller) {
+    return Obx(() {
+      final files = controller.attachedFiles;
+      final existingFiles = controller.existingAttachments;
+      final isLoading = controller.isLoadingAttachments.value;
+      final error = controller.attachmentsError.value;
+
+      return Card(
+        elevation: 1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'File Attachments',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  if (files.isNotEmpty) ...[
+                    Text(
+                      '${files.length} new file${files.length == 1 ? '' : 's'}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: controller.clearAllFiles,
+                      icon: const Icon(Icons.clear_all, size: 16),
+                      label: const Text('Clear New'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Show loading state for existing attachments
+              if (isLoading) ...[
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // Show error state
+              if (error.isNotEmpty && !isLoading) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, color: Colors.red.shade600),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          error,
+                          style: TextStyle(color: Colors.red.shade600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // Existing attachments section
+              if (existingFiles.isNotEmpty && !isLoading) ...[
+                Text(
+                  'Existing Attachments',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 150),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: existingFiles.length,
+                    itemBuilder: (context, index) {
+                      final file = existingFiles[index];
+                      final fileName = file['name'] as String? ?? 'Unknown';
+                      final fileSize = file['size'] as int? ?? 0;
+                      final filename = file['filename'] as String? ?? '';
+
+                      // Format file size
+                      String formatFileSize(int bytes) {
+                        if (bytes < 1024) return '$bytes B';
+                        if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+                        return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+                      }
+
+                      return ListTile(
+                        dense: true,
+                        leading: Icon(
+                          _getFileIcon(filename.split('.').last),
+                          color: _getFileColor(filename.split('.').last),
+                          size: 20,
+                        ),
+                        title: Text(
+                          fileName,
+                          style: const TextStyle(fontSize: 14),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          formatFileSize(fileSize),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.visibility, size: 16),
+                              onPressed: () => controller.previewAttachment(filename, context),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              tooltip: 'Preview',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.download, size: 16),
+                              onPressed: () => controller.downloadAttachment(filename, context),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              tooltip: 'Download',
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // New attachments section
+              if (files.isNotEmpty) ...[
+                Text(
+                  'New Attachments to Add',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 150),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: files.length,
+                    itemBuilder: (context, index) {
+                      final file = files[index];
+                      final fileName = file['name'] as String? ?? 'Unknown';
+                      final fileSize = file['size'] as int? ?? 0;
+                      final extension = file['extension'] as String? ?? '';
+
+                      // Format file size
+                      String formatFileSize(int bytes) {
+                        if (bytes < 1024) return '$bytes B';
+                        if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+                        return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+                      }
+
+                      return ListTile(
+                        dense: true,
+                        leading: Icon(
+                          _getFileIcon(extension),
+                          color: _getFileColor(extension),
+                          size: 20,
+                        ),
+                        title: Text(
+                          fileName,
+                          style: const TextStyle(fontSize: 14),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          formatFileSize(fileSize),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.close, size: 16),
+                          onPressed: () => controller.removeFile(index),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // Add files button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: controller.isPickingFiles.value
+                      ? null
+                      : () => controller.pickFiles(context),
+                  icon: controller.isPickingFiles.value
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.attach_file),
+                  label: Text(
+                    controller.isPickingFiles.value
+                        ? 'Selecting files...'
+                        : 'Add Files',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: Theme.of(context).primaryColor),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+              Text(
+                'You can attach any type of file (PDF, images, documents, etc.). Maximum 10 files, 10MB each.\n\n'
+                'Tip: Hold Ctrl/Cmd to select multiple files, or click "Add Files" multiple times.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey[600],
+                  fontSize: 11,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
+  IconData _getFileIcon(String extension) {
+    final ext = extension.toLowerCase();
+    if (['pdf'].contains(ext)) return Icons.picture_as_pdf;
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(ext)) return Icons.image;
+    if (['doc', 'docx'].contains(ext)) return Icons.description;
+    if (['xls', 'xlsx'].contains(ext)) return Icons.table_chart;
+    if (['txt'].contains(ext)) return Icons.text_snippet;
+    return Icons.insert_drive_file;
+  }
+
+  Color _getFileColor(String extension) {
+    final ext = extension.toLowerCase();
+    if (['pdf'].contains(ext)) return Colors.red;
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(ext)) return Colors.blue;
+    if (['doc', 'docx'].contains(ext)) return Colors.blue[700]!;
+    if (['xls', 'xlsx'].contains(ext)) return Colors.green;
+    return Colors.grey;
   }
 
   Widget _buildDropdownField({
