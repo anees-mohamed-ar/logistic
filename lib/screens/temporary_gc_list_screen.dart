@@ -258,12 +258,40 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
         );
       }),
       floatingActionButton: Obx(() {
-        if (controller.isAdmin && controller.temporaryGCs.isNotEmpty) {
+        if (controller.temporaryGCs.isNotEmpty) {
           return FloatingActionButton.extended(
-            onPressed: () => _createNewTemporaryGC(),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('New Form'),
+            onPressed: () async {
+              // Show loading indicator
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+
+              await controller.fetchTemporaryGCs();
+
+              // Close loading indicator
+              Navigator.pop(context);
+
+              // Show success message
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('List refreshed successfully'),
+                    backgroundColor: Colors.green,
+                    behavior: SnackBarBehavior.floating,
+                    margin: EdgeInsets.all(16),
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Refresh'),
             elevation: 4,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Colors.white,
           );
         }
         return const SizedBox.shrink();
@@ -1066,6 +1094,11 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
       gcController.tempGcNumber.value = tempGC.tempGcNumber;
       gcController.isEditMode.value = false;
       gcController.isTemporaryMode.value = false;
+
+      // Fetch temporary GC attachments if any exist
+      if (tempGC.attachmentCount != null && tempGC.attachmentCount! > 0) {
+        await gcController.fetchTemporaryGCAttachments(tempGC.tempGcNumber);
+      }
 
       // Navigate and refresh on return
       await Get.toNamed(AppRoutes.gcForm);

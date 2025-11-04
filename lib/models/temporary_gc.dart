@@ -11,6 +11,7 @@ class TemporaryGC {
   final String? convertedGcNumber;
   final int? convertedByUserId;
   final DateTime? convertedAt;
+  final int? attachmentCount;
 
   // GC Form Fields
   final String? branchCode;
@@ -114,6 +115,7 @@ class TemporaryGC {
     this.convertedGcNumber,
     this.convertedByUserId,
     this.convertedAt,
+    this.attachmentCount,
     this.branchCode,
     this.branch,
     this.gcDate,
@@ -217,6 +219,7 @@ class TemporaryGC {
       convertedGcNumber: json['converted_gc_number'] as String?,
       convertedByUserId: json['converted_by_user_id'] as int?,
       convertedAt: json['converted_at'] != null ? DateTime.parse(json['converted_at'] as String) : null,
+      attachmentCount: json['attachment_count'] as int?,
       branchCode: json['BranchCode'] as String?,
       branch: json['Branch'] as String?,
       gcDate: json['GcDate'] as String?,
@@ -312,6 +315,7 @@ class TemporaryGC {
     bool? isLocked,
     Object? lockedByUserId = _unset,
     Object? lockedAt = _unset,
+    Object? attachmentCount = _unset,
   }) {
     return TemporaryGC(
       id: id,
@@ -324,6 +328,9 @@ class TemporaryGC {
           : lockedByUserId as int?,
       lockedAt:
           lockedAt == _unset ? this.lockedAt : lockedAt as DateTime?,
+      attachmentCount: attachmentCount == _unset
+          ? this.attachmentCount
+          : attachmentCount as int?,
       isConverted: isConverted,
       convertedGcNumber: convertedGcNumber,
       convertedByUserId: convertedByUserId,

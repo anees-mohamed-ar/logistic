@@ -17,6 +17,7 @@ import 'dart:io' show Platform, Directory;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
+import 'package:logistic/services/upload_progress_service.dart';
 
 class WeightRate {
   final int id;
@@ -60,9 +61,24 @@ class GCFormController extends GetxController {
   final IdController _idController = Get.find<IdController>();
   final Random _random = Random();
 
+  // Upload progress service
+  final UploadProgressService _uploadService = UploadProgressService();
+
+  // Upload progress observables
+  final RxDouble uploadProgress = 0.0.obs;
+  final RxString currentUploadingFile = ''.obs;
+  final RxBool isUploading = false.obs;
+  final RxString uploadStatus = ''.obs;
+
   // Preview attachment file
-  Future<void> previewAttachment(String filename, BuildContext context) async {
-    final url = '${ApiConfig.baseUrl}/gc/files/$filename';
+  Future<void> previewAttachment(
+    String filename,
+    BuildContext context, {
+    bool isTemporaryGC = false,
+  }) async {
+    final url = isTemporaryGC
+        ? '${ApiConfig.baseUrl}/temporary-gc/files/$filename'
+        : '${ApiConfig.baseUrl}/gc/files/$filename';
 
     try {
       // Validate URL format
@@ -81,7 +97,6 @@ class GCFormController extends GetxController {
       } else {
         throw Exception('URL cannot be launched: $url');
       }
-
     } catch (e) {
       debugPrint('Failed to preview attachment: $e');
 
@@ -101,7 +116,9 @@ class GCFormController extends GetxController {
                   style: const TextStyle(fontSize: 12, color: Colors.red),
                 ),
                 const SizedBox(height: 16),
-                const Text('Try copying the URL and opening it manually in your browser.'),
+                const Text(
+                  'Try copying the URL and opening it manually in your browser.',
+                ),
               ],
             ),
             actions: [
@@ -111,7 +128,9 @@ class GCFormController extends GetxController {
               ),
               TextButton(
                 onPressed: () async {
-                  final url = '${ApiConfig.baseUrl}/gc/files/$filename';
+                  final url = isTemporaryGC
+                      ? '${ApiConfig.baseUrl}/temporary-gc/files/$filename'
+                      : '${ApiConfig.baseUrl}/gc/files/$filename';
                   await Clipboard.setData(ClipboardData(text: url));
                   if (context.mounted) {
                     Navigator.of(context).pop();
@@ -130,11 +149,17 @@ class GCFormController extends GetxController {
   }
 
   // Download attachment file to local storage
-  Future<void> downloadAttachment(String filename, BuildContext context) async {
+  Future<void> downloadAttachment(
+    String filename,
+    BuildContext context, {
+    bool isTemporaryGC = false,
+  }) async {
     Directory? downloadDir;
 
     try {
-      final url = '${ApiConfig.baseUrl}/gc/files/$filename';
+      final url = isTemporaryGC
+          ? '${ApiConfig.baseUrl}/temporary-gc/files/$filename'
+          : '${ApiConfig.baseUrl}/gc/files/$filename';
 
       // Validate URL format
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
@@ -154,7 +179,7 @@ class GCFormController extends GetxController {
             title: const Text('Storage Permission Required'),
             content: const Text(
               'This app needs storage permission to download and save files to your device. '
-              'Files will be saved to your Downloads folder.'
+              'Files will be saved to your Downloads folder.',
             ),
             actions: [
               TextButton(
@@ -181,14 +206,18 @@ class GCFormController extends GetxController {
 
         // If WRITE_EXTERNAL_STORAGE is denied, try MANAGE_EXTERNAL_STORAGE for Android 11+
         if (!status.isGranted) {
-          debugPrint('WRITE_EXTERNAL_STORAGE denied, trying MANAGE_EXTERNAL_STORAGE...');
+          debugPrint(
+            'WRITE_EXTERNAL_STORAGE denied, trying MANAGE_EXTERNAL_STORAGE...',
+          );
           status = await Permission.manageExternalStorage.request();
           debugPrint('MANAGE_EXTERNAL_STORAGE permission result: $status');
         }
 
         debugPrint('Final permission granted: ${status.isGranted}');
         debugPrint('Final permission denied: ${status.isDenied}');
-        debugPrint('Final permission permanently denied: ${status.isPermanentlyDenied}');
+        debugPrint(
+          'Final permission permanently denied: ${status.isPermanentlyDenied}',
+        );
 
         if (!status.isGranted) {
           debugPrint('Permission not granted, showing snackbar...');
@@ -214,7 +243,11 @@ class GCFormController extends GetxController {
                         label: 'Retry',
                         onPressed: () async {
                           // Retry download after user potentially grants permission
-                          await downloadAttachment(filename, context);
+                          await downloadAttachment(
+                            filename,
+                            context,
+                            isTemporaryGC: isTemporaryGC,
+                          );
                         },
                       ),
                 duration: const Duration(seconds: 8),
@@ -293,7 +326,9 @@ class GCFormController extends GetxController {
         filePath,
         onReceiveProgress: (received, total) {
           if (total != -1) {
-            debugPrint('Download progress: ${(received / total * 100).toStringAsFixed(0)}%');
+            debugPrint(
+              'Download progress: ${(received / total * 100).toStringAsFixed(0)}%',
+            );
           }
         },
       );
@@ -305,16 +340,21 @@ class GCFormController extends GetxController {
 
       // Show success message
       if (context.mounted) {
-        final location = downloadDir.path.contains('Download') || downloadDir.path.contains('Downloads')
+        final location =
+            downloadDir.path.contains('Download') ||
+                downloadDir.path.contains('Downloads')
             ? 'Downloads folder'
             : 'app storage';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('File downloaded successfully to $location: $fileName')),
+          SnackBar(
+            content: Text(
+              'File downloaded successfully to $location: $fileName',
+            ),
+          ),
         );
       }
 
       debugPrint('Successfully downloaded file: $filePath');
-
     } catch (e) {
       debugPrint('Failed to download attachment: $e');
 
@@ -570,15 +610,15 @@ class GCFormController extends GetxController {
   bool _isShowingDialog = false;
 
   // File attachment variables
-  final RxList<Map<String, dynamic>> attachedFiles = <Map<String, dynamic>>[].obs;
+  final RxList<Map<String, dynamic>> attachedFiles =
+      <Map<String, dynamic>>[].obs;
   final RxBool isPickingFiles = false.obs;
 
   // Existing attachments variables (for editing GCs)
-  final RxList<Map<String, dynamic>> existingAttachments = <Map<String, dynamic>>[].obs;
+  final RxList<Map<String, dynamic>> existingAttachments =
+      <Map<String, dynamic>>[].obs;
   final RxBool isLoadingAttachments = false.obs;
   final RxString attachmentsError = ''.obs;
-
-  // ... rest of the code remains the same ...
   // Start the lock timer based on lockedAt timestamp
   void startLockTimer() {
     _timer?.cancel();
@@ -889,6 +929,12 @@ class GCFormController extends GetxController {
       lockedAt.value =
           DateTime.now(); // Default to current time if not provided
     }
+
+    // Load existing attachments from temporary GC
+    if (tempGC.tempGcNumber != null && tempGC.tempGcNumber!.isNotEmpty) {
+      print('📎 [loadTemporaryGc] Loading attachments for temp GC: ${tempGC.tempGcNumber}');
+      fetchTemporaryGCAttachments(tempGC.tempGcNumber!);
+    }
   }
 
   // Cancel all timers
@@ -1144,38 +1190,69 @@ class GCFormController extends GetxController {
     try {
       branchesLoading.value = true;
       branchesError.value = null;
-      final url = Uri.parse('${ApiConfig.baseUrl}/location/search');
+
+      final userRole = _idController.userRole.value;
+      final userId = _idController.userId.value;
+      final companyId = _idController.companyId.value;
+
+      Uri url;
+      if (userRole == 'admin' && companyId.isNotEmpty) {
+        url = Uri.parse('${ApiConfig.baseUrl}/branch/company/$companyId');
+      } else if (userId.isNotEmpty) {
+        url = Uri.parse('${ApiConfig.baseUrl}/branch/user/$userId');
+      } else {
+        throw Exception('User ID or Company ID not available');
+      }
+
       final response = await http.get(url).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
         final dynamic decoded = jsonDecode(response.body);
-        if (decoded is List) {
-          // Clear existing data
-          branches.clear();
-          branchCodeMap.clear();
 
-          // Add default option
-          branches.add('Select Branch');
+        // Clear existing data
+        branches.clear();
+        branchCodeMap.clear();
 
-          // Process each branch
-          for (var branch in decoded) {
-            final name = (branch['branchName'] ?? branch['BranchName'] ?? '')
-                .toString();
-            final code = (branch['branchCode'] ?? branch['BranchCode'] ?? '')
-                .toString();
+        // Add default option
+        branches.add('Select Branch');
 
-            if (name.isNotEmpty && code.isNotEmpty) {
-              branches.add(name);
-              branchCodeMap[name] = code;
-            }
+        List<dynamic> branchList = [];
+
+        if (userRole == 'admin') {
+          // Admin gets an array directly
+          if (decoded is List) {
+            branchList = decoded;
           }
-
-          // Remove duplicates and sort
-          branches.value = branches.toSet().toList()
-            ..sort((a, b) => a == 'Select Branch' ? -1 : a.compareTo(b));
+        } else {
+          // User gets a single object wrapped in response
+          if (decoded is Map &&
+              decoded['success'] == true &&
+              decoded['data'] != null) {
+            branchList = [decoded['data']];
+          }
         }
+
+        // Process each branch
+        for (var branch in branchList) {
+          final name = (branch['branch_name'] ?? branch['branchName'] ?? '')
+              .toString();
+          final code = (branch['branch_code'] ?? branch['branchCode'] ?? '')
+              .toString();
+
+          if (name.isNotEmpty && code.isNotEmpty) {
+            branches.add(name);
+            branchCodeMap[name] = code;
+          }
+        }
+
+        // Remove duplicates and sort
+        branches.value = branches.toSet().toList()
+          ..sort((a, b) => a == 'Select Branch' ? -1 : a.compareTo(b));
+      } else {
+        throw Exception('Failed to fetch branches: ${response.statusCode}');
       }
     } catch (e) {
       branchesError.value = 'Failed to load branches. Tap to retry.';
+      debugPrint('Error fetching branches: $e');
     } finally {
       branchesLoading.value = false;
     }
@@ -1861,8 +1938,7 @@ class GCFormController extends GetxController {
                       entry.key != 'branchId' &&
                       entry.value is Map,
                 )
-                .map((entry) =>
-                    (entry.value as Map).cast<String, dynamic>());
+                .map((entry) => (entry.value as Map).cast<String, dynamic>());
           }
 
           final hasQueuedRange = ranges.any(
@@ -2137,6 +2213,13 @@ class GCFormController extends GetxController {
   Future<void> submitFormToBackend() async {
     if (!formKey.currentState!.validate()) return;
 
+    debugPrint(' [submitFormToBackend] Starting submission');
+    debugPrint(' [submitFormToBackend] isTemporaryMode: ${isTemporaryMode.value}');
+    debugPrint(' [submitFormToBackend] isFillTemporaryMode: ${isFillTemporaryMode.value}');
+    debugPrint(' [submitFormToBackend] tempGcNumber: ${tempGcNumber.value}');
+    debugPrint(' [submitFormToBackend] isEditMode: ${isEditMode.value}');
+    debugPrint(' [submitFormToBackend] attachedFiles count: ${attachedFiles.length}');
+
     // For temporary GCs, verify the lock status before submission
     if (isFillTemporaryMode.value && tempGcNumber.value.isNotEmpty) {
       debugPrint('Checking lock status for GC: ${tempGcNumber.value}');
@@ -2258,8 +2341,15 @@ class GCFormController extends GetxController {
       print('GC Form Debug - userId: $userId');
       print('GC Form Debug - companyId: $companyId');
       print('GC Form Debug - branchId: $branchId');
+      print('GC Form Debug - controller userId: ${_idController.userId.value}');
+      print(
+        'GC Form Debug - controller companyId: ${_idController.companyId.value}',
+      );
+      print(
+        'GC Form Debug - controller branchId: ${_idController.branchId.value}',
+      );
 
-      if (userId.isEmpty) {
+      if (userId == null || userId.isEmpty) {
         throw Exception('User ID not found. Please login again.');
       }
 
@@ -2270,51 +2360,61 @@ class GCFormController extends GetxController {
       // Check if we have attached files
       final hasFiles = attachedFiles.isNotEmpty;
 
+      if (hasFiles) {
+        debugPrint(
+          'Starting GC ${isEditMode.value ? 'update' : 'creation'} with ${attachedFiles.length} file(s)',
+        );
+      }
+
       if (isEditMode.value && editingGcNumber.value.isNotEmpty) {
         // Handle GC update (with or without files)
         if (hasFiles) {
-          final request = http.MultipartRequest('PUT', Uri.parse('${ApiConfig.baseUrl}/gc/updateGC/${editingGcNumber.value}').replace(
-            queryParameters: {
-              'userId': userId,
-              'companyId': _idController.companyId.value,
-              if (_idController.branchId.value.isNotEmpty)
-                'branchId': _idController.branchId.value,
-            },
-          ));
-          data.forEach((key, value) {
-            if (value != null) {
-              request.fields[key] = value.toString();
-            }
-          });
+          final url =
+              '${ApiConfig.baseUrl}/gc/updateGC/${editingGcNumber.value}';
+          final queryParams = {
+            'userId': userId,
+            'companyId': _idController.companyId.value,
+            if (_idController.branchId.value.isNotEmpty)
+              'branchId': _idController.branchId.value,
+          };
+          final fullUrl = Uri.parse(
+            url,
+          ).replace(queryParameters: queryParams).toString();
 
-          // Add files
-          for (int i = 0; i < attachedFiles.length; i++) {
-            final file = attachedFiles[i];
-            final filePath = file['path'];
-            if (filePath != null && filePath is String && filePath.isNotEmpty) {
-              request.files.add(
-                await http.MultipartFile.fromPath(
-                  'attachments',
-                  filePath,
-                  filename: file['name'],
-                ),
-              );
-            }
+          debugPrint('Constructed URL: $fullUrl');
+          debugPrint('GC Number: ${editingGcNumber.value}');
+          debugPrint('Query params: $queryParams');
+
+          final uploadResult = await _uploadGCWithProgress(
+            fullUrl,
+            data,
+            attachedFiles,
+            method: 'PUT',
+          );
+
+          if (!uploadResult['success']) {
+            debugPrint('GC update upload failed: ${uploadResult['error']}');
+            debugPrint('Status code: ${uploadResult['statusCode']}');
+            debugPrint('Response data: ${uploadResult['data']}');
+            throw Exception(uploadResult['error'] ?? 'Upload failed');
           }
 
-          final streamedResponse = await request.send();
-          response = await http.Response.fromStream(streamedResponse);
-        } else {
-          url = Uri.parse(
-            '${ApiConfig.baseUrl}/gc/updateGC/${editingGcNumber.value}',
-          ).replace(
-            queryParameters: {
-              'userId': userId,
-              'companyId': _idController.companyId.value,
-              if (_idController.branchId.value.isNotEmpty)
-                'branchId': _idController.branchId.value,
-            },
+          response = http.Response(
+            jsonEncode(uploadResult['data']),
+            uploadResult['statusCode'] ?? 200,
           );
+        } else {
+          url =
+              Uri.parse(
+                '${ApiConfig.baseUrl}/gc/updateGC/${editingGcNumber.value}',
+              ).replace(
+                queryParameters: {
+                  'userId': userId,
+                  'companyId': _idController.companyId.value,
+                  if (_idController.branchId.value.isNotEmpty)
+                    'branchId': _idController.branchId.value,
+                },
+              );
           response = await http.put(
             url,
             headers: {'Content-Type': 'application/json'},
@@ -2323,44 +2423,150 @@ class GCFormController extends GetxController {
         }
       } else {
         // Handle GC creation (with or without files)
-        if (hasFiles) {
-          final request = http.MultipartRequest('POST', Uri.parse('${ApiConfig.baseUrl}/gc/add').replace(
-            queryParameters: {
-              'userId': userId,
-              'companyId': _idController.companyId.value,
-              if (_idController.branchId.value.isNotEmpty)
-                'branchId': _idController.branchId.value,
-            },
-          ));
+        if (hasFiles && isFillTemporaryMode.value && tempGcNumber.value.isNotEmpty) {
+          // Temporary GC conversion with files
+          final url =
+              '${ApiConfig.baseUrl}/temporary-gc/convert/${tempGcNumber.value}';
 
-          // Add form data
-          data.forEach((key, value) {
-            if (value != null) {
-              request.fields[key] = value.toString();
-            }
-          });
-
-          // Add files
-          for (int i = 0; i < attachedFiles.length; i++) {
-            final file = attachedFiles[i];
-            final filePath = file['path'];
-            if (filePath != null && filePath is String && filePath.isNotEmpty) {
-              request.files.add(
-                await http.MultipartFile.fromPath(
-                  'attachments',
-                  filePath,
-                  filename: file['name'],
-                ),
-              );
-            }
+          // Add the actual GC number to the data
+          data['actualGcNumber'] = gcNumberCtrl.text;
+          data['userId'] = userId;
+          data['companyId'] = _idController.companyId.value;
+          if (_idController.branchId.value.isNotEmpty) {
+            data['branchId'] = _idController.branchId.value;
           }
 
-          final streamedResponse = await request.send();
-          response = await http.Response.fromStream(streamedResponse);
-        } else if (isTemporaryMode.value) {
+          // Double-check lock status right before submission
+          final lockStatus = await _checkLockStatus(tempGcNumber.value);
+          if (lockStatus['isLocked'] == true) {
+            throw Exception('Lost lock on the temporary GC. Please try again.');
+          }
+
+          final uploadResult = await _uploadGCWithProgress(
+            url,
+            data,
+            attachedFiles,
+            method: 'POST',
+          );
+
+          if (!uploadResult['success']) {
+            debugPrint(
+              'Temporary GC conversion upload failed: ${uploadResult['error']}',
+            );
+            debugPrint('Status code: ${uploadResult['statusCode']}');
+            debugPrint('Response data: ${uploadResult['data']}');
+            throw Exception(uploadResult['error'] ?? 'Upload failed');
+          }
+
+          response = http.Response(
+            jsonEncode(uploadResult['data']),
+            uploadResult['statusCode'] ?? 200,
+          );
+
+          // The submit-gc endpoint is already called in the backend during conversion
+          // No need to call it again from the frontend
+          // Release the lock after successful conversion
+          await http
+              .post(
+                Uri.parse('${ApiConfig.baseUrl}/temporary-gc/release-lock'),
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({
+                  'gcNumber': tempGcNumber.value,
+                  'userId': userId,
+                  'force': true, // Add force flag to ensure release
+                }),
+              )
+              .catchError((e) {
+                debugPrint('Error releasing lock: $e');
+                // Return a dummy response to satisfy the type system
+                // The actual response doesn't matter since we're in an error case
+                return http.Response('', 200);
+              });
+        } else if (hasFiles && !isTemporaryMode.value) {
+          final url = '${ApiConfig.baseUrl}/gc/add';
+          final queryParams = {
+            'userId': userId,
+            'companyId': _idController.companyId.value,
+            if (_idController.branchId.value.isNotEmpty)
+              'branchId': _idController.branchId.value,
+          };
+          final fullUrl = Uri.parse(
+            url,
+          ).replace(queryParameters: queryParams).toString();
+
+          final uploadResult = await _uploadGCWithProgress(
+            fullUrl,
+            data,
+            attachedFiles,
+            method: 'POST',
+          );
+
+          if (!uploadResult['success']) {
+            debugPrint('GC creation upload failed: ${uploadResult['error']}');
+            debugPrint('Status code: ${uploadResult['statusCode']}');
+            debugPrint('Response data: ${uploadResult['data']}');
+            throw Exception(uploadResult['error'] ?? 'Upload failed');
+          }
+
+          response = http.Response(
+            jsonEncode(uploadResult['data']),
+            uploadResult['statusCode'] ?? 201,
+          );
+        } else if (hasFiles && isTemporaryMode.value) {
+          // Temporary GC with files
+          final url = '${ApiConfig.baseUrl}/temporary-gc/create';
+
+          // Add required fields to form data
           data['userId'] = userId;
-          data['companyId'] = companyId;
-          data['branchId'] = branchId;
+          data['companyId'] = _idController.companyId.value;
+          if (_idController.branchId.value.isNotEmpty) {
+            data['branchId'] = _idController.branchId.value;
+          }
+
+          final uploadResult = await _uploadGCWithProgress(
+            url,
+            data,
+            attachedFiles,
+            method: 'POST',
+          );
+
+          if (!uploadResult['success']) {
+            debugPrint(
+              'Temporary GC creation upload failed: ${uploadResult['error']}',
+            );
+            debugPrint('Status code: ${uploadResult['statusCode']}');
+            debugPrint('Response data: ${uploadResult['data']}');
+            throw Exception(uploadResult['error'] ?? 'Upload failed');
+          }
+
+          response = http.Response(
+            jsonEncode(uploadResult['data']),
+            uploadResult['statusCode'] ?? 201,
+          );
+        } else if (isTemporaryMode.value) {
+          print('DEBUG: About to assign temporary GC data');
+          print('DEBUG: userId = $userId');
+          print(
+            'DEBUG: _idController.companyId.value = ${_idController.companyId.value}',
+          );
+          print(
+            'DEBUG: _idController.branchId.value = ${_idController.branchId.value}',
+          );
+
+          // Ensure we have valid values
+          final companyIdValue = _idController.companyId.value;
+          final branchIdValue = _idController.branchId.value;
+
+          if (companyIdValue == null || companyIdValue.isEmpty) {
+            throw Exception('Company ID is required for temporary GC creation');
+          }
+
+          data['userId'] = userId;
+          data['companyId'] = companyIdValue;
+          if (branchIdValue != null && branchIdValue.isNotEmpty) {
+            data['branchId'] = branchIdValue;
+          }
+          print('DEBUG: Final data object: $data');
           url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/create');
           response = await http.post(
             url,
@@ -2373,24 +2579,35 @@ class GCFormController extends GetxController {
           try {
             data['actualGcNumber'] = gcNumberCtrl.text;
             data['userId'] = userId;
-            data['companyId'] = companyId;
-            data['branchId'] = branchId;
+            data['companyId'] = _idController.companyId.value;
+            if (_idController.branchId.value.isNotEmpty) {
+              data['branchId'] = _idController.branchId.value;
+            }
 
             // Double-check lock status right before submission
             final lockStatus = await _checkLockStatus(tempGcNumber.value);
             if (lockStatus['isLocked'] == true) {
-              throw Exception('Lost lock on the temporary GC. Please try again.');
+              throw Exception(
+                'Lost lock on the temporary GC. Please try again.',
+              );
             }
 
             // Convert the temporary GC to a real GC
             url = Uri.parse(
               '${ApiConfig.baseUrl}/temporary-gc/convert/${tempGcNumber.value}',
             );
+            debugPrint('🔄 [submitFormToBackend] Converting temp GC - URL: $url');
+            debugPrint('🔄 [submitFormToBackend] Converting temp GC - tempGcNumber: ${tempGcNumber.value}');
+            debugPrint('🔄 [submitFormToBackend] Converting temp GC - data keys: ${data.keys.toList()}');
             response = await http.post(
               url,
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode(data),
             );
+
+            debugPrint('🔄 [submitFormToBackend] Convert response status: ${response.statusCode}');
+            debugPrint('🔄 [submitFormToBackend] Convert response body: ${response.body}');
+
 
             if (response.statusCode != 200) {
               throw Exception(
@@ -2503,6 +2720,7 @@ class GCFormController extends GetxController {
       }
     } catch (e) {
       isLoading.value = false;
+      debugPrint('GC submission failed: $e');
       final operation = isEditMode.value ? 'update' : 'create';
       _showToast(
         'Failed to $operation GC: $e',
@@ -2511,6 +2729,53 @@ class GCFormController extends GetxController {
         backgroundColor: Colors.red,
         textColor: Colors.white,
       );
+    }
+  }
+
+  // Helper method to upload GC with progress tracking
+  Future<Map<String, dynamic>> _uploadGCWithProgress(
+    String url,
+    Map<String, dynamic> formData,
+    List<Map<String, dynamic>> files, {
+    String method = 'POST',
+  }) async {
+    isUploading.value = true;
+    uploadProgress.value = 0.0;
+    uploadStatus.value = 'Preparing upload...';
+    currentUploadingFile.value = '';
+
+    try {
+      final result = await _uploadService.uploadGCWithProgress(
+        url: url,
+        formData: formData,
+        files: files,
+        method: method,
+        onProgress: (progress, fileName) {
+          uploadProgress.value = progress;
+          if (fileName != null) {
+            currentUploadingFile.value = fileName;
+            uploadStatus.value = 'Uploading $fileName...';
+          } else {
+            uploadStatus.value = 'Uploading files...';
+          }
+        },
+        onFileProgress: (fileName, progress) {
+          currentUploadingFile.value = fileName;
+          uploadStatus.value = 'Uploading $fileName...';
+        },
+      );
+
+      uploadProgress.value = 1.0;
+      uploadStatus.value = 'Upload completed successfully!';
+      return result;
+    } finally {
+      // Reset progress after a short delay
+      Future.delayed(const Duration(seconds: 2), () {
+        isUploading.value = false;
+        uploadProgress.value = 0.0;
+        uploadStatus.value = '';
+        currentUploadingFile.value = '';
+      });
     }
   }
 
@@ -2530,7 +2795,8 @@ class GCFormController extends GetxController {
       if (result != null && result.files.isNotEmpty) {
         int addedCount = 0;
         for (final file in result.files) {
-          if (file.size > 10 * 1024 * 1024) { // 10MB limit
+          if (file.size > 10 * 1024 * 1024) {
+            // 10MB limit
             _showToast(
               'File "${file.name}" is too large. Maximum size is 10MB.',
               backgroundColor: Colors.red,
@@ -2540,7 +2806,7 @@ class GCFormController extends GetxController {
 
           // Check if file already exists
           final existingIndex = attachedFiles.indexWhere(
-            (f) => f['name'] == file.name && f['size'] == file.size
+            (f) => f['name'] == file.name && f['size'] == file.size,
           );
 
           if (existingIndex >= 0) {
@@ -2572,7 +2838,8 @@ class GCFormController extends GetxController {
       print('Multiple file selection failed: $e');
 
       // Check if this is the specific dart:io error
-      if (e.toString().contains('dart io') || e.toString().contains('multiple file')) {
+      if (e.toString().contains('dart io') ||
+          e.toString().contains('multiple file')) {
         // Fall back to single file selection
         try {
           final result = await FilePicker.platform.pickFiles(
@@ -2595,7 +2862,7 @@ class GCFormController extends GetxController {
 
             // Check if file already exists
             final existingIndex = attachedFiles.indexWhere(
-              (f) => f['name'] == file.name && f['size'] == file.size
+              (f) => f['name'] == file.name && f['size'] == file.size,
             );
 
             if (existingIndex >= 0) {
@@ -2642,10 +2909,7 @@ class GCFormController extends GetxController {
     if (index >= 0 && index < attachedFiles.length) {
       final fileName = attachedFiles[index]['name'];
       attachedFiles.removeAt(index);
-      _showToast(
-        'Removed "$fileName"',
-        backgroundColor: Colors.blue,
-      );
+      _showToast('Removed "$fileName"', backgroundColor: Colors.blue);
     }
   }
 
@@ -2653,15 +2917,89 @@ class GCFormController extends GetxController {
     final count = attachedFiles.length;
     attachedFiles.clear();
     if (count > 0) {
-      _showToast(
-        'Removed all $count file(s)',
-        backgroundColor: Colors.blue,
-      );
+      _showToast('Removed all $count file(s)', backgroundColor: Colors.blue);
     }
   }
 
   // Fetch existing attachments for editing GCs
   Future<void> fetchExistingAttachments(String gcNumber) async {
+    debugPrint('🔍 [fetchExistingAttachments] Starting for GC: $gcNumber');
+    try {
+      isLoadingAttachments.value = true;
+      attachmentsError.value = '';
+      existingAttachments.clear();
+
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+
+      debugPrint('🔍 [fetchExistingAttachments] CompanyId: $companyId, BranchId: $branchId');
+
+      if (companyId.isEmpty) {
+        attachmentsError.value = 'Company ID not found';
+        debugPrint('❌ [fetchExistingAttachments] Company ID is empty, aborting');
+        return;
+      }
+
+      final url = Uri.parse('${ApiConfig.baseUrl}/gc/attachments/$gcNumber')
+          .replace(
+            queryParameters: {
+              'companyId': companyId,
+              if (branchId.isNotEmpty) 'branchId': branchId,
+            },
+          );
+
+      debugPrint('🔍 [fetchExistingAttachments] API URL: $url');
+
+      final response = await http.get(
+        url,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      debugPrint('🔍 [fetchExistingAttachments] Response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        debugPrint('🔍 [fetchExistingAttachments] Response data: $data');
+
+        if (data['success'] == true && data['data'] != null) {
+          final attachments =
+              data['data']['attachments'] as List<dynamic>? ?? [];
+          debugPrint('🔍 [fetchExistingAttachments] Found ${attachments.length} attachments');
+
+          existingAttachments.assignAll(
+            attachments
+                .map(
+                  (attachment) => {
+                    'name': attachment['originalName']?.toString() ?? 'Unknown',
+                    'filename': attachment['filename']?.toString() ?? '',
+                    'size': attachment['size'] ?? 0,
+                    'type': attachment['mimeType']?.toString() ?? 'unknown',
+                    'uploadedAt': attachment['uploadDate']?.toString() ?? '',
+                    'uploadedBy': attachment['uploadedBy']?.toString() ?? '',
+                  },
+                )
+                .toList(),
+          );
+
+          debugPrint('✅ [fetchExistingAttachments] Successfully loaded ${existingAttachments.length} attachments');
+        } else {
+          debugPrint('⚠️ [fetchExistingAttachments] API returned success=false or no data');
+        }
+      } else {
+        attachmentsError.value = 'Failed to fetch attachments';
+        debugPrint('❌ [fetchExistingAttachments] HTTP error: ${response.statusCode}, body: ${response.body}');
+      }
+    } catch (e) {
+      attachmentsError.value = 'Error fetching attachments: $e';
+      debugPrint('❌ [fetchExistingAttachments] Exception: $e');
+    } finally {
+      isLoadingAttachments.value = false;
+      debugPrint('🔄 [fetchExistingAttachments] Completed for GC: $gcNumber, loading state reset');
+    }
+  }
+
+  // Fetch attachments for temporary GCs
+  Future<void> fetchTemporaryGCAttachments(String tempGcNumber) async {
     try {
       isLoadingAttachments.value = true;
       attachmentsError.value = '';
@@ -2675,39 +3013,49 @@ class GCFormController extends GetxController {
         return;
       }
 
-      final url = Uri.parse('${ApiConfig.baseUrl}/gc/attachments/$gcNumber').replace(
-        queryParameters: {
-          'companyId': companyId,
-          if (branchId.isNotEmpty) 'branchId': branchId,
-        },
-      );
+      final url =
+          Uri.parse(
+            '${ApiConfig.baseUrl}/temporary-gc/attachments/$tempGcNumber',
+          ).replace(
+            queryParameters: {
+              'companyId': companyId,
+              if (branchId.isNotEmpty) 'branchId': branchId,
+            },
+          );
 
-      final response = await http.get(url, headers: {'Content-Type': 'application/json'});
+      final response = await http.get(
+        url,
+        headers: {'Content-Type': 'application/json'},
+      );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['data'] != null) {
-          final attachments = data['data']['attachments'] as List<dynamic>? ?? [];
+          final attachments =
+              data['data']['attachments'] as List<dynamic>? ?? [];
           existingAttachments.assignAll(
-            attachments.map((attachment) => {
-              'name': attachment['originalName']?.toString() ?? 'Unknown',
-              'filename': attachment['filename']?.toString() ?? '',
-              'size': attachment['size'] ?? 0,
-              'type': attachment['mimeType']?.toString() ?? 'unknown',
-              'uploadedAt': attachment['uploadDate']?.toString() ?? '',
-              'uploadedBy': attachment['uploadedBy']?.toString() ?? '',
-            }).toList(),
+            attachments
+                .map(
+                  (attachment) => {
+                    'name': attachment['originalName']?.toString() ?? 'Unknown',
+                    'filename': attachment['filename']?.toString() ?? '',
+                    'size': attachment['size'] ?? 0,
+                    'type': attachment['mimeType']?.toString() ?? 'unknown',
+                    'uploadedAt': attachment['uploadDate']?.toString() ?? '',
+                    'uploadedBy': attachment['uploadedBy']?.toString() ?? '',
+                  },
+                )
+                .toList(),
           );
         }
       } else {
-        attachmentsError.value = 'Failed to fetch attachments';
+        attachmentsError.value = 'Failed to fetch temporary GC attachments';
       }
     } catch (e) {
-      attachmentsError.value = 'Error fetching attachments: $e';
-      debugPrint('Error fetching attachments: $e');
+      attachmentsError.value = 'Error fetching temporary GC attachments: $e';
+      debugPrint('Error fetching temporary GC attachments: $e');
     } finally {
       isLoadingAttachments.value = false;
     }
   }
-
 }

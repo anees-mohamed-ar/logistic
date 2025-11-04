@@ -348,7 +348,10 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          child: SingleChildScrollView(
+            // The physics property prevents scrolling if the content fits, which is usually desired here.
+            physics: const BouncingScrollPhysics(),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -516,7 +519,7 @@ class _GCUsageWidgetState extends State<GCUsageWidget> {
                 ],
               ),
             ],
-          ),
+          ),),
         ),
       ),
     );

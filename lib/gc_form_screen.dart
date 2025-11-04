@@ -1652,6 +1652,10 @@ class _GCFormScreenState extends State<GCFormScreen> {
       final existingFiles = controller.existingAttachments;
       final isLoading = controller.isLoadingAttachments.value;
       final error = controller.attachmentsError.value;
+      final isUploading = controller.isUploading.value;
+      final uploadProgress = controller.uploadProgress.value;
+      final currentUploadingFile = controller.currentUploadingFile.value;
+      final uploadStatus = controller.uploadStatus.value;
 
       return Card(
         elevation: 1,
@@ -1691,8 +1695,76 @@ class _GCFormScreenState extends State<GCFormScreen> {
               ),
               const SizedBox(height: 12),
 
+              // Upload progress indicator
+              if (controller.isUploading.value) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  controller.uploadStatus.value,
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (controller.currentUploadingFile.value.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    controller.currentUploadingFile.value,
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Colors.grey[600],
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      LinearProgressIndicator(
+                        value: controller.uploadProgress.value,
+                        backgroundColor: Colors.blue.shade100,
+                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${(controller.uploadProgress.value * 100).toStringAsFixed(1)}% uploaded',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
               // Show loading state for existing attachments
-              if (isLoading) ...[
+              if (controller.isLoadingAttachments.value) ...[
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(16),
@@ -1703,7 +1775,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
               ],
 
               // Show error state
-              if (error.isNotEmpty && !isLoading) ...[
+              if (controller.attachmentsError.value.isNotEmpty && !controller.isLoadingAttachments.value) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -1717,7 +1789,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          error,
+                          controller.attachmentsError.value,
                           style: TextStyle(color: Colors.red.shade600),
                         ),
                       ),
@@ -1728,145 +1800,151 @@ class _GCFormScreenState extends State<GCFormScreen> {
               ],
 
               // Existing attachments section
-              if (existingFiles.isNotEmpty && !isLoading) ...[
-                Text(
-                  'Existing Attachments',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+              Obx(() => controller.existingAttachments.isNotEmpty && !controller.isLoadingAttachments.value && (controller.isEditMode.value || controller.isFillTemporaryMode.value) ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Existing Attachments',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 150),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: existingFiles.length,
-                    itemBuilder: (context, index) {
-                      final file = existingFiles[index];
-                      final fileName = file['name'] as String? ?? 'Unknown';
-                      final fileSize = file['size'] as int? ?? 0;
-                      final filename = file['filename'] as String? ?? '';
+                  const SizedBox(height: 8),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 150),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: controller.existingAttachments.length,
+                      itemBuilder: (context, index) {
+                        final file = controller.existingAttachments[index];
+                        final fileName = file['name'] as String? ?? 'Unknown';
+                        final fileSize = file['size'] as int? ?? 0;
+                        final filename = file['filename'] as String? ?? '';
 
-                      // Format file size
-                      String formatFileSize(int bytes) {
-                        if (bytes < 1024) return '$bytes B';
-                        if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-                        return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-                      }
+                        // Format file size
+                        String formatFileSize(int bytes) {
+                          if (bytes < 1024) return '$bytes B';
+                          if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+                          return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+                        }
 
-                      return ListTile(
-                        dense: true,
-                        leading: Icon(
-                          _getFileIcon(filename.split('.').last),
-                          color: _getFileColor(filename.split('.').last),
-                          size: 20,
-                        ),
-                        title: Text(
-                          fileName,
-                          style: const TextStyle(fontSize: 14),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          formatFileSize(fileSize),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
+                        return ListTile(
+                          dense: true,
+                          leading: Icon(
+                            _getFileIcon(filename.split('.').last),
+                            color: _getFileColor(filename.split('.').last),
+                            size: 20,
                           ),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.visibility, size: 16),
-                              onPressed: () => controller.previewAttachment(filename, context),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              tooltip: 'Preview',
+                          title: Text(
+                            fileName,
+                            style: const TextStyle(fontSize: 14),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            formatFileSize(fileSize),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.download, size: 16),
-                              onPressed: () => controller.downloadAttachment(filename, context),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              tooltip: 'Download',
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.visibility, size: 16),
+                                onPressed: () => controller.previewAttachment(filename, context, isTemporaryGC: controller.isFillTemporaryMode.value),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                tooltip: 'Preview',
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.download, size: 16),
+                                onPressed: () => controller.downloadAttachment(filename, context, isTemporaryGC: controller.isFillTemporaryMode.value),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                tooltip: 'Download',
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
+                  const SizedBox(height: 16),
+                ],
+              ) : const SizedBox.shrink()),
 
               // New attachments section
-              if (files.isNotEmpty) ...[
-                Text(
-                  'New Attachments to Add',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+              Obx(() => controller.attachedFiles.isNotEmpty ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'New Attachments to Add',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 150),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: files.length,
-                    itemBuilder: (context, index) {
-                      final file = files[index];
-                      final fileName = file['name'] as String? ?? 'Unknown';
-                      final fileSize = file['size'] as int? ?? 0;
-                      final extension = file['extension'] as String? ?? '';
+                  const SizedBox(height: 8),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 150),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: controller.attachedFiles.length,
+                      itemBuilder: (context, index) {
+                        final file = controller.attachedFiles[index];
+                        final fileName = file['name'] as String? ?? 'Unknown';
+                        final fileSize = file['size'] as int? ?? 0;
+                        final extension = file['extension'] as String? ?? '';
 
-                      // Format file size
-                      String formatFileSize(int bytes) {
-                        if (bytes < 1024) return '$bytes B';
-                        if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-                        return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-                      }
+                        // Format file size
+                        String formatFileSize(int bytes) {
+                          if (bytes < 1024) return '$bytes B';
+                          if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+                          return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+                        }
 
-                      return ListTile(
-                        dense: true,
-                        leading: Icon(
-                          _getFileIcon(extension),
-                          color: _getFileColor(extension),
-                          size: 20,
-                        ),
-                        title: Text(
-                          fileName,
-                          style: const TextStyle(fontSize: 14),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          formatFileSize(fileSize),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
+                        return ListTile(
+                          dense: true,
+                          leading: Icon(
+                            _getFileIcon(extension),
+                            color: _getFileColor(extension),
+                            size: 20,
                           ),
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.close, size: 16),
-                          onPressed: () => controller.removeFile(index),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      );
-                    },
+                          title: Text(
+                            fileName,
+                            style: const TextStyle(fontSize: 14),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            formatFileSize(fileSize),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.close, size: 16),
+                            onPressed: () => controller.removeFile(index),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-              ],
+                  const SizedBox(height: 12),
+                ],
+              ) : const SizedBox.shrink()),
 
               // Add files button
               SizedBox(

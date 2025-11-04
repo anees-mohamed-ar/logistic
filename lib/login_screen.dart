@@ -506,23 +506,23 @@ class LoginScreen extends StatelessWidget {
 
                 // Sign Up Prompt
                 const SizedBox(height: 24),
-                TextButton(
-                  onPressed: () => Get.toNamed(AppRoutes.register),
-                  child: const Text.rich(
-                    TextSpan(
-                      text: "Don't have an account? ",
-                      children: [
-                        TextSpan(
-                          text: 'Sign Up',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                ).animate().fadeIn(
-                  delay: const Duration(milliseconds: 600),
-                  duration: const Duration(milliseconds: 600),
-                ),
+                // TextButton(
+                //   onPressed: () => Get.toNamed(AppRoutes.register),
+                //   child: const Text.rich(
+                //     TextSpan(
+                //       text: "Don't have an account? ",
+                //       children: [
+                //         TextSpan(
+                //           text: 'Sign Up',
+                //           style: TextStyle(fontWeight: FontWeight.bold),
+                //         ),
+                //       ],
+                //     ),
+                //   ),
+                // ).animate().fadeIn(
+                //   delay: const Duration(milliseconds: 600),
+                //   duration: const Duration(milliseconds: 600),
+                // ),
               ],
             ),
           ),

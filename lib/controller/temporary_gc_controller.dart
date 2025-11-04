@@ -342,6 +342,7 @@ class TemporaryGCController extends GetxController {
       final branchId = _idController.branchId.value;
       if (companyId.isEmpty) return;
 
+      print('Connecting to SSE for company: $companyId, branch: $branchId');
       _disconnectFromLiveUpdates();
 
       _sseClient = HttpClient();
@@ -359,6 +360,7 @@ class TemporaryGCController extends GetxController {
         return;
       }
 
+      print('SSE connection established successfully');
       String? currentEvent;
       final dataBuf = StringBuffer();
 
@@ -392,6 +394,7 @@ class TemporaryGCController extends GetxController {
               }
             },
             onDone: () {
+              print('SSE connection closed, scheduling reconnect');
               if (!_sseClosing) _scheduleReconnect();
             },
             onError: (e) {
@@ -407,6 +410,7 @@ class TemporaryGCController extends GetxController {
   }
 
   void _dispatchSseEvent(String? event, dynamic data) {
+    print('Received SSE event: $event with data: $data');
     switch (event) {
       case 'temp_gc_snapshot':
         _handleGCSnapshot(data);
@@ -421,10 +425,14 @@ class TemporaryGCController extends GetxController {
         _handleGCUnlocked(data);
         break;
       case 'temp_gc_converted':
+        print('Handling temp_gc_converted event for: ${data['temp_gc_number']}');
+        _handleGCRemoved(data);
+        break;
       case 'temp_gc_deleted':
         _handleGCRemoved(data);
         break;
       default:
+        print('Unknown SSE event: $event');
         break;
     }
   }
@@ -521,30 +529,57 @@ class TemporaryGCController extends GetxController {
 
   // Mark a GC number as used for the current user
   Future<bool> _markGCNumberAsUsed(String gcNumber) async {
+    print('=== STARTING GC NUMBER SUBMISSION ===');
+    print('GC Number to mark as used: $gcNumber');
+
     try {
       final userId = _idController.userId.value;
       final url = Uri.parse('${ApiConfig.baseUrl}/api/gc-management/submit-gc');
 
+      print('Submit GC URL: $url');
+      print('User ID for submission: $userId');
+      print('Company ID: ${_idController.companyId.value}');
+      print('Branch ID: ${_idController.branchId.value}');
+
+      final requestBody = {
+        'userId': userId,
+        'gcNumber': gcNumber,
+        'companyId': _idController.companyId.value,
+        if (_idController.branchId.value.isNotEmpty)
+          'branchId': _idController.branchId.value,
+      };
+
+      print('=== SUBMIT GC REQUEST BODY ===');
+      print(requestBody);
+
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'userId': userId,
-          'gcNumber': gcNumber,
-          'companyId': _idController.companyId.value,
-          if (_idController.branchId.value.isNotEmpty)
-            'branchId': _idController.branchId.value,
-        }),
+        body: json.encode(requestBody),
       );
 
+      print('=== SUBMIT GC RESPONSE RECEIVED ===');
+      print('Response Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
-        return true;
+        final data = json.decode(response.body);
+        print('Parsed response data: $data');
+        if (data['success'] == true) {
+          print('=== GC NUMBER SUBMISSION SUCCESSFUL ===');
+          return true;
+        } else {
+          print('=== GC NUMBER SUBMISSION FAILED - API returned success=false ===');
+          return false;
+        }
       } else {
-        print('Failed to mark GC number as used: ${response.body}');
+        print('=== GC NUMBER SUBMISSION FAILED - HTTP ${response.statusCode} ===');
         return false;
       }
     } catch (e) {
-      print('Error marking GC number as used: $e');
+      print('=== GC NUMBER SUBMISSION ERROR ===');
+      print('Error details: $e');
+      print('Stack trace: ${StackTrace.current}');
       return false;
     }
   }
@@ -555,11 +590,21 @@ class TemporaryGCController extends GetxController {
     required String actualGcNumber,
     required Map<String, dynamic> additionalData,
   }) async {
+    print('=== STARTING TEMPORARY GC CONVERSION ===');
+    print('Temp GC Number: $tempGcNumber');
+    print('Actual GC Number: $actualGcNumber');
+    print('Additional Data Keys: ${additionalData.keys.toList()}');
+
     try {
       isConverting.value = true;
       final userId = _idController.userId.value;
       final companyId = _idController.companyId.value;
       final branchId = _idController.branchId.value;
+
+      print('User ID: $userId');
+      print('Company ID: $companyId');
+      print('Branch ID: $branchId');
+      print('Converting state set to: ${isConverting.value}');
 
       // First convert the temporary GC to a real GC
       final url = Uri.parse(
@@ -573,16 +618,34 @@ class TemporaryGCController extends GetxController {
         ...additionalData,
       };
 
+      print('=== CONVERSION REQUEST DETAILS ===');
+      print('URL: $url');
+      print('Request Body: $body');
+      print('Headers: {"Content-Type": "application/json"}');
+
+      print('=== SENDING CONVERSION REQUEST ===');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode(body),
       );
 
+      print('=== CONVERSION RESPONSE RECEIVED ===');
+      print('Response Status Code: ${response.statusCode}');
+      print('Response Headers: ${response.headers}');
+      print('Response Body: ${response.body}');
+
       final data = json.decode(response.body);
+      print('Parsed Response Data: $data');
 
       if (response.statusCode == 200 && data['success'] == true) {
+        print('=== CONVERSION SUCCESSFUL ===');
+        print('GC Number from response: ${data['data']?['gc_number']}');
+        print('GC ID from response: ${data['data']?['gc_id']}');
+        print('Attachment count: ${data['data']?['attachmentCount']}');
+
         // Mark the GC number as used for the current user
+        print('=== MARKING GC NUMBER AS USED ===');
         final gcMarked = await _markGCNumberAsUsed(actualGcNumber);
 
         if (!gcMarked) {
@@ -590,18 +653,29 @@ class TemporaryGCController extends GetxController {
           print(
             'Warning: Failed to mark GC number as used, but conversion was successful',
           );
+        } else {
+          print('GC number marked as used successfully');
         }
 
+        print('=== SHOWING SUCCESS TOAST ===');
         Fluttertoast.showToast(
           msg: 'GC created successfully!',
           backgroundColor: Colors.green,
           toastLength: Toast.LENGTH_LONG,
         );
 
-        // The list will be updated automatically via SSE
+        // The list will be updated automatically via SSE, but refresh as fallback
+        print('=== WAITING FOR SSE UPDATE ===');
+        await Future.delayed(const Duration(seconds: 1));
+        print('=== REFRESHING GC LIST ===');
+        await fetchTemporaryGCs();
+
+        print('=== TEMPORARY GC CONVERSION COMPLETED SUCCESSFULLY ===');
         return true;
       } else if (response.statusCode == 409) {
         // GC number already exists
+        print('=== CONVERSION FAILED - GC NUMBER ALREADY EXISTS ===');
+        print('Error message: ${data['message']}');
         Fluttertoast.showToast(
           msg:
               data['message'] ??
@@ -611,6 +685,8 @@ class TemporaryGCController extends GetxController {
         );
         return false;
       } else {
+        print('=== CONVERSION FAILED ===');
+        print('Error message: ${data['message']}');
         Fluttertoast.showToast(
           msg: data['message'] ?? 'Failed to convert temporary GC',
           backgroundColor: Colors.red,
@@ -618,11 +694,16 @@ class TemporaryGCController extends GetxController {
         return false;
       }
     } catch (e) {
-      print('Error converting temporary GC: $e');
+      print('=== CONVERSION ERROR ===');
+      print('Error details: $e');
+      print('Stack trace: ${StackTrace.current}');
       Fluttertoast.showToast(msg: 'Error: $e', backgroundColor: Colors.red);
       return false;
     } finally {
+      print('=== CLEANING UP CONVERSION STATE ===');
       isConverting.value = false;
+      print('Converting state set to: ${isConverting.value}');
+      print('=== TEMPORARY GC CONVERSION PROCESS ENDED ===');
     }
   }
 
