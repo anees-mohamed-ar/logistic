@@ -153,6 +153,7 @@ class GCFormController extends GetxController {
     String filename,
     BuildContext context, {
     bool isTemporaryGC = false,
+    String? originalName,
   }) async {
     Directory? downloadDir;
 
@@ -267,16 +268,18 @@ class GCFormController extends GetxController {
 
         if (!await downloadDir.exists()) {
           // Fallback to external storage directory
-          downloadDir = await getExternalStorageDirectory();
+          final externalDir = await getExternalStorageDirectory();
 
-          if (downloadDir == null || !await downloadDir.exists()) {
+          if (externalDir != null && await externalDir.exists()) {
+            downloadDir = externalDir;
+          } else {
             // Final fallback: app documents directory
             downloadDir = await getApplicationDocumentsDirectory();
           }
         }
 
         // Create Download subfolder in app documents if using app directory
-        if (downloadDir != null && downloadDir.path.contains('app_flutter')) {
+        if (downloadDir.path.contains('app_flutter')) {
           downloadDir = Directory('${downloadDir.path}/Downloads');
           if (!await downloadDir.exists()) {
             await downloadDir.create(recursive: true);
@@ -291,12 +294,13 @@ class GCFormController extends GetxController {
         }
       }
 
-      if (downloadDir == null) {
-        throw Exception('Could not access download directory');
-      }
-
-      // Create full file path
-      final fileName = filename.split('/').last;
+      // Create full file path with GC number prefix
+      // Use provided originalName if available, otherwise extract from filename
+      final baseFileName = originalName ?? filename.split('/').last;
+      final gcNum = isTemporaryGC ? tempGcNumber.value : editingGcNumber.value;
+      final fileName = gcNum.isNotEmpty
+          ? 'GC_${gcNum}_$baseFileName'
+          : baseFileName;
       final filePath = '${downloadDir.path}/$fileName';
 
       debugPrint('Downloading to: $filePath');
@@ -522,6 +526,13 @@ class GCFormController extends GetxController {
     }
   }
 
+  // Helper method to safely dispose focus nodes
+  void _disposeFocusNode(FocusNode? node) {
+    if (node != null) {
+      node.dispose();
+    }
+  }
+
   Future<void> _showToast(
     String message, {
     Toast toastLength = Toast.LENGTH_SHORT,
@@ -547,6 +558,32 @@ class GCFormController extends GetxController {
   final RxString balanceAmount = '0.00'.obs; // Reactive balance amount
   final gstPayerOptions = ['Consignor', 'Consignee', 'Transporter'];
   final selectedGstPayer = ''.obs; // Holds the currently selected GST payer
+
+  // FocusNodes for automatic field navigation
+  // Tab 0 - Shipment
+  final FocusNode eDaysFocus = FocusNode();
+  final FocusNode poNumberFocus = FocusNode();
+  final FocusNode truckTypeFocus = FocusNode();
+  final FocusNode tripIdFocus = FocusNode();
+
+  // Tab 1 - Parties
+  final FocusNode consignorGstFocus = FocusNode();
+  final FocusNode consignorAddressFocus = FocusNode();
+  final FocusNode billToGstFocus = FocusNode();
+  final FocusNode billToAddressFocus = FocusNode();
+  final FocusNode consigneeGstFocus = FocusNode();
+  final FocusNode consigneeAddressFocus = FocusNode();
+
+  // Tab 2 - Goods
+  final FocusNode packagesFocus = FocusNode();
+  final FocusNode natureGoodsFocus = FocusNode();
+  final FocusNode methodPackageFocus = FocusNode();
+  final FocusNode deliveryInstructionsFocus = FocusNode();
+  final FocusNode customInvoiceFocus = FocusNode();
+  final FocusNode invValueFocus = FocusNode();
+  final FocusNode ewayBillFocus = FocusNode();
+  final FocusNode actualWeightFocus = FocusNode();
+  final FocusNode remarksFocus = FocusNode();
 
   String _normalizeGstPayerValue(String? value) {
     print('Normalizing GST payer: "$value" → "$value"');
@@ -583,6 +620,9 @@ class GCFormController extends GetxController {
   final isEditMode = false.obs;
   final editingGcNumber = ''.obs;
   final editingCompanyId = ''.obs;
+
+  // Store GC creator's booking officer name (for PDF display)
+  final gcBookingOfficerName = ''.obs;
 
   // Format time for display
   String formatTime(Duration duration) {
@@ -776,6 +816,9 @@ class GCFormController extends GetxController {
     tempGcPreview.value = number;
     // Set lockedAt timestamp to current time when creating new temporary GC
     lockedAt.value = DateTime.now();
+
+    // Clear booking officer name for temporary GC creation - will be set when filling
+    gcBookingOfficerName.value = '';
   }
 
   void loadTemporaryGc(TemporaryGC tempGC) {
@@ -838,11 +881,13 @@ class GCFormController extends GetxController {
     // Consignor / Consignee
     if (tempGC.consignorName != null) {
       selectedConsignor.value = tempGC.consignorName!;
+      consignorNameCtrl.text = tempGC.consignorName!;
       consignorAddressCtrl.text = tempGC.consignorAddress ?? '';
       consignorGstCtrl.text = tempGC.consignorGst ?? '';
     }
     if (tempGC.consigneeName != null) {
       selectedConsignee.value = tempGC.consigneeName!;
+      consigneeNameCtrl.text = tempGC.consigneeName!;
       consigneeAddressCtrl.text = tempGC.consigneeAddress ?? '';
       consigneeGstCtrl.text = tempGC.consigneeGst ?? '';
     }
@@ -932,9 +977,15 @@ class GCFormController extends GetxController {
 
     // Load existing attachments from temporary GC
     if (tempGC.tempGcNumber != null && tempGC.tempGcNumber!.isNotEmpty) {
-      print('📎 [loadTemporaryGc] Loading attachments for temp GC: ${tempGC.tempGcNumber}');
+      print(
+        '📎 [loadTemporaryGc] Loading attachments for temp GC: ${tempGC.tempGcNumber}',
+      );
       fetchTemporaryGCAttachments(tempGC.tempGcNumber!);
     }
+
+    // Set booking officer name for PDF preview when filling temporary GC
+    // Use current user's booking officer name since they are converting the temp GC
+    gcBookingOfficerName.value = _idController.bookingOfficerName.value;
   }
 
   // Cancel all timers
@@ -1055,6 +1106,27 @@ class GCFormController extends GetxController {
     _disposeIfMounted(deliveryInstructionsCtrl);
     tabScrollController.dispose();
 
+    // Dispose focus nodes
+    _disposeFocusNode(eDaysFocus);
+    _disposeFocusNode(poNumberFocus);
+    _disposeFocusNode(truckTypeFocus);
+    _disposeFocusNode(tripIdFocus);
+    _disposeFocusNode(consignorGstFocus);
+    _disposeFocusNode(consignorAddressFocus);
+    _disposeFocusNode(billToGstFocus);
+    _disposeFocusNode(billToAddressFocus);
+    _disposeFocusNode(consigneeGstFocus);
+    _disposeFocusNode(consigneeAddressFocus);
+    _disposeFocusNode(packagesFocus);
+    _disposeFocusNode(natureGoodsFocus);
+    _disposeFocusNode(methodPackageFocus);
+    _disposeFocusNode(deliveryInstructionsFocus);
+    _disposeFocusNode(customInvoiceFocus);
+    _disposeFocusNode(invValueFocus);
+    _disposeFocusNode(ewayBillFocus);
+    _disposeFocusNode(actualWeightFocus);
+    _disposeFocusNode(remarksFocus);
+
     super.onClose(); // Always call super.onClose() last
   }
 
@@ -1107,6 +1179,10 @@ class GCFormController extends GetxController {
   void navigateToNextTab() {
     if (currentTab.value < 3) {
       currentTab.value++;
+      // Focus first field of next tab after a short delay
+      Future.delayed(const Duration(milliseconds: 300), () {
+        _focusFirstFieldOfCurrentTab();
+      });
     } else {
       // Validate only when submitting on the last tab
       if (formKey.currentState?.validate() ?? false) {
@@ -1120,6 +1196,25 @@ class GCFormController extends GetxController {
           textColor: Colors.white,
         );
       }
+    }
+  }
+
+  // Focus the first editable field of the current tab
+  void _focusFirstFieldOfCurrentTab() {
+    switch (currentTab.value) {
+      case 0: // Shipment tab
+        eDaysFocus.requestFocus();
+        break;
+      case 1: // Parties tab
+        // First field is broker dropdown, so skip to consignor GST after selection
+        consignorGstFocus.requestFocus();
+        break;
+      case 2: // Goods tab
+        packagesFocus.requestFocus();
+        break;
+      case 3: // Attachments tab
+        // No text fields to focus on attachments tab
+        break;
     }
   }
 
@@ -2039,6 +2134,10 @@ class GCFormController extends GetxController {
     attachedFiles.clear();
     existingAttachments.clear();
     attachmentsError.value = '';
+
+    // Set booking officer name for new GC creation (for PDF preview)
+    // This will be used in PDF even before submission
+    gcBookingOfficerName.value = _idController.bookingOfficerName.value;
   }
 
   // Initialize editing mode for a GC
@@ -2056,8 +2155,9 @@ class GCFormController extends GetxController {
   }
 
   Future<void> checkGCUsageAndWarn(String userId) async {
+    debugPrint('🚀 checkGCUsageAndWarn CALLED with userId: $userId');
     if (userId.isEmpty) {
-      debugPrint('checkGCUsageAndWarn: User ID is empty');
+      debugPrint('❌ checkGCUsageAndWarn: User ID is empty');
       return;
     }
 
@@ -2082,10 +2182,21 @@ class GCFormController extends GetxController {
         final data = jsonDecode(response.body);
         debugPrint('Parsed GC usage data: $data');
 
-        if (data['success'] == true && data['data'] is List) {
-          final usageList = data['data'] as List;
+        if (data['success'] == true && data['data'] is Map) {
+          final dataMap = data['data'] as Map<String, dynamic>;
+          debugPrint('🔍 Data is a Map, converting to List...');
 
-          final activeRange = usageList.cast<Map<String, dynamic>>().firstWhere(
+          // Convert the map to a list, filtering out non-numeric keys
+          final usageList = <Map<String, dynamic>>[];
+          dataMap.forEach((key, value) {
+            if (value is Map && int.tryParse(key) != null) {
+              usageList.add(Map<String, dynamic>.from(value));
+            }
+          });
+
+          debugPrint('🔍 Converted to list with ${usageList.length} items');
+
+          final activeRange = usageList.firstWhere(
             (item) => item['status']?.toString().toLowerCase() == 'active',
             orElse: () => <String, dynamic>{},
           );
@@ -2096,30 +2207,120 @@ class GCFormController extends GetxController {
               (item) => item['status'] == 'queued',
             );
 
-            if (remaining <= 5 && !hasQueuedRange) {
-              final message =
-                  'Warning: Only $remaining GCs remaining in your current range (${activeRange['fromGC']}-${activeRange['toGC']}).\n\n'
-                  '⚠️ No queued GC range available. Please contact admin to assign a new range.\n\n'
-                  'Please request a new range soon!';
+            debugPrint('Active range found:');
+            debugPrint('- remainingGCs: $remaining');
+            debugPrint('- hasQueuedRange: $hasQueuedRange');
+            debugPrint('- fromGC: ${activeRange['fromGC']}');
+            debugPrint('- toGC: ${activeRange['toGC']}');
+
+            if (remaining <= 5) {
+              debugPrint(
+                '✅ SHOWING LOW GC BALANCE WARNING: $remaining GCs remaining',
+              );
+
+              // Build rich text content with red bold remaining value
+              final contentWidget = RichText(
+                text: TextSpan(
+                  style: const TextStyle(color: Colors.black87, fontSize: 16),
+                  children: [
+                    const TextSpan(text: 'Warning: Only '),
+                    TextSpan(
+                      text: '$remaining',
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    TextSpan(text: ' GCs remaining in your current range '),
+                    TextSpan(
+                      text:
+                          '${activeRange['fromGC']}-${activeRange['toGC']}\n\n',
+                      style: const TextStyle(
+                        color: Colors.blue,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    TextSpan(
+                      text: hasQueuedRange
+                          ? '✅ You have a queued range available.'
+                          : '⚠️ No queued GC range available. Please contact admin to assign a new range.',
+                    ),
+                    TextSpan(
+                      text: hasQueuedRange
+                          ? ''
+                          : '\n\nPlease request a new range soon!',
+                    ),
+                  ],
+                ),
+              );
 
               if (Get.isDialogOpen != true) {
+                debugPrint('🔥 SHOWING WARNING DIALOG IMMEDIATELY');
                 Get.dialog(
                   AlertDialog(
                     title: const Text(
                       'Low GC Balance',
                       style: TextStyle(color: Colors.orange),
                     ),
-                    content: Text(message),
+                    content: contentWidget,
                     actions: [
                       TextButton(
-                        onPressed: () => Get.back(),
+                        onPressed: () {
+                          debugPrint('🔥 WARNING DIALOG OK BUTTON PRESSED');
+                          Get.back();
+                        },
                         child: const Text('OK'),
                       ),
                     ],
                   ),
-                  barrierDismissible: false,
+                  barrierDismissible:
+                      true, // Allow dismissing by tapping outside
                 );
+                debugPrint('🔥 WARNING DIALOG DISPLAYED IMMEDIATELY');
+              } else {
+                debugPrint(
+                  '❌ CANNOT SHOW WARNING: Another dialog is already open',
+                );
+                // Try again after a short delay if there's a dialog blocking
+                Future.delayed(const Duration(milliseconds: 200), () {
+                  if (Get.isDialogOpen != true) {
+                    debugPrint('🔥 RETRYING WARNING DIALOG AFTER SHORT DELAY');
+                    Get.dialog(
+                      AlertDialog(
+                        title: const Text(
+                          'Low GC Balance',
+                          style: TextStyle(color: Colors.orange),
+                        ),
+                        content: contentWidget,
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              debugPrint(
+                                '🔥 RETRY WARNING DIALOG OK BUTTON PRESSED',
+                              );
+                              Get.back();
+                            },
+                            child: const Text('OK'),
+                          ),
+                        ],
+                      ),
+                      barrierDismissible:
+                          true, // Allow dismissing by tapping outside
+                    );
+                    debugPrint('🔥 WARNING DIALOG DISPLAYED ON RETRY');
+                  } else {
+                    debugPrint(
+                      '❌ RETRY FAILED: Still blocked by another dialog',
+                    );
+                  }
+                });
               }
+            } else {
+              debugPrint(
+                '❌ NOT SHOWING WARNING: remaining=$remaining, hasQueuedRange=$hasQueuedRange',
+              );
             }
           }
         }
@@ -2214,11 +2415,17 @@ class GCFormController extends GetxController {
     if (!formKey.currentState!.validate()) return;
 
     debugPrint(' [submitFormToBackend] Starting submission');
-    debugPrint(' [submitFormToBackend] isTemporaryMode: ${isTemporaryMode.value}');
-    debugPrint(' [submitFormToBackend] isFillTemporaryMode: ${isFillTemporaryMode.value}');
+    debugPrint(
+      ' [submitFormToBackend] isTemporaryMode: ${isTemporaryMode.value}',
+    );
+    debugPrint(
+      ' [submitFormToBackend] isFillTemporaryMode: ${isFillTemporaryMode.value}',
+    );
     debugPrint(' [submitFormToBackend] tempGcNumber: ${tempGcNumber.value}');
     debugPrint(' [submitFormToBackend] isEditMode: ${isEditMode.value}');
-    debugPrint(' [submitFormToBackend] attachedFiles count: ${attachedFiles.length}');
+    debugPrint(
+      ' [submitFormToBackend] attachedFiles count: ${attachedFiles.length}',
+    );
 
     // For temporary GCs, verify the lock status before submission
     if (isFillTemporaryMode.value && tempGcNumber.value.isNotEmpty) {
@@ -2278,11 +2485,11 @@ class GCFormController extends GetxController {
       'DriverName': selectedDriver.value,
       'DriverPhoneNumber': driverPhoneCtrl.text,
       'Consignor': selectedConsignor.value,
-      'ConsignorName': selectedConsignor.value,
+      'ConsignorName': consignorNameCtrl.text,
       'ConsignorAddress': consignorAddressCtrl.text,
       'ConsignorGst': consignorGstCtrl.text,
       'Consignee': selectedConsignee.value,
-      'ConsigneeName': selectedConsignee.value,
+      'ConsigneeName': consigneeNameCtrl.text,
       'ConsigneeAddress': consigneeAddressCtrl.text,
       'ConsigneeGst': consigneeGstCtrl.text,
       'BillTo': selectedBillTo.value,
@@ -2303,11 +2510,11 @@ class GCFormController extends GetxController {
       'NumberofPkg': packagesCtrl.text,
       'MethodofPkg': selectedPackageMethod.value,
       'ActualWeightKgs': actualWeightCtrl.text,
-      'km': kmCtrl.text,
+      'km': '',
       'PrivateMark': remarksCtrl.text,
       'GoodContain': natureGoodsCtrl.text,
-      'Rate': rateCtrl.text,
-      'Total': calculatedGoodsTotal.value,
+      'Rate': '',
+      'Total': '',
       'PoNumber': poNumberCtrl.text,
       'TripId': tripIdCtrl.text,
       'DeliveryFromSpecial': deliveryInstructionsCtrl.text,
@@ -2319,7 +2526,7 @@ class GCFormController extends GetxController {
         );
         return normalizedGstPayer.isNotEmpty ? normalizedGstPayer : 'Consignor';
       }(),
-      'TotalRate': rateCtrl.text,
+      'TotalRate': '',
       'TotalWeight': actualWeightCtrl.text,
       'HireAmount': hireAmountCtrl.text,
       'AdvanceAmount': advanceAmountCtrl.text,
@@ -2328,8 +2535,16 @@ class GCFormController extends GetxController {
       'Charges': 'FTL',
       'CompanyId': _idController.companyId.value,
       'branch_id': _idController.branchId.value,
+      'booking_officer_name': _idController.bookingOfficerName.value,
       'isTemporary': isTemporaryMode.value,
     };
+
+    // Store the booking officer name for PDF generation
+    // When creating a new GC, use current user's booking officer name
+    // When editing/viewing, this will be populated from loaded GC data
+    if (!isEditMode.value) {
+      gcBookingOfficerName.value = _idController.bookingOfficerName.value;
+    }
 
     try {
       final Uri url;
@@ -2423,7 +2638,9 @@ class GCFormController extends GetxController {
         }
       } else {
         // Handle GC creation (with or without files)
-        if (hasFiles && isFillTemporaryMode.value && tempGcNumber.value.isNotEmpty) {
+        if (hasFiles &&
+            isFillTemporaryMode.value &&
+            tempGcNumber.value.isNotEmpty) {
           // Temporary GC conversion with files
           final url =
               '${ApiConfig.baseUrl}/temporary-gc/convert/${tempGcNumber.value}';
@@ -2596,18 +2813,27 @@ class GCFormController extends GetxController {
             url = Uri.parse(
               '${ApiConfig.baseUrl}/temporary-gc/convert/${tempGcNumber.value}',
             );
-            debugPrint('🔄 [submitFormToBackend] Converting temp GC - URL: $url');
-            debugPrint('🔄 [submitFormToBackend] Converting temp GC - tempGcNumber: ${tempGcNumber.value}');
-            debugPrint('🔄 [submitFormToBackend] Converting temp GC - data keys: ${data.keys.toList()}');
+            debugPrint(
+              '🔄 [submitFormToBackend] Converting temp GC - URL: $url',
+            );
+            debugPrint(
+              '🔄 [submitFormToBackend] Converting temp GC - tempGcNumber: ${tempGcNumber.value}',
+            );
+            debugPrint(
+              '🔄 [submitFormToBackend] Converting temp GC - data keys: ${data.keys.toList()}',
+            );
             response = await http.post(
               url,
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode(data),
             );
 
-            debugPrint('🔄 [submitFormToBackend] Convert response status: ${response.statusCode}');
-            debugPrint('🔄 [submitFormToBackend] Convert response body: ${response.body}');
-
+            debugPrint(
+              '🔄 [submitFormToBackend] Convert response status: ${response.statusCode}',
+            );
+            debugPrint(
+              '🔄 [submitFormToBackend] Convert response body: ${response.body}',
+            );
 
             if (response.statusCode != 200) {
               throw Exception(
@@ -2688,6 +2914,9 @@ class GCFormController extends GetxController {
           message = 'Temporary GC created: $tempGcNum';
         } else if (isFillTemporaryMode.value) {
           message = 'GC created successfully from template!';
+
+          // Check GC usage and warn if balance is low after filling temporary GC
+          await checkGCUsageAndWarn(_idController.userId.value);
         } else if (isEditMode.value) {
           message = 'GC updated successfully!';
         } else {
@@ -2705,6 +2934,9 @@ class GCFormController extends GetxController {
         // If a new GC was created, signal the GCUsageWidget to refresh
         if (!isEditMode.value && !isTemporaryMode.value) {
           _idController.gcDataNeedsRefresh.value = true;
+
+          // Check GC usage and warn if balance is low
+          await checkGCUsageAndWarn(_idController.userId.value);
         }
 
         clearForm();
@@ -2932,11 +3164,15 @@ class GCFormController extends GetxController {
       final companyId = _idController.companyId.value;
       final branchId = _idController.branchId.value;
 
-      debugPrint('🔍 [fetchExistingAttachments] CompanyId: $companyId, BranchId: $branchId');
+      debugPrint(
+        '🔍 [fetchExistingAttachments] CompanyId: $companyId, BranchId: $branchId',
+      );
 
       if (companyId.isEmpty) {
         attachmentsError.value = 'Company ID not found';
-        debugPrint('❌ [fetchExistingAttachments] Company ID is empty, aborting');
+        debugPrint(
+          '❌ [fetchExistingAttachments] Company ID is empty, aborting',
+        );
         return;
       }
 
@@ -2955,7 +3191,9 @@ class GCFormController extends GetxController {
         headers: {'Content-Type': 'application/json'},
       );
 
-      debugPrint('🔍 [fetchExistingAttachments] Response status: ${response.statusCode}');
+      debugPrint(
+        '🔍 [fetchExistingAttachments] Response status: ${response.statusCode}',
+      );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -2964,7 +3202,9 @@ class GCFormController extends GetxController {
         if (data['success'] == true && data['data'] != null) {
           final attachments =
               data['data']['attachments'] as List<dynamic>? ?? [];
-          debugPrint('🔍 [fetchExistingAttachments] Found ${attachments.length} attachments');
+          debugPrint(
+            '🔍 [fetchExistingAttachments] Found ${attachments.length} attachments',
+          );
 
           existingAttachments.assignAll(
             attachments
@@ -2981,20 +3221,28 @@ class GCFormController extends GetxController {
                 .toList(),
           );
 
-          debugPrint('✅ [fetchExistingAttachments] Successfully loaded ${existingAttachments.length} attachments');
+          debugPrint(
+            '✅ [fetchExistingAttachments] Successfully loaded ${existingAttachments.length} attachments',
+          );
         } else {
-          debugPrint('⚠️ [fetchExistingAttachments] API returned success=false or no data');
+          debugPrint(
+            '⚠️ [fetchExistingAttachments] API returned success=false or no data',
+          );
         }
       } else {
         attachmentsError.value = 'Failed to fetch attachments';
-        debugPrint('❌ [fetchExistingAttachments] HTTP error: ${response.statusCode}, body: ${response.body}');
+        debugPrint(
+          '❌ [fetchExistingAttachments] HTTP error: ${response.statusCode}, body: ${response.body}',
+        );
       }
     } catch (e) {
       attachmentsError.value = 'Error fetching attachments: $e';
       debugPrint('❌ [fetchExistingAttachments] Exception: $e');
     } finally {
       isLoadingAttachments.value = false;
-      debugPrint('🔄 [fetchExistingAttachments] Completed for GC: $gcNumber, loading state reset');
+      debugPrint(
+        '🔄 [fetchExistingAttachments] Completed for GC: $gcNumber, loading state reset',
+      );
     }
   }
 

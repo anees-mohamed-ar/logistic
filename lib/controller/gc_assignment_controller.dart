@@ -10,6 +10,7 @@ class GCAssignmentController extends GetxController {
   //Form controllers
   final userCtrl = TextEditingController();
   final fromGcCtrl = TextEditingController();
+  final toGcCtrl = TextEditingController();
   final countCtrl = TextEditingController();
   final statusCtrl = TextEditingController();
 
@@ -34,18 +35,41 @@ class GCAssignmentController extends GetxController {
   final loadingUsage = false.obs;
   final usageError = RxnString();
 
+  // From GC number validation
+  final gcNumberValidating = false.obs;
+  final gcNumberStatus = RxnString(); // 'available', 'active', 'queued', 'expired'
+  final gcNumberMessage = RxnString();
+  final gcNumberIsInUse = false.obs;
+
+  // To GC number validation
+  final toGcNumberValidating = false.obs;
+  final toGcNumberStatus = RxnString(); // 'available', 'active', 'queued', 'expired'
+  final toGcNumberMessage = RxnString();
+  final toGcNumberIsInUse = false.obs;
+
   final IdController _idController = Get.find<IdController>();
 
   @override
   void onInit() {
     super.onInit();
     fetchUsers();
+    
+    // Add listener to fromGcCtrl for real-time validation
+    fromGcCtrl.addListener(_onFromGcChanged);
+    
+    // Add listeners to auto-calculate toGc
+    fromGcCtrl.addListener(_calculateToGc);
+    countCtrl.addListener(_calculateToGc);
   }
 
   @override
   void onClose() {
+    fromGcCtrl.removeListener(_onFromGcChanged);
+    fromGcCtrl.removeListener(_calculateToGc);
+    countCtrl.removeListener(_calculateToGc);
     userCtrl.dispose();
     fromGcCtrl.dispose();
+    toGcCtrl.dispose();
     countCtrl.dispose();
     statusCtrl.dispose();
     super.onClose();
@@ -355,5 +379,159 @@ class GCAssignmentController extends GetxController {
       return 'Please enter a valid count';
     }
     return null;
+  }
+
+  // Calculate To GC Number based on From GC and Count
+  void _calculateToGc() {
+    final fromGc = int.tryParse(fromGcCtrl.text.trim());
+    final count = int.tryParse(countCtrl.text.trim());
+    
+    if (fromGc != null && count != null && count > 0) {
+      final toGc = fromGc + count - 1;
+      toGcCtrl.text = toGc.toString();
+      
+      // Trigger validation for To GC after calculation
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (toGcCtrl.text == toGc.toString()) {
+          checkToGCNumberAvailability(toGc.toString());
+        }
+      });
+    } else {
+      toGcCtrl.text = '';
+      // Clear To GC validation when empty
+      toGcNumberStatus.value = null;
+      toGcNumberMessage.value = null;
+      toGcNumberIsInUse.value = false;
+    }
+  }
+
+  // Debounced listener for GC number validation
+  void _onFromGcChanged() {
+    final gcNumber = fromGcCtrl.text.trim();
+    if (gcNumber.isEmpty) {
+      gcNumberStatus.value = null;
+      gcNumberMessage.value = null;
+      gcNumberIsInUse.value = false;
+      return;
+    }
+    
+    // Only validate if it's a valid number
+    final number = int.tryParse(gcNumber);
+    if (number != null && number > 0) {
+      // Debounce the validation call
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (fromGcCtrl.text.trim() == gcNumber) {
+          checkGCNumberAvailability(gcNumber);
+        }
+      });
+    }
+  }
+
+  // Check GC number availability
+  Future<void> checkGCNumberAvailability(String gcNumber) async {
+    try {
+      gcNumberValidating.value = true;
+      
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+      
+      // Parse GC number as integer
+      final gcNumberInt = int.tryParse(gcNumber);
+      if (gcNumberInt == null) {
+        gcNumberStatus.value = null;
+        gcNumberMessage.value = 'Invalid GC number';
+        gcNumberIsInUse.value = false;
+        gcNumberValidating.value = false;
+        return;
+      }
+      
+      final url = Uri.parse('${ApiConfig.baseUrl}/gc-management/check-fromGC')
+          .replace(queryParameters: {
+        'gcNumber': gcNumberInt.toString(),
+        'companyId': companyId,
+        if (branchId.isNotEmpty) 'branchId': branchId,
+      });
+      
+      final response = await http.get(url).timeout(const Duration(seconds: 5));
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        
+        if (responseData['success'] == true) {
+          gcNumberIsInUse.value = responseData['isInUse'] ?? false;
+          gcNumberStatus.value = responseData['status'];
+          gcNumberMessage.value = responseData['message'];
+        } else {
+          gcNumberStatus.value = null;
+          gcNumberMessage.value = 'Failed to check GC number';
+          gcNumberIsInUse.value = false;
+        }
+      } else {
+        gcNumberStatus.value = null;
+        gcNumberMessage.value = 'Error checking GC number';
+        gcNumberIsInUse.value = false;
+      }
+    } catch (e) {
+      print('Error checking GC number: $e');
+      gcNumberStatus.value = null;
+      gcNumberMessage.value = 'Connection error';
+      gcNumberIsInUse.value = false;
+    } finally {
+      gcNumberValidating.value = false;
+    }
+  }
+
+  // Check To GC number availability
+  Future<void> checkToGCNumberAvailability(String gcNumber) async {
+    try {
+      toGcNumberValidating.value = true;
+      
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+      
+      // Parse GC number as integer
+      final gcNumberInt = int.tryParse(gcNumber);
+      if (gcNumberInt == null) {
+        toGcNumberStatus.value = null;
+        toGcNumberMessage.value = 'Invalid To GC number';
+        toGcNumberIsInUse.value = false;
+        toGcNumberValidating.value = false;
+        return;
+      }
+      
+      final url = Uri.parse('${ApiConfig.baseUrl}/gc-management/check-toGC')
+          .replace(queryParameters: {
+        'gcNumber': gcNumberInt.toString(),
+        'companyId': companyId,
+        if (branchId.isNotEmpty) 'branchId': branchId,
+      });
+      
+      final response = await http.get(url).timeout(const Duration(seconds: 5));
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        
+        if (responseData['success'] == true) {
+          toGcNumberIsInUse.value = responseData['isInUse'] ?? false;
+          toGcNumberStatus.value = responseData['status'];
+          toGcNumberMessage.value = responseData['message'];
+        } else {
+          toGcNumberStatus.value = null;
+          toGcNumberMessage.value = 'Failed to check To GC number';
+          toGcNumberIsInUse.value = false;
+        }
+      } else {
+        toGcNumberStatus.value = null;
+        toGcNumberMessage.value = 'Error checking To GC number';
+        toGcNumberIsInUse.value = false;
+      }
+    } catch (e) {
+      print('Error checking To GC number: $e');
+      toGcNumberStatus.value = null;
+      toGcNumberMessage.value = 'Connection error';
+      toGcNumberIsInUse.value = false;
+    } finally {
+      toGcNumberValidating.value = false;
+    }
   }
 }

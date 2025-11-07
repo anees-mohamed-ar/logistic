@@ -11,6 +11,7 @@ class IdController extends GetxController {
   var bloodGroup = ''.obs;
   var phoneNumber = ''.obs;
   var userRole = ''.obs; // Added user role field
+  var bookingOfficerName = ''.obs; // Added booking officer name field
 
   // NEW: RxBool to signal when GC usage data needs a refresh.
   var gcDataNeedsRefresh = false.obs;
@@ -30,12 +31,20 @@ class IdController extends GetxController {
     fileName.value = name ?? '';
   }
 
-  void setUserName(String name) {
-    userName.value = name;
+  void setUserRole(String role) {
+    userRole.value = role;
+  }
+
+  void setBookingOfficerName(String name) {
+    bookingOfficerName.value = name;
   }
 
   void setUserEmail(String email) {
     userEmail.value = email;
+  }
+
+  void setUserName(String name) {
+    userName.value = name;
   }
 
   void setCompanyName(String name) {
@@ -71,6 +80,7 @@ class IdController extends GetxController {
     bloodGroup.value = '';
     phoneNumber.value = '';
     userRole.value = '';
+    bookingOfficerName.value = '';
     gcDataNeedsRefresh.value = false; // Also reset the flag
     profilePictureTimestamp.value = DateTime.now().millisecondsSinceEpoch;
   }
@@ -91,6 +101,7 @@ class IdController extends GetxController {
     userRole.value =
         userData['user_role']?.toString() ??
         'user'; // Default to 'user' if not specified
+    bookingOfficerName.value = userData['booking_officer_name']?.toString() ?? '';
   }
 
   void clear() {
@@ -105,5 +116,7 @@ class IdController extends GetxController {
     phoneNumber.value = '';
     gcDataNeedsRefresh.value = false;
     profilePictureTimestamp.value = DateTime.now().millisecondsSinceEpoch;
+    userRole.value = '';
+    bookingOfficerName.value = '';
   }
 }

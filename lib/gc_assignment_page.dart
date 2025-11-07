@@ -878,14 +878,7 @@ class GCAssignmentPage extends StatelessWidget {
         padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
-            _buildModernTextField(
-              controller: controller.fromGcCtrl,
-              label: 'From GC Number',
-              hint: 'Enter starting GC number',
-              icon: Icons.numbers_rounded,
-              keyboardType: TextInputType.number,
-              validator: controller.validateFromGc,
-            ),
+            _buildGCNumberFieldWithValidation(controller),
             const SizedBox(height: 20),
             _buildModernTextField(
               controller: controller.countCtrl,
@@ -895,6 +888,8 @@ class GCAssignmentPage extends StatelessWidget {
               keyboardType: TextInputType.number,
               validator: controller.validateCount,
             ),
+            const SizedBox(height: 20),
+            _buildToGCNumberFieldWithValidation(controller),
             const SizedBox(height: 20),
             _buildModernTextField(
               controller: controller.statusCtrl,
@@ -908,6 +903,343 @@ class GCAssignmentPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildGCNumberFieldWithValidation(GCAssignmentController controller) {
+    return Obx(() {
+      // Determine border color and icon based on validation status
+      Color borderColor = Colors.grey[300]!;
+      Color? fillColor = Colors.grey[50];
+      Widget? suffixIcon;
+      
+      if (controller.gcNumberValidating.value) {
+        // Checking status - blue with loading indicator
+        borderColor = const Color(0xFF4A90E2);
+        suffixIcon = const Padding(
+          padding: EdgeInsets.all(12.0),
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4A90E2)),
+            ),
+          ),
+        );
+      } else if (controller.gcNumberStatus.value != null) {
+        final status = controller.gcNumberStatus.value!;
+        
+        if (status == 'available') {
+          // Available - green with check icon
+          borderColor = Colors.green;
+          fillColor = Colors.green[50];
+          suffixIcon = Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Icon(
+              Icons.check_circle,
+              color: Colors.green,
+              size: 24,
+            ),
+          );
+        } else if (status == 'active') {
+          // Active range - orange with warning icon
+          borderColor = Colors.orange;
+          fillColor = Colors.orange[50];
+          suffixIcon = Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.orange,
+              size: 24,
+            ),
+          );
+        } else if (status == 'queued') {
+          // Queued range - blue with info icon
+          borderColor = Colors.blue;
+          fillColor = Colors.blue[50];
+          suffixIcon = Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Icon(
+              Icons.schedule,
+              color: Colors.blue,
+              size: 24,
+            ),
+          );
+        } else if (status == 'expired') {
+          // Expired range - red with error icon
+          borderColor = Colors.red[300]!;
+          fillColor = Colors.red[50];
+          suffixIcon = Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Icon(
+              Icons.error_outline,
+              color: Colors.red[300],
+              size: 24,
+            ),
+          );
+        }
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'From GC Number',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1A1A1A),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: controller.fromGcCtrl,
+            decoration: InputDecoration(
+              hintText: 'Enter starting GC number',
+              hintStyle: TextStyle(color: Colors.grey[400]),
+              prefixIcon: const Icon(
+                Icons.numbers_rounded,
+                color: Color(0xFF4A90E2),
+              ),
+              suffixIcon: suffixIcon,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: borderColor, width: 2),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: borderColor, width: 2),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: borderColor, width: 2),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.red),
+              ),
+              filled: true,
+              fillColor: fillColor,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+            keyboardType: TextInputType.number,
+            validator: controller.validateFromGc,
+            style: const TextStyle(
+              color: Color(0xFF1A1A1A),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          // Status message
+          if (controller.gcNumberMessage.value != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  _getStatusIcon(controller.gcNumberStatus.value),
+                  size: 16,
+                  color: _getStatusColor(controller.gcNumberStatus.value),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    controller.gcNumberMessage.value!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _getStatusColor(controller.gcNumberStatus.value),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      );
+    });
+  }
+
+  Widget _buildToGCNumberFieldWithValidation(GCAssignmentController controller) {
+    return Obx(() {
+      // Determine border color and icon based on validation status
+      Color borderColor = Colors.grey[300]!;
+      Color? fillColor = Colors.grey[100];
+      Widget? suffixIcon;
+      
+      if (controller.toGcNumberValidating.value) {
+        // Checking status - blue with loading indicator
+        borderColor = const Color(0xFF4A90E2);
+        suffixIcon = const Padding(
+          padding: EdgeInsets.all(12.0),
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4A90E2)),
+            ),
+          ),
+        );
+      } else if (controller.toGcNumberStatus.value != null) {
+        final status = controller.toGcNumberStatus.value!;
+        
+        if (status == 'available') {
+          // Available - green with check icon
+          borderColor = Colors.green;
+          fillColor = Colors.green[50];
+          suffixIcon = Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Icon(
+              Icons.check_circle,
+              color: Colors.green,
+              size: 24,
+            ),
+          );
+        } else if (status == 'active') {
+          // Active range - orange with warning icon
+          borderColor = Colors.orange;
+          fillColor = Colors.orange[50];
+          suffixIcon = Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.orange,
+              size: 24,
+            ),
+          );
+        } else if (status == 'queued') {
+          // Queued range - blue with info icon
+          borderColor = Colors.blue;
+          fillColor = Colors.blue[50];
+          suffixIcon = Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Icon(
+              Icons.schedule,
+              color: Colors.blue,
+              size: 24,
+            ),
+          );
+        } else if (status == 'expired') {
+          // Expired range - red with error icon
+          borderColor = Colors.red[300]!;
+          fillColor = Colors.red[50];
+          suffixIcon = Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Icon(
+              Icons.error_outline,
+              color: Colors.red[300],
+              size: 24,
+            ),
+          );
+        }
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'To GC Number',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1A1A1A),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: controller.toGcCtrl,
+            decoration: InputDecoration(
+              hintText: 'Auto-calculated',
+              hintStyle: TextStyle(color: Colors.grey[400]),
+              prefixIcon: Icon(
+                Icons.arrow_forward_rounded,
+                color: Colors.grey[400],
+              ),
+              suffixIcon: suffixIcon,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: borderColor, width: 2),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: borderColor, width: 2),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: borderColor, width: 2),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.red),
+              ),
+              filled: true,
+              fillColor: fillColor,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+            readOnly: true,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          // Status message
+          if (controller.toGcNumberMessage.value != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  _getStatusIcon(controller.toGcNumberStatus.value),
+                  size: 16,
+                  color: _getStatusColor(controller.toGcNumberStatus.value),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    controller.toGcNumberMessage.value!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _getStatusColor(controller.toGcNumberStatus.value),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      );
+    });
+  }
+
+  IconData _getStatusIcon(String? status) {
+    if (status == null) return Icons.info_outline;
+    switch (status) {
+      case 'available':
+        return Icons.check_circle;
+      case 'active':
+        return Icons.warning_amber_rounded;
+      case 'queued':
+        return Icons.schedule;
+      case 'expired':
+        return Icons.error_outline;
+      default:
+        return Icons.info_outline;
+    }
+  }
+
+  Color _getStatusColor(String? status) {
+    if (status == null) return Colors.grey;
+    switch (status) {
+      case 'available':
+        return Colors.green;
+      case 'active':
+        return Colors.orange;
+      case 'queued':
+        return Colors.blue;
+      case 'expired':
+        return Colors.red[300]!;
+      default:
+        return Colors.grey;
+    }
   }
 
   Widget _buildModernTextField({

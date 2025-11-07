@@ -24,6 +24,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _bloodGroupController = TextEditingController();
+  final _bookingOfficerNameController = TextEditingController();
   String _selectedRole = CompanyConfig.defaultUserRole;
   
   // Use CompanyConfig for company values
@@ -124,6 +125,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
       
       final bloodGroup = _bloodGroupController.text.trim();
       if (bloodGroup.isNotEmpty) requestBody['bloodGroup'] = bloodGroup;
+      
+      // Add booking officer name if provided
+      final bookingOfficerName = _bookingOfficerNameController.text.trim();
+      if (bookingOfficerName.isNotEmpty) requestBody['booking_officer_name'] = bookingOfficerName;
       
       // Always include role as it's required
       requestBody['user_role'] = _selectedRole;
@@ -229,9 +234,13 @@ class _UserManagementPageState extends State<UserManagementPage> {
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _passwordController,
-                        decoration: const InputDecoration(labelText: 'Password'),
+                        decoration: InputDecoration(
+                          labelText: 'Password${isEditing ? ' (Leave empty to keep current)' : ''}',
+                        ),
                         obscureText: true,
-                        validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                        validator: (value) => isEditing
+                            ? null  // Not required when editing
+                            : (value?.isEmpty ?? true ? 'Required' : null),
                       ),
                       const SizedBox(height: 8),
 
@@ -297,6 +306,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
                       TextFormField(
                         controller: _bloodGroupController,
                         decoration: const InputDecoration(labelText: 'Blood Group (Optional)'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _bookingOfficerNameController,
+                        decoration: const InputDecoration(labelText: 'Booking Officer Name (Optional)'),
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
@@ -735,6 +749,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       _passwordController.clear();
       _phoneController.clear();
       _bloodGroupController.clear();
+      _bookingOfficerNameController.clear();
       _selectedBranch = null;
       _selectedRole = CompanyConfig.defaultUserRole;
       isEditing = false;
@@ -751,6 +766,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       _passwordController.clear(); // Clear password for security
       _phoneController.text = user['phoneNumber'] ?? '';
       _bloodGroupController.text = user['bloodGroup'] ?? '';
+      _bookingOfficerNameController.text = user['booking_officer_name'] ?? '';
       _selectedRole = user['user_role']?.toString().toLowerCase() ?? CompanyConfig.defaultUserRole;
 
       // Company is hardcoded, no need to set it

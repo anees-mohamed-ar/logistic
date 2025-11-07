@@ -52,7 +52,12 @@ class _GCFormScreenState extends State<GCFormScreen> {
       if (controller.isTemporaryMode.value) {
         controller.clearForm();
         controller.prepareTemporaryGcForm();
+        
+        // Skip GC usage warning for temporary GC creation - will be checked when filling
       } else if (controller.isFillTemporaryMode.value) {
+        // When filling temporary GC, check GC usage first
+        await controller.checkGCUsageAndWarn(userId);
+
         // When filling temporary GC, check access and get next GC number
         final hasAccess = await controller.checkGCAccess(userId);
         if (!hasAccess) {
@@ -72,13 +77,14 @@ class _GCFormScreenState extends State<GCFormScreen> {
           if (nextGC != null) {
             controller.gcNumberCtrl.text = nextGC;
           }
-
-          await controller.checkGCUsageAndWarn(userId);
         } catch (e) {
           print('Error in form initialization: $e');
         }
       } else if (!controller.isEditMode.value) {
         controller.clearForm();
+
+        // Check GC usage warning first for new GC creation
+        await controller.checkGCUsageAndWarn(userId);
 
         final hasAccess = await controller.checkGCAccess(userId);
         if (!hasAccess) {
@@ -98,8 +104,6 @@ class _GCFormScreenState extends State<GCFormScreen> {
           if (nextGC != null) {
             controller.gcNumberCtrl.text = nextGC;
           }
-
-          await controller.checkGCUsageAndWarn(userId);
         } catch (e) {
           print('Error in form initialization: $e');
         }
@@ -176,19 +180,25 @@ class _GCFormScreenState extends State<GCFormScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: controller.remainingTime.value.inSeconds <= 30
-                      ? Colors.red.shade600
-                      : Colors.orange.shade600,
-                  borderRadius: BorderRadius.circular(6),
+                  color: controller.remainingTime.value.inSeconds > 60
+                      ? Colors.white
+                      : controller.remainingTime.value.inSeconds.isEven
+                          ? Colors.red.shade700
+                          : Colors.white,
+                  borderRadius: BorderRadius.circular(15),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.3),
+                    color: Colors.black.withOpacity(0.3),
                     width: 1,
                   ),
                 ),
                 child: Text(
                   timeStr,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: controller.remainingTime.value.inSeconds > 60
+                        ? Colors.redAccent
+                        : controller.remainingTime.value.inSeconds.isEven
+                            ? Colors.white
+                            : Colors.redAccent,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'monospace',
                     fontSize: 14,
@@ -500,15 +510,20 @@ class _GCFormScreenState extends State<GCFormScreen> {
   }
 
   Future<void> _unlockIfNeeded() async {
-    if (tempController != null) {
-      final controller = Get.isRegistered<GCFormController>()
-          ? Get.find<GCFormController>()
-          : null;
-      if (controller != null && controller.isFillTemporaryMode.value && controller.tempGcNumber.value.isNotEmpty) {
+    final controller = Get.isRegistered<GCFormController>()
+        ? Get.find<GCFormController>()
+        : null;
+    
+    if (controller != null) {
+      // Unlock temporary GC if needed
+      if (tempController != null && controller.isFillTemporaryMode.value && controller.tempGcNumber.value.isNotEmpty) {
         await tempController!.unlockTemporaryGC(controller.tempGcNumber.value);
-        controller.isFillTemporaryMode.value = false;
-        controller.tempGcNumber.value = '';
       }
+      
+      // Reset all temporary mode flags when closing the form
+      controller.isTemporaryMode.value = false;
+      controller.isFillTemporaryMode.value = false;
+      controller.tempGcNumber.value = '';
     }
   }
 
@@ -609,11 +624,16 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   Expanded(
                     child: TextFormField(
                       controller: controller.eDaysCtrl,
+                      focusNode: controller.eDaysFocus,
                       decoration: _inputDecoration('E-Days', Icons.schedule),
                       keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
                       validator: null,
                       onChanged: (_) {
                         controller.updateDeliveryDateFromInputs();
+                      },
+                      onFieldSubmitted: (_) {
+                        controller.poNumberFocus.requestFocus();
                       },
                     ),
                   ),
@@ -680,13 +700,18 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: controller.poNumberCtrl,
+                        focusNode: controller.poNumberFocus,
                         decoration: _inputDecoration(
                           'PO Number',
                           Icons.description,
                         ),
+                        textInputAction: TextInputAction.next,
                         validator: (value) =>
                         value == null || value.isEmpty ? 'Required' : null,
                         onChanged: (_) {},
+                        onFieldSubmitted: (_) {
+                          controller.truckTypeFocus.requestFocus();
+                        },
                       ),
                     ),
                 ],
@@ -695,9 +720,14 @@ class _GCFormScreenState extends State<GCFormScreen> {
               if (isSmallScreen)
                 TextFormField(
                   controller: controller.poNumberCtrl,
+                  focusNode: controller.poNumberFocus,
                   decoration: _inputDecoration('PO Number', Icons.description),
+                  textInputAction: TextInputAction.next,
                   validator: null,
                   onChanged: (_) {},
+                  onFieldSubmitted: (_) {
+                    controller.truckTypeFocus.requestFocus();
+                  },
                 ),
               const SizedBox(height: 16),
               // Truck Type and Driver Name row
@@ -706,9 +736,14 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   Expanded(
                     child: TextFormField(
                       controller: controller.truckTypeCtrl,
+                      focusNode: controller.truckTypeFocus,
                       decoration: _inputDecoration('Truck Type', Icons.local_shipping, compact: isSmallScreen),
+                      textInputAction: TextInputAction.next,
                       validator: null,
                       onChanged: (_) {},
+                      onFieldSubmitted: (_) {
+                        controller.tripIdFocus.requestFocus();
+                      },
                     ),
                   ),
                   if (!isSmallScreen) const SizedBox(width: 16),
@@ -836,9 +871,15 @@ class _GCFormScreenState extends State<GCFormScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: controller.tripIdCtrl,
+                focusNode: controller.tripIdFocus,
                 decoration: _inputDecoration('Trip ID', Icons.route),
+                textInputAction: TextInputAction.next,
                 validator: null,
                 onChanged: (_) {},
+                onFieldSubmitted: (_) {
+                  // Last field in Shipment tab - move to next tab
+                  controller.navigateToNextTab();
+                },
               ),
             ],
           ),
@@ -952,11 +993,16 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         message: 'e.g., 27AABCU9603R1Z',
                         child: TextFormField(
                           controller: controller.consignorGstCtrl,
+                          focusNode: controller.consignorGstFocus,
                           decoration: _inputDecoration('GST', Icons.business),
+                          textInputAction: TextInputAction.next,
                           validator: (value) => value == null || value.isEmpty
                               ? 'Required'
                               : null,
                           onChanged: (_) {},
+                          onFieldSubmitted: (_) {
+                            controller.consignorAddressFocus.requestFocus();
+                          },
                         ),
                       ),
                     ),
@@ -968,18 +1014,28 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   message: 'e.g., 27AABCU9603R1Z',
                   child: TextFormField(
                     controller: controller.consignorGstCtrl,
+                    focusNode: controller.consignorGstFocus,
                     decoration: _inputDecoration('GST', Icons.business),
+                    textInputAction: TextInputAction.next,
                     validator: null,
                     onChanged: (_) {},
+                    onFieldSubmitted: (_) {
+                      controller.consignorAddressFocus.requestFocus();
+                    },
                   ),
                 ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: controller.consignorAddressCtrl,
+                focusNode: controller.consignorAddressFocus,
                 decoration: _inputDecoration('Address', Icons.location_on),
                 maxLines: 2,
+                textInputAction: TextInputAction.next,
                 validator: null,
                 onChanged: (_) {},
+                onFieldSubmitted: (_) {
+                  controller.billToGstFocus.requestFocus();
+                },
               ),
               const SizedBox(height: 24),
               Text(
@@ -1013,9 +1069,14 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         message: 'e.g., 27AABCU9603R1Z',
                         child: TextFormField(
                           controller: controller.billToGstCtrl,
+                          focusNode: controller.billToGstFocus,
                           decoration: _inputDecoration('GST', Icons.business),
+                          textInputAction: TextInputAction.next,
                           validator: null,
                           onChanged: (_) {},
+                          onFieldSubmitted: (_) {
+                            controller.billToAddressFocus.requestFocus();
+                          },
                         ),
                       ),
                     ),
@@ -1027,18 +1088,28 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   message: 'e.g., 27AABCU9603R1Z',
                   child: TextFormField(
                     controller: controller.billToGstCtrl,
+                    focusNode: controller.billToGstFocus,
                     decoration: _inputDecoration('GST', Icons.business),
+                    textInputAction: TextInputAction.next,
                     validator: null,
                     onChanged: (_) {},
+                    onFieldSubmitted: (_) {
+                      controller.billToAddressFocus.requestFocus();
+                    },
                   ),
                 ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: controller.billToAddressCtrl,
+                focusNode: controller.billToAddressFocus,
                 decoration: _inputDecoration('Address', Icons.location_on),
                 maxLines: 2,
+                textInputAction: TextInputAction.next,
                 validator: null,
                 onChanged: (_) {},
+                onFieldSubmitted: (_) {
+                  controller.consigneeGstFocus.requestFocus();
+                },
               ),
               const SizedBox(height: 24),
               Text(
@@ -1088,9 +1159,14 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         message: 'e.g., 27AABCU9603R1Z',
                         child: TextFormField(
                           controller: controller.consigneeGstCtrl,
+                          focusNode: controller.consigneeGstFocus,
                           decoration: _inputDecoration('GST', Icons.business),
+                          textInputAction: TextInputAction.next,
                           validator: null,
                           onChanged: (_) {},
+                          onFieldSubmitted: (_) {
+                            controller.consigneeAddressFocus.requestFocus();
+                          },
                         ),
                       ),
                     ),
@@ -1102,18 +1178,29 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   message: 'e.g., 27AABCU9603R1Z',
                   child: TextFormField(
                     controller: controller.consigneeGstCtrl,
+                    focusNode: controller.consigneeGstFocus,
                     decoration: _inputDecoration('GST', Icons.business),
+                    textInputAction: TextInputAction.next,
                     validator: null,
                     onChanged: (_) {},
+                    onFieldSubmitted: (_) {
+                      controller.consigneeAddressFocus.requestFocus();
+                    },
                   ),
                 ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: controller.consigneeAddressCtrl,
+                focusNode: controller.consigneeAddressFocus,
                 decoration: _inputDecoration('Address', Icons.location_on),
                 maxLines: 2,
+                textInputAction: TextInputAction.next,
                 validator: null,
                 onChanged: (_) {},
+                onFieldSubmitted: (_) {
+                  // Last field in Parties tab - move to next tab
+                  controller.navigateToNextTab();
+                },
               ),
               const SizedBox(height: 16),
               // From / To fields
@@ -1246,13 +1333,18 @@ class _GCFormScreenState extends State<GCFormScreen> {
               // Number of Packages
               TextFormField(
                 controller: controller.packagesCtrl,
+                focusNode: controller.packagesFocus,
                 decoration: _inputDecoration(
                   'No. of Packages',
                   Icons.inventory_2_outlined,
                 ),
                 keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
                 validator: null,
                 onChanged: (_) {},
+                onFieldSubmitted: (_) {
+                  controller.natureGoodsFocus.requestFocus();
+                },
               ),
               const SizedBox(height: 16),
 
@@ -1263,26 +1355,36 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: controller.natureGoodsCtrl,
+                        focusNode: controller.natureGoodsFocus,
                         decoration: _inputDecoration(
                           'Nature of Goods',
                           Icons.category,
                         ),
+                        textInputAction: TextInputAction.next,
                         validator: (value) =>
                         value == null || value.isEmpty ? 'Required' : null,
                         onChanged: (_) {},
+                        onFieldSubmitted: (_) {
+                          controller.methodPackageFocus.requestFocus();
+                        },
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: TextFormField(
                         controller: controller.methodPackageCtrl,
+                        focusNode: controller.methodPackageFocus,
                         decoration: _inputDecoration(
                           'Package Method',
                           Icons.inventory_2_outlined,
                         ),
+                        textInputAction: TextInputAction.next,
                         validator: (value) =>
                         value == null || value.isEmpty ? 'Required' : null,
                         onChanged: (_) {},
+                        onFieldSubmitted: (_) {
+                          controller.customInvoiceFocus.requestFocus();
+                        },
                       ),
                     ),
                   ],
@@ -1290,35 +1392,50 @@ class _GCFormScreenState extends State<GCFormScreen> {
               else ...[ // For small screens, stack them vertically
                 TextFormField(
                   controller: controller.natureGoodsCtrl,
+                  focusNode: controller.natureGoodsFocus,
                   decoration: _inputDecoration(
                     'Nature of Goods',
                     Icons.category,
                   ),
+                  textInputAction: TextInputAction.next,
                   validator: null,
                   onChanged: (_) {},
+                  onFieldSubmitted: (_) {
+                    controller.methodPackageFocus.requestFocus();
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: controller.methodPackageCtrl,
+                  focusNode: controller.methodPackageFocus,
                   decoration: _inputDecoration(
                     'Package Method',
                     Icons.inventory_2_outlined,
                   ),
+                  textInputAction: TextInputAction.next,
                   validator: null,
                   onChanged: (_) {},
+                  onFieldSubmitted: (_) {
+                    controller.deliveryInstructionsFocus.requestFocus();
+                  },
                 ),
                 const SizedBox(height: 16),
                 // Delivery Special Instructions
                 TextFormField(
                   controller: controller.deliveryInstructionsCtrl,
+                  focusNode: controller.deliveryInstructionsFocus,
                   decoration: _inputDecoration(
                     'Delivery Special Instructions',
                     Icons.delivery_dining,
                     hintText: 'Enter any special delivery instructions',
                   ),
                   maxLines: 3,
+                  textInputAction: TextInputAction.next,
                   validator: null,
                   onChanged: (_) {},
+                  onFieldSubmitted: (_) {
+                    controller.customInvoiceFocus.requestFocus();
+                  },
                 ),
               ],
               // // const SizedBox(height: 16),
@@ -1390,25 +1507,35 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: controller.customInvoiceCtrl,
+                        focusNode: controller.customInvoiceFocus,
                         decoration: _inputDecoration(
                           'Cust Inv No',
                           Icons.receipt_long,
                           isOptional: true,
                         ),
+                        textInputAction: TextInputAction.next,
                         onChanged: (_) {},
+                        onFieldSubmitted: (_) {
+                          controller.invValueFocus.requestFocus();
+                        },
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: TextFormField(
                         controller: controller.invValueCtrl,
+                        focusNode: controller.invValueFocus,
                         decoration: _inputDecoration(
                           'Inv Value',
                           Icons.currency_rupee,
                           isOptional: true,
                         ),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        textInputAction: TextInputAction.next,
                         onChanged: (_) {},
+                        onFieldSubmitted: (_) {
+                          controller.ewayBillFocus.requestFocus();
+                        },
                       ),
                     ),
                   ],
@@ -1416,23 +1543,33 @@ class _GCFormScreenState extends State<GCFormScreen> {
               else ...[
                 TextFormField(
                   controller: controller.customInvoiceCtrl,
+                  focusNode: controller.customInvoiceFocus,
                   decoration: _inputDecoration(
                     'Cust Inv No',
                     Icons.receipt_long,
                     isOptional: true,
                   ),
+                  textInputAction: TextInputAction.next,
                   onChanged: (_) {},
+                  onFieldSubmitted: (_) {
+                    controller.invValueFocus.requestFocus();
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: controller.invValueCtrl,
+                  focusNode: controller.invValueFocus,
                   decoration: _inputDecoration(
                     'Inv Value',
                     Icons.currency_rupee,
                     isOptional: true,
                   ),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.next,
                   onChanged: (_) {},
+                  onFieldSubmitted: (_) {
+                    controller.ewayBillFocus.requestFocus();
+                  },
                 ),
               ],
               
@@ -1441,12 +1578,17 @@ class _GCFormScreenState extends State<GCFormScreen> {
               // E-way Bill Number
               TextFormField(
                 controller: controller.ewayBillCtrl,
+                focusNode: controller.ewayBillFocus,
                 decoration: _inputDecoration(
                   'Eway Bill No',
                   Icons.description,
                   isOptional: true,
                 ),
+                textInputAction: TextInputAction.next,
                 onChanged: (_) {},
+                onFieldSubmitted: (_) {
+                  controller.actualWeightFocus.requestFocus();
+                },
               ),
               
               const SizedBox(height: 16),
@@ -1527,13 +1669,18 @@ class _GCFormScreenState extends State<GCFormScreen> {
               // Actual Weight field
               TextFormField(
                 controller: controller.actualWeightCtrl,
+                focusNode: controller.actualWeightFocus,
                 decoration: _inputDecoration(
                   'Actual Weight (Kgs)',
                   Icons.scale,
                   isOptional: true,
                 ),
                 keyboardType: TextInputType.text,
+                textInputAction: TextInputAction.next,
                 onChanged: (_) {},
+                onFieldSubmitted: (_) {
+                  controller.remarksFocus.requestFocus();
+                },
               ),
               
               const SizedBox(height: 16),
@@ -1583,12 +1730,18 @@ class _GCFormScreenState extends State<GCFormScreen> {
               // Private Mark in its own row
               TextFormField(
                 controller: controller.remarksCtrl,
+                focusNode: controller.remarksFocus,
                 decoration: _inputDecoration(
                   'Private Mark',
                   Icons.note_alt_outlined,
                   isOptional: true,
                 ),
+                textInputAction: TextInputAction.next,
                 onChanged: (_) {},
+                onFieldSubmitted: (_) {
+                  // Last field in Goods tab - move to next tab
+                  controller.navigateToNextTab();
+                },
               ),
               const SizedBox(height: 16),
               // Charges in its own row
@@ -1864,7 +2017,12 @@ class _GCFormScreenState extends State<GCFormScreen> {
                               ),
                               IconButton(
                                 icon: const Icon(Icons.download, size: 16),
-                                onPressed: () => controller.downloadAttachment(filename, context, isTemporaryGC: controller.isFillTemporaryMode.value),
+                                onPressed: () => controller.downloadAttachment(
+                                  filename, 
+                                  context, 
+                                  isTemporaryGC: controller.isFillTemporaryMode.value,
+                                  originalName: fileName,
+                                ),
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
                                 tooltip: 'Download',

@@ -81,6 +81,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           (sum, gc) => sum + _parseDouble(gc['FreightCharge']),
     );
 
+    // Debug logging for displayed count
+    debugPrint('🏠 [HomePage] Updating animations with GC count: $totalGCs');
+
     setState(() {
       _totalGCsAnim = Tween<double>(begin: 0, end: totalGCs).animate(
         CurvedAnimation(
@@ -131,10 +134,26 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       if (response.statusCode == 200) {
         if (!mounted) return;
         final List<dynamic> data = jsonDecode(response.body);
+
+        // Debug logging to identify count discrepancy
+        debugPrint('🏠 [HomePage] API Response received: ${data.length} GCs');
+        debugPrint('🏠 [HomePage] Raw response body length: ${response.body.length}');
+        debugPrint('🏠 [HomePage] First few GCs: ${data.take(3).map((gc) => gc['GcNumber'] ?? 'Unknown').toList()}');
+
+        // Check for null or invalid records
+        final validData = data.where((item) => item != null && item is Map).toList();
+        debugPrint('🏠 [HomePage] Valid GCs after filtering: ${validData.length}');
+
+        if (validData.length != data.length) {
+          debugPrint('🏠 [HomePage] Found ${data.length - validData.length} null/invalid records');
+        }
+
         setState(() {
-          _gcList = data.cast<Map<String, dynamic>>();
+          _gcList = validData.cast<Map<String, dynamic>>();
           _isSummaryLoading = false;
         });
+
+        debugPrint('🏠 [HomePage] Final GC list length: ${_gcList.length}');
         _updateAnimations();
       } else {
         if (!mounted) return;
@@ -173,7 +192,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return '₹${amount.toStringAsFixed(0)}';
   }
 
-  Future<void> _checkGCAccessAndNavigate({bool toForm = false}) async {
+  Future<void>  _checkGCAccessAndNavigate({bool toForm = false}) async {
     final idController = Get.find<IdController>();
     final userId = idController.userId.value;
 

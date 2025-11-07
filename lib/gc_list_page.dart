@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:logistic/gc_form_screen.dart';
 import 'package:logistic/controller/id_controller.dart';
 import 'package:logistic/controller/gc_form_controller.dart';
+import 'package:logistic/gc_attachments_page.dart';
 import 'api_config.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
@@ -63,7 +64,9 @@ class _GCListPageState extends State<GCListPage> {
         final dynamic decodedData = jsonDecode(response.body);
         if (decodedData is List) {
           setState(() {
-            gcList = List<Map<String, dynamic>>.from(decodedData.whereType<Map<String, dynamic>>());
+            gcList = List<Map<String, dynamic>>.from(
+              decodedData.whereType<Map<String, dynamic>>(),
+            );
             _extractFilterOptions();
             _applyFiltersAndSort();
             isLoading = false;
@@ -90,29 +93,32 @@ class _GCListPageState extends State<GCListPage> {
 
   void _extractFilterOptions() {
     // Extract unique values for filter dropdowns
-    branches = gcList
-        .map((gc) => gc['Branch']?.toString())
-        .where((b) => b != null && b.isNotEmpty)
-        .cast<String>()
-        .toSet()
-        .toList()
-      ..sort();
+    branches =
+        gcList
+            .map((gc) => gc['Branch']?.toString())
+            .where((b) => b != null && b.isNotEmpty)
+            .cast<String>()
+            .toSet()
+            .toList()
+          ..sort();
 
-    paymentMethods = gcList
-        .map((gc) => gc['PaymentDetails']?.toString())
-        .where((p) => p != null && p.isNotEmpty)
-        .cast<String>()
-        .toSet()
-        .toList()
-      ..sort();
+    paymentMethods =
+        gcList
+            .map((gc) => gc['PaymentDetails']?.toString())
+            .where((p) => p != null && p.isNotEmpty)
+            .cast<String>()
+            .toSet()
+            .toList()
+          ..sort();
 
-    truckTypes = gcList
-        .map((gc) => gc['TruckType']?.toString())
-        .where((t) => t != null && t.isNotEmpty)
-        .cast<String>()
-        .toSet()
-        .toList()
-      ..sort();
+    truckTypes =
+        gcList
+            .map((gc) => gc['TruckType']?.toString())
+            .where((t) => t != null && t.isNotEmpty)
+            .cast<String>()
+            .toSet()
+            .toList()
+          ..sort();
   }
 
   void _applyFiltersAndSort() {
@@ -122,29 +128,42 @@ class _GCListPageState extends State<GCListPage> {
     if (searchController.text.isNotEmpty) {
       final query = searchController.text.toLowerCase();
       result = result.where((gc) {
-        return (gc['GcNumber']?.toString().toLowerCase().contains(query) ?? false) ||
-            (gc['TruckNumber']?.toString().toLowerCase().contains(query) ?? false) ||
-            (gc['PoNumber']?.toString().toLowerCase().contains(query) ?? false) ||
+        return (gc['GcNumber']?.toString().toLowerCase().contains(query) ??
+                false) ||
+            (gc['TruckNumber']?.toString().toLowerCase().contains(query) ??
+                false) ||
+            (gc['PoNumber']?.toString().toLowerCase().contains(query) ??
+                false) ||
             (gc['TripId']?.toString().toLowerCase().contains(query) ?? false) ||
-            (gc['DriverName']?.toString().toLowerCase().contains(query) ?? false) ||
-            (gc['ConsignorName']?.toString().toLowerCase().contains(query) ?? false) ||
+            (gc['DriverName']?.toString().toLowerCase().contains(query) ??
+                false) ||
+            (gc['ConsignorName']?.toString().toLowerCase().contains(query) ??
+                false) ||
             (gc['Branch']?.toString().toLowerCase().contains(query) ?? false);
       }).toList();
     }
 
     // Apply branch filter
     if (selectedBranchFilter != null) {
-      result = result.where((gc) => gc['Branch']?.toString() == selectedBranchFilter).toList();
+      result = result
+          .where((gc) => gc['Branch']?.toString() == selectedBranchFilter)
+          .toList();
     }
 
     // Apply payment filter
     if (selectedPaymentFilter != null) {
-      result = result.where((gc) => gc['PaymentDetails']?.toString() == selectedPaymentFilter).toList();
+      result = result
+          .where(
+            (gc) => gc['PaymentDetails']?.toString() == selectedPaymentFilter,
+          )
+          .toList();
     }
 
     // Apply truck type filter
     if (selectedTruckTypeFilter != null) {
-      result = result.where((gc) => gc['TruckType']?.toString() == selectedTruckTypeFilter).toList();
+      result = result
+          .where((gc) => gc['TruckType']?.toString() == selectedTruckTypeFilter)
+          .toList();
     }
 
     // Apply date range filter
@@ -154,7 +173,9 @@ class _GCListPageState extends State<GCListPage> {
         if (gcDate == null || gcDate.isEmpty) return false;
         try {
           final date = DateTime.parse(gcDate);
-          return date.isAfter(dateRangeFilter!.start.subtract(const Duration(days: 1))) &&
+          return date.isAfter(
+                dateRangeFilter!.start.subtract(const Duration(days: 1)),
+              ) &&
               date.isBefore(dateRangeFilter!.end.add(const Duration(days: 1)));
         } catch (e) {
           return false;
@@ -173,18 +194,25 @@ class _GCListPageState extends State<GCListPage> {
       if (bValue == null) return sortAscending ? 1 : -1;
 
       // Parse dates for date fields
-      if (sortBy == 'GcDate' || sortBy == 'DeliveryDate' || sortBy == 'created_at') {
+      if (sortBy == 'GcDate' ||
+          sortBy == 'DeliveryDate' ||
+          sortBy == 'created_at') {
         try {
           final aDate = DateTime.parse(aValue.toString());
           final bDate = DateTime.parse(bValue.toString());
-          return sortAscending ? aDate.compareTo(bDate) : bDate.compareTo(aDate);
+          return sortAscending
+              ? aDate.compareTo(bDate)
+              : bDate.compareTo(aDate);
         } catch (e) {
           return 0;
         }
       }
 
       // Parse numbers for numeric fields
-      if (sortBy == 'HireAmount' || sortBy == 'FreightCharge' || sortBy == 'AdvanceAmount' || sortBy == 'km') {
+      if (sortBy == 'HireAmount' ||
+          sortBy == 'FreightCharge' ||
+          sortBy == 'AdvanceAmount' ||
+          sortBy == 'km') {
         try {
           final aNum = double.parse(aValue.toString());
           final bNum = double.parse(bValue.toString());
@@ -227,7 +255,10 @@ class _GCListPageState extends State<GCListPage> {
                   children: [
                     const Text(
                       'Filter & Sort',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),
@@ -243,7 +274,10 @@ class _GCListPageState extends State<GCListPage> {
                       // Sort Section
                       const Text(
                         'Sort By',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Wrap(
@@ -251,11 +285,31 @@ class _GCListPageState extends State<GCListPage> {
                         runSpacing: 8,
                         children: [
                           _buildSortChip('GC Date', 'GcDate', setModalState),
-                          _buildSortChip('Created Date', 'created_at', setModalState),
-                          _buildSortChip('GC Number', 'GcNumber', setModalState),
-                          _buildSortChip('Delivery Date', 'DeliveryDate', setModalState),
-                          _buildSortChip('Hire Amount', 'HireAmount', setModalState),
-                          _buildSortChip('Freight Charge', 'FreightCharge', setModalState),
+                          _buildSortChip(
+                            'Created Date',
+                            'created_at',
+                            setModalState,
+                          ),
+                          _buildSortChip(
+                            'GC Number',
+                            'GcNumber',
+                            setModalState,
+                          ),
+                          _buildSortChip(
+                            'Delivery Date',
+                            'DeliveryDate',
+                            setModalState,
+                          ),
+                          _buildSortChip(
+                            'Hire Amount',
+                            'HireAmount',
+                            setModalState,
+                          ),
+                          _buildSortChip(
+                            'Freight Charge',
+                            'FreightCharge',
+                            setModalState,
+                          ),
                           _buildSortChip('Distance', 'km', setModalState),
                         ],
                       ),
@@ -266,7 +320,10 @@ class _GCListPageState extends State<GCListPage> {
                       // Filter Section
                       const Text(
                         'Filters',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 16),
 
@@ -275,7 +332,8 @@ class _GCListPageState extends State<GCListPage> {
                         'Branch',
                         selectedBranchFilter,
                         branches,
-                            (value) => setModalState(() => selectedBranchFilter = value),
+                        (value) =>
+                            setModalState(() => selectedBranchFilter = value),
                       ),
                       const SizedBox(height: 16),
 
@@ -284,7 +342,8 @@ class _GCListPageState extends State<GCListPage> {
                         'Payment Method',
                         selectedPaymentFilter,
                         paymentMethods,
-                            (value) => setModalState(() => selectedPaymentFilter = value),
+                        (value) =>
+                            setModalState(() => selectedPaymentFilter = value),
                       ),
                       const SizedBox(height: 16),
 
@@ -293,7 +352,9 @@ class _GCListPageState extends State<GCListPage> {
                         'Truck Type',
                         selectedTruckTypeFilter,
                         truckTypes,
-                            (value) => setModalState(() => selectedTruckTypeFilter = value),
+                        (value) => setModalState(
+                          () => selectedTruckTypeFilter = value,
+                        ),
                       ),
                       const SizedBox(height: 16),
 
@@ -372,7 +433,9 @@ class _GCListPageState extends State<GCListPage> {
             sortAscending = !sortAscending;
           } else {
             sortBy = field;
-            sortAscending = field == 'GcNumber'; // Ascending for GC Number, descending for others
+            sortAscending =
+                field ==
+                'GcNumber'; // Ascending for GC Number, descending for others
           }
         });
       },
@@ -382,15 +445,18 @@ class _GCListPageState extends State<GCListPage> {
   }
 
   Widget _buildFilterDropdown(
-      String label,
-      String? value,
-      List<String> options,
-      Function(String?) onChanged,
-      ) {
+    String label,
+    String? value,
+    List<String> options,
+    Function(String?) onChanged,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -408,10 +474,12 @@ class _GCListPageState extends State<GCListPage> {
                   value: null,
                   child: Text('All $label'),
                 ),
-                ...options.map((option) => DropdownMenuItem<String>(
-                  value: option,
-                  child: Text(option),
-                )),
+                ...options.map(
+                  (option) => DropdownMenuItem<String>(
+                    value: option,
+                    child: Text(option),
+                  ),
+                ),
               ],
               onChanged: onChanged,
             ),
@@ -425,7 +493,10 @@ class _GCListPageState extends State<GCListPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('GC Date Range', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        const Text(
+          'GC Date Range',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 8),
         InkWell(
           onTap: () async {
@@ -453,7 +524,9 @@ class _GCListPageState extends State<GCListPage> {
                       ? 'Select date range'
                       : '${_formatDisplayDate(dateRangeFilter!.start.toString())} - ${_formatDisplayDate(dateRangeFilter!.end.toString())}',
                   style: TextStyle(
-                    color: dateRangeFilter == null ? Colors.grey : Colors.black87,
+                    color: dateRangeFilter == null
+                        ? Colors.grey
+                        : Colors.black87,
                   ),
                 ),
                 Row(
@@ -461,7 +534,8 @@ class _GCListPageState extends State<GCListPage> {
                     if (dateRangeFilter != null)
                       IconButton(
                         icon: const Icon(Icons.clear, size: 20),
-                        onPressed: () => setModalState(() => dateRangeFilter = null),
+                        onPressed: () =>
+                            setModalState(() => dateRangeFilter = null),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
@@ -583,8 +657,14 @@ class _GCListPageState extends State<GCListPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('GC Management', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Text('Goods Consignment List', style: TextStyle(fontSize: 12, color: Colors.white70)),
+                Text(
+                  'GC Management',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'Goods Cargo List',
+                  style: TextStyle(fontSize: 12, color: Colors.white70),
+                ),
               ],
             ),
           ),
@@ -650,12 +730,12 @@ class _GCListPageState extends State<GCListPage> {
               prefixIcon: const Icon(Icons.search, color: Colors.white70),
               suffixIcon: searchController.text.isNotEmpty
                   ? IconButton(
-                icon: const Icon(Icons.clear, color: Colors.white70),
-                onPressed: () {
-                  searchController.clear();
-                  _applyFiltersAndSort();
-                },
-              )
+                      icon: const Icon(Icons.clear, color: Colors.white70),
+                      onPressed: () {
+                        searchController.clear();
+                        _applyFiltersAndSort();
+                      },
+                    )
                   : null,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -663,7 +743,10 @@ class _GCListPageState extends State<GCListPage> {
               ),
               filled: true,
               fillColor: Colors.white.withOpacity(0.15),
-              contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 12,
+                horizontal: 16,
+              ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: Colors.white54, width: 1),
@@ -744,7 +827,9 @@ class _GCListPageState extends State<GCListPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red.shade600,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ],
@@ -791,10 +876,7 @@ class _GCListPageState extends State<GCListPage> {
               searchController.text.isNotEmpty || _getActiveFilterCount() > 0
                   ? 'Try adjusting your filters or search criteria'
                   : 'GC records will appear here once created',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -815,8 +897,13 @@ class _GCListPageState extends State<GCListPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1E2A44),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
           ],
@@ -869,6 +956,26 @@ class _GCListPageState extends State<GCListPage> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Container(
+                margin: const EdgeInsets.only(right: 8),
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.attach_file,
+                    size: 20,
+                    color: Colors.orange,
+                  ),
+                  onPressed: () => _viewAttachments(gc),
+                  padding: const EdgeInsets.all(6),
+                  constraints: const BoxConstraints(),
+                  tooltip: 'View Attachments',
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.orange.withOpacity(0.1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                ),
+              ),
               if (_canEditGC(gc))
                 Container(
                   margin: const EdgeInsets.only(right: 8),
@@ -892,16 +999,11 @@ class _GCListPageState extends State<GCListPage> {
                   color: const Color(0xFF1E2A44).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
-                  Icons.expand_more,
-                  color: Color(0xFF1E2A44),
-                ),
+                child: const Icon(Icons.expand_more, color: Color(0xFF1E2A44)),
               ),
             ],
           ),
-          children: [
-            _buildCardDetails(gc),
-          ],
+          children: [_buildCardDetails(gc)],
         ),
       ),
     );
@@ -942,10 +1044,7 @@ class _GCListPageState extends State<GCListPage> {
                 const SizedBox(height: 2),
                 Text(
                   'Driver: ${gc['DriverName']}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
             ],
@@ -965,7 +1064,10 @@ class _GCListPageState extends State<GCListPage> {
         children: [
           _buildInfoChip(Icons.business, gc['Branch']),
           if (gc['GcDate']?.toString().isNotEmpty == true)
-            _buildInfoChip(Icons.calendar_today, _formatDisplayDate(gc['GcDate'])),
+            _buildInfoChip(
+              Icons.calendar_today,
+              _formatDisplayDate(gc['GcDate']),
+            ),
           if (gc['created_at']?.toString().isNotEmpty == true)
             _buildInfoChip(
               Icons.access_time,
@@ -1016,45 +1118,36 @@ class _GCListPageState extends State<GCListPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildDetailSection(
-            'Trip Information',
-            Icons.local_shipping,
-            [
-              _infoRow('PO Number', gc['PoNumber']),
-              _infoRow('Trip ID', gc['TripId']),
-              _infoRow('Distance (KM)', gc['km']),
-              _infoRow('Route', '${gc['TruckFrom'] ?? ''} → ${gc['TruckTo'] ?? ''}'),
-            ],
-          ),
+          _buildDetailSection('Trip Information', Icons.local_shipping, [
+            _infoRow('PO Number', gc['PoNumber']),
+            _infoRow('Trip ID', gc['TripId']),
+            _infoRow('Distance (KM)', gc['km']),
+            _infoRow(
+              'Route',
+              '${gc['TruckFrom'] ?? ''} → ${gc['TruckTo'] ?? ''}',
+            ),
+          ]),
 
           const SizedBox(height: 16),
 
-          _buildDetailSection(
-            'Parties Information',
-            Icons.people,
-            [
-              _infoRow('Broker', gc['BrokerName']),
-              _infoRow('Consignor', gc['ConsignorName']),
-              _infoRow('Consignor GST', gc['ConsignorGst']),
-              _infoRow('Consignor Address', gc['ConsignorAddress']),
-              _infoRow('Consignee', gc['ConsigneeName']),
-              _infoRow('Consignee GST', gc['ConsigneeGst']),
-              _infoRow('Consignee Address', gc['ConsigneeAddress']),
-            ],
-          ),
+          _buildDetailSection('Parties Information', Icons.people, [
+            _infoRow('Broker', gc['BrokerName']),
+            _infoRow('Consignor', gc['ConsignorName']),
+            _infoRow('Consignor GST', gc['ConsignorGst']),
+            _infoRow('Consignor Address', gc['ConsignorAddress']),
+            _infoRow('Consignee', gc['ConsigneeName']),
+            _infoRow('Consignee GST', gc['ConsigneeGst']),
+            _infoRow('Consignee Address', gc['ConsigneeAddress']),
+          ]),
 
           const SizedBox(height: 16),
 
-          _buildDetailSection(
-            'Goods Information',
-            Icons.inventory,
-            [
-              _infoRow('Packages', gc['NumberofPkg']),
-              _infoRow('Package Method', gc['MethodofPkg']),
-              _infoRow('Actual Weight (kg)', gc['ActualWeightKgs']),
-              _infoRow('Goods Description', gc['GoodContain']),
-            ],
-          ),
+          _buildDetailSection('Goods Information', Icons.inventory, [
+            _infoRow('Packages', gc['NumberofPkg']),
+            _infoRow('Package Method', gc['MethodofPkg']),
+            _infoRow('Actual Weight (kg)', gc['ActualWeightKgs']),
+            _infoRow('Goods Description', gc['GoodContain']),
+          ]),
 
           const SizedBox(height: 16),
 
@@ -1095,8 +1188,14 @@ class _GCListPageState extends State<GCListPage> {
     );
   }
 
-  Widget _buildDetailSection(String title, IconData icon, List<Widget> children) {
-    final validChildren = children.where((child) => child is! SizedBox || child.height != 0).toList();
+  Widget _buildDetailSection(
+    String title,
+    IconData icon,
+    List<Widget> children,
+  ) {
+    final validChildren = children
+        .where((child) => child is! SizedBox || child.height != 0)
+        .toList();
 
     if (validChildren.isEmpty) return const SizedBox.shrink();
 
@@ -1126,9 +1225,7 @@ class _GCListPageState extends State<GCListPage> {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey.shade200),
           ),
-          child: Column(
-            children: validChildren,
-          ),
+          child: Column(children: validChildren),
         ),
       ],
     );
@@ -1174,13 +1271,16 @@ class _GCListPageState extends State<GCListPage> {
       final now = DateTime.now().toLocal();
       final difference = now.difference(createdDate);
       final hoursDifference = difference.inHours;
-      final isWithin24Hours = hoursDifference < 24 ||
+      final isWithin24Hours =
+          hoursDifference < 24 ||
           (hoursDifference == 24 && difference.inMinutes % 60 == 0);
 
-      debugPrint('GC ${gc['GcNumber']} - Created: $createdAt, '
-          'Local: $createdDate, Now: $now, '
-          'Diff: ${difference.inHours}h ${difference.inMinutes % 60}m, '
-          'Can Edit: $isWithin24Hours');
+      debugPrint(
+        'GC ${gc['GcNumber']} - Created: $createdAt, '
+        'Local: $createdDate, Now: $now, '
+        'Diff: ${difference.inHours}h ${difference.inMinutes % 60}m, '
+        'Can Edit: $isWithin24Hours',
+      );
 
       return isWithin24Hours;
     } catch (e) {
@@ -1193,14 +1293,11 @@ class _GCListPageState extends State<GCListPage> {
     try {
       final userId = _idController.userId.value;
       final url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/release-lock');
-      
+
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'gcNumber': gcNumber,
-          'userId': userId,
-        }),
+        body: json.encode({'gcNumber': gcNumber, 'userId': userId}),
       );
 
       final data = json.decode(response.body);
@@ -1215,14 +1312,11 @@ class _GCListPageState extends State<GCListPage> {
     try {
       final userId = _idController.userId.value;
       final url = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/acquire-lock');
-      
+
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'gcNumber': gcNumber,
-          'userId': userId,
-        }),
+        body: json.encode({'gcNumber': gcNumber, 'userId': userId}),
       );
 
       final data = json.decode(response.body);
@@ -1235,15 +1329,17 @@ class _GCListPageState extends State<GCListPage> {
 
   Future<void> _editGC(Map<String, dynamic> gc) async {
     final gcNumber = gc['GcNumber']?.toString() ?? '';
-    
+
     // Check if it's a temporary GC
-    final isTemporaryGC = gc['isTemporary'] == true || 
-                         (gc['tempGcNumber'] != null && gc['tempGcNumber'].toString().isNotEmpty);
-    
+    final isTemporaryGC =
+        gc['isTemporary'] == true ||
+        (gc['tempGcNumber'] != null &&
+            gc['tempGcNumber'].toString().isNotEmpty);
+
     if (isTemporaryGC) {
       // For temporary GCs, try to acquire a lock
       final lockAcquired = await _acquireGCLock(gcNumber);
-      
+
       if (!lockAcquired) {
         Fluttertoast.showToast(
           msg: 'This temporary GC is currently in use by another user',
@@ -1255,7 +1351,7 @@ class _GCListPageState extends State<GCListPage> {
         return;
       }
     }
-    
+
     // Then check the 24-hour edit restriction
     if (!_canEditGC(gc)) {
       Fluttertoast.showToast(
@@ -1278,7 +1374,10 @@ class _GCListPageState extends State<GCListPage> {
     gcController.editingCompanyId.value = companyId;
 
     // Initialize edit mode which will fetch existing attachments
-    await gcController.initializeEditMode(gc['GcNumber']?.toString() ?? '', companyId);
+    await gcController.initializeEditMode(
+      gc['GcNumber']?.toString() ?? '',
+      companyId,
+    );
 
     if (gcController.weightRates.isEmpty) {
       gcController.fetchWeightRates().then((_) {
@@ -1293,20 +1392,57 @@ class _GCListPageState extends State<GCListPage> {
       () => const GCFormScreen(),
       preventDuplicates: false,
     );
-    
+
     // If this was a temporary GC, release the lock when returning from the form
     if (isTemporaryGC && result?['gcNumber'] == gcNumber) {
       await _releaseGCLock(gcNumber);
     }
   }
 
-  void _populateFormWithGCData(GCFormController controller, Map<String, dynamic> gc, String companyId) {
+  void _viewAttachments(Map<String, dynamic> gc) {
+    final gcNumber = gc['GcNumber']?.toString() ?? '';
+    final companyId = _idController.companyId.value;
+    final branchId = _idController.branchId.value;
+
+    if (gcNumber.isEmpty) {
+      Fluttertoast.showToast(
+        msg: 'Invalid GC Number',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => GCAttachmentsPage(
+          gcNumber: gcNumber,
+          companyId: companyId,
+          branchId: branchId,
+        ),
+      ),
+    );
+  }
+
+  void _populateFormWithGCData(
+    GCFormController controller,
+    Map<String, dynamic> gc,
+    String companyId,
+  ) {
     controller.gcNumberCtrl.text = gc['GcNumber']?.toString() ?? '';
     controller.isEditMode.value = true;
     controller.editingGcNumber.value = gc['GcNumber']?.toString() ?? '';
     controller.editingCompanyId.value = companyId;
 
-    controller.selectedBranch.value = gc['Branch']?.toString() ?? 'Select Branch';
+    // Populate the GC creator's booking officer name for PDF display
+    controller.gcBookingOfficerName.value =
+        gc['booking_officer_name']?.toString() ?? '';
+
+    controller.selectedBranch.value =
+        gc['Branch']?.toString() ?? 'Select Branch';
 
     if (gc['GcDate'] != null) {
       try {
@@ -1324,7 +1460,8 @@ class _GCListPageState extends State<GCListPage> {
       } catch (e) {}
     }
 
-    controller.selectedTruck.value = gc['TruckNumber']?.toString() ?? 'Select Truck';
+    controller.selectedTruck.value =
+        gc['TruckNumber']?.toString() ?? 'Select Truck';
     controller.truckNumberCtrl.text = gc['TruckNumber']?.toString() ?? '';
     controller.truckTypeCtrl.text = gc['TruckType']?.toString() ?? '';
     controller.poNumberCtrl.text = gc['PoNumber']?.toString() ?? '';
@@ -1333,24 +1470,29 @@ class _GCListPageState extends State<GCListPage> {
     controller.fromCtrl.text = gc['TruckFrom']?.toString() ?? '';
     controller.toCtrl.text = gc['TruckTo']?.toString() ?? '';
 
-    controller.selectedBroker.value = gc['BrokerName']?.toString() ?? 'Select Broker';
+    controller.selectedBroker.value =
+        gc['BrokerName']?.toString() ?? 'Select Broker';
     controller.brokerNameCtrl.text = gc['BrokerName']?.toString() ?? '';
     controller.selectedDriver.value = gc['DriverName']?.toString() ?? '';
     controller.driverNameCtrl.text = gc['DriverName']?.toString() ?? '';
     controller.driverPhoneCtrl.text = gc['DriverPhoneNumber']?.toString() ?? '';
 
-    controller.selectedConsignor.value = gc['ConsignorName']?.toString() ?? 'Select Consignor';
+    controller.selectedConsignor.value =
+        gc['ConsignorName']?.toString() ?? 'Select Consignor';
     controller.consignorNameCtrl.text = gc['ConsignorName']?.toString() ?? '';
     controller.consignorGstCtrl.text = gc['ConsignorGst']?.toString() ?? '';
-    controller.consignorAddressCtrl.text = gc['ConsignorAddress']?.toString() ?? '';
+    controller.consignorAddressCtrl.text =
+        gc['ConsignorAddress']?.toString() ?? '';
 
     final consigneeAddress = gc['ConsigneeAddress']?.toString() ?? '';
-    controller.selectedConsignee.value = gc['ConsigneeName']?.toString() ?? 'Select Consignee';
+    controller.selectedConsignee.value =
+        gc['ConsigneeName']?.toString() ?? 'Select Consignee';
     controller.consigneeNameCtrl.text = gc['ConsigneeName']?.toString() ?? '';
     controller.consigneeGstCtrl.text = gc['ConsigneeGst']?.toString() ?? '';
     controller.consigneeAddressCtrl.text = consigneeAddress;
 
-    controller.selectedBillTo.value = gc['BillToName']?.toString() ?? 'Select Bill To';
+    controller.selectedBillTo.value =
+        gc['BillToName']?.toString() ?? 'Select Bill To';
     controller.billToNameCtrl.text = gc['BillToName']?.toString() ?? '';
     controller.billToGstCtrl.text = gc['BillToGst']?.toString() ?? '';
     controller.billToAddressCtrl.text = gc['BillToAddress']?.toString() ?? '';
@@ -1391,16 +1533,19 @@ class _GCListPageState extends State<GCListPage> {
 
     controller.hireAmountCtrl.text = gc['HireAmount']?.toString() ?? '';
     controller.advanceAmountCtrl.text = gc['AdvanceAmount']?.toString() ?? '';
-    controller.deliveryAddressCtrl.text = gc['DeliveryAddress']?.toString() ?? '';
+    controller.deliveryAddressCtrl.text =
+        gc['DeliveryAddress']?.toString() ?? '';
     if ((controller.freightChargeCtrl.text).isEmpty) {
       controller.freightChargeCtrl.text = gc['FreightCharge']?.toString() ?? '';
     }
-    controller.selectedPayment.value = gc['PaymentDetails']?.toString() ?? 'Cash';
+    controller.selectedPayment.value =
+        gc['PaymentDetails']?.toString() ?? 'Cash';
 
     controller.onGstPayerSelected(gc['ServiceTax']?.toString());
 
     controller.customInvoiceCtrl.text = gc['CustInvNo']?.toString() ?? '';
-    controller.deliveryInstructionsCtrl.text = gc['DeliveryFromSpecial']?.toString() ?? '';
+    controller.deliveryInstructionsCtrl.text =
+        gc['DeliveryFromSpecial']?.toString() ?? '';
     controller.invValueCtrl.text = gc['InvValue']?.toString() ?? '';
     controller.ewayBillCtrl.text = gc['EInv']?.toString() ?? '';
 
@@ -1424,7 +1569,8 @@ class _GCListPageState extends State<GCListPage> {
   }
 
   Widget _infoRow(String label, dynamic value) {
-    if (value == null || value.toString().isEmpty) return const SizedBox.shrink();
+    if (value == null || value.toString().isEmpty)
+      return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
@@ -1444,10 +1590,7 @@ class _GCListPageState extends State<GCListPage> {
           Expanded(
             child: Text(
               value.toString(),
-              style: const TextStyle(
-                fontSize: 13,
-                color: Colors.black87,
-              ),
+              style: const TextStyle(fontSize: 13, color: Colors.black87),
             ),
           ),
         ],

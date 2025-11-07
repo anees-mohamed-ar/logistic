@@ -45,8 +45,15 @@ class BranchController extends GetxController {
     try {
       isLoading(true);
       error.value = '';
+
+      final companyId = idController.companyId.value;
+      if (companyId.isEmpty) {
+        error.value = 'Company ID not found';
+        return;
+      }
+
       final response = await http.get(
-        Uri.parse('$baseUrl/list'),
+        Uri.parse('$baseUrl/company/$companyId'),
         headers: {'Content-Type': 'application/json'},
       );
 
