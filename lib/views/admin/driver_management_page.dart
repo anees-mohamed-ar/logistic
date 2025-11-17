@@ -249,6 +249,17 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
       editingDriverDlNumber = null;
       _selectedState = null;
     });
+    // Clear all text controllers
+    _nameController.clear();
+    _dlNumberController.clear();
+    _addressController.clear();
+    _districtController.clear();
+    _countryController.clear();
+    _emailController.clear();
+    _phoneController.clear();
+    _mobileController.clear();
+    _panController.clear();
+    _bloodGroupController.clear();
   }
 
   Future<void> _loadStates() async {

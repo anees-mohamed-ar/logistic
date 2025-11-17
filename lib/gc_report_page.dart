@@ -5,6 +5,11 @@ import 'package:logistic/api_config.dart';
 import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:logistic/controller/id_controller.dart';
+import 'package:excel/excel.dart' as excel;
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:io';
 
 class GCReportPage extends StatefulWidget {
   const GCReportPage({Key? key}) : super(key: key);
@@ -173,6 +178,426 @@ class _GCReportPageState extends State<GCReportPage>
     return '₹${amount.toStringAsFixed(2)}';
   }
 
+  Future<void> _downloadExcel() async {
+    if (filteredGcList.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No data to export')),
+      );
+      return;
+    }
+
+    Directory? downloadDir;
+
+    try {
+      debugPrint('📊 Starting Excel export process...');
+
+      // Request storage permissions
+      if (Platform.isAndroid) {
+        debugPrint('Checking Android storage permission...');
+
+        // First show explanation dialog
+        final shouldRequest = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Storage Permission Required'),
+            content: const Text(
+              'This app needs storage permission to download and save Excel files to your device. '
+              'Files will be saved to your Downloads folder.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldRequest != true) {
+          debugPrint('User cancelled permission request');
+          return;
+        }
+
+        // Directly request permission - this will show the system permission dialog
+        PermissionStatus status = await Permission.storage.request();
+
+        debugPrint('WRITE_EXTERNAL_STORAGE permission result: $status');
+
+        // If WRITE_EXTERNAL_STORAGE is denied, try MANAGE_EXTERNAL_STORAGE for Android 11+
+        if (!status.isGranted) {
+          debugPrint(
+            'WRITE_EXTERNAL_STORAGE denied, trying MANAGE_EXTERNAL_STORAGE...',
+          );
+          status = await Permission.manageExternalStorage.request();
+          debugPrint('MANAGE_EXTERNAL_STORAGE permission result: $status');
+        }
+
+        debugPrint('Final permission granted: ${status.isGranted}');
+        debugPrint('Final permission denied: ${status.isDenied}');
+        debugPrint(
+          'Final permission permanently denied: ${status.isPermanentlyDenied}',
+        );
+
+        if (!status.isGranted) {
+          debugPrint('Permission not granted, showing snackbar...');
+          if (mounted) {
+            // Check if permanently denied
+            final permanentlyDenied = status.isPermanentlyDenied;
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  permanentlyDenied
+                      ? 'Storage permission is required to download files. Please enable it in app settings.'
+                      : 'Storage permission is required to download files.',
+                ),
+                action: permanentlyDenied
+                    ? SnackBarAction(
+                        label: 'Settings',
+                        onPressed: () async {
+                          await openAppSettings();
+                        },
+                      )
+                    : SnackBarAction(
+                        label: 'Retry',
+                        onPressed: () async {
+                          // Retry download after user potentially grants permission
+                          await _downloadExcel();
+                        },
+                      ),
+                duration: const Duration(seconds: 8),
+              ),
+            );
+          }
+          return;
+        } else {
+          debugPrint('Permission granted, proceeding with Excel generation...');
+        }
+      }
+
+      // Get download directory
+      if (Platform.isAndroid) {
+        // Try Downloads folder first (Android 10 and below, or with MANAGE_EXTERNAL_STORAGE)
+        downloadDir = Directory('/storage/emulated/0/Download');
+
+        if (!await downloadDir.exists()) {
+          // Fallback to external storage directory
+          final externalDir = await getExternalStorageDirectory();
+
+          if (externalDir != null && await externalDir.exists()) {
+            downloadDir = externalDir;
+          } else {
+            // Final fallback: app documents directory
+            downloadDir = await getApplicationDocumentsDirectory();
+          }
+        }
+
+        // Create Download subfolder in app documents if using app directory
+        if (downloadDir.path.contains('app_flutter')) {
+          downloadDir = Directory('${downloadDir.path}/Downloads');
+          if (!await downloadDir.exists()) {
+            await downloadDir.create(recursive: true);
+          }
+        }
+      } else {
+        // iOS and other platforms
+        downloadDir = await getApplicationDocumentsDirectory();
+        downloadDir = Directory('${downloadDir.path}/Downloads');
+        if (!await downloadDir.exists()) {
+          await downloadDir.create(recursive: true);
+        }
+      }
+
+      // Create full file path
+      final fileName = 'GC_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+      final filePath = '${downloadDir.path}/$fileName';
+
+      debugPrint('Generating Excel file to: $filePath');
+
+      // Show progress dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => const AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Generating Excel file...'),
+              ],
+            ),
+          ),
+        );
+      }
+
+      // Create Excel workbook
+      final excel.Excel workbook = excel.Excel.createExcel();
+      final excel.Sheet sheet = workbook['GC_Report'];
+
+      // Define headers
+      final headers = [
+        'GC Number',
+        'Date',
+        'Truck',
+        'PO Number',
+        'Trip ID',
+        'Broker',
+        'Driver',
+        'Consignor',
+        'Consignee',
+        'Packages',
+        'Weight (kg)',
+        'Rate',
+        'Hire Amount',
+        'Advance',
+        'Freight',
+      ];
+
+      final fieldKeys = [
+        'GcNumber',
+        'GcDate',
+        'TruckNumber',
+        'PoNumber',
+        'TripId',
+        'BrokerName',
+        'DriverName',
+        'ConsignorName',
+        'ConsigneeName',
+        'NumberofPkg',
+        'ActualWeightKgs',
+        'Rate',
+        'HireAmount',
+        'AdvanceAmount',
+        'FreightCharge',
+      ];
+
+      // Add headers
+      for (int i = 0; i < headers.length; i++) {
+        final cell = sheet.cell(excel.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+        cell.value = excel.TextCellValue(headers[i]);
+        // Make header bold
+        cell.cellStyle = excel.CellStyle(
+          fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
+          bold: true,
+          fontSize: 12,
+        );
+      }
+
+      // Add data rows
+      for (int rowIndex = 0; rowIndex < filteredGcList.length; rowIndex++) {
+        final gc = filteredGcList[rowIndex];
+        for (int colIndex = 0; colIndex < fieldKeys.length; colIndex++) {
+          final key = fieldKeys[colIndex];
+          dynamic value = gc[key];
+
+          // Format currency fields
+          if (['HireAmount', 'AdvanceAmount', 'FreightCharge'].contains(key)) {
+            value = _parseDouble(value);
+            final cell = sheet.cell(excel.CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex + 1));
+            cell.value = excel.DoubleCellValue(value);
+            cell.cellStyle = excel.CellStyle(
+              fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
+              fontSize: 11,
+              numberFormat: excel.NumFormat.standard_2,
+            );
+          } else {
+            // Handle null values and convert to string
+            final displayValue = value?.toString() ?? '';
+            final cell = sheet.cell(excel.CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex + 1));
+            cell.value = excel.TextCellValue(displayValue);
+            cell.cellStyle = excel.CellStyle(
+              fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
+              fontSize: 11,
+            );
+          }
+        }
+      }
+
+      // Auto-fit columns (approximate width based on content)
+      for (int i = 0; i < headers.length; i++) {
+        sheet.setColumnWidth(i, 15.0); // Set reasonable width
+      }
+
+      // Save file
+      final fileBytes = workbook.encode();
+      if (fileBytes != null) {
+        final file = File(filePath);
+        await file.writeAsBytes(fileBytes);
+
+        debugPrint('✅ Successfully saved Excel file: $filePath');
+      } else {
+        throw Exception('Failed to encode Excel file');
+      }
+
+      // Close progress dialog
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      // Show success message
+      if (mounted) {
+        final location =
+            downloadDir.path.contains('Download') ||
+                downloadDir.path.contains('Downloads')
+            ? 'Downloads folder'
+            : 'app storage';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Excel file downloaded successfully to $location: $fileName',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Excel download error: $e');
+
+      // Close progress dialog if open
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _shareExcel() async {
+    if (filteredGcList.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No data to export')),
+      );
+      return;
+    }
+
+    try {
+      // Create Excel workbook
+      final excel.Excel workbook = excel.Excel.createExcel();
+      final excel.Sheet sheet = workbook['GC_Report'];
+
+      // Define headers
+      final headers = [
+        'GC Number',
+        'Date',
+        'Truck',
+        'PO Number',
+        'Trip ID',
+        'Broker',
+        'Driver',
+        'Consignor',
+        'Consignee',
+        'Packages',
+        'Weight (kg)',
+        'Rate',
+        'Hire Amount',
+        'Advance',
+        'Freight',
+      ];
+
+      final fieldKeys = [
+        'GcNumber',
+        'GcDate',
+        'TruckNumber',
+        'PoNumber',
+        'TripId',
+        'BrokerName',
+        'DriverName',
+        'ConsignorName',
+        'ConsigneeName',
+        'NumberofPkg',
+        'ActualWeightKgs',
+        'Rate',
+        'HireAmount',
+        'AdvanceAmount',
+        'FreightCharge',
+      ];
+
+      // Add headers
+      for (int i = 0; i < headers.length; i++) {
+        final cell = sheet.cell(excel.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+        cell.value = excel.TextCellValue(headers[i]);
+        // Make header bold
+        cell.cellStyle = excel.CellStyle(
+          fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
+          bold: true,
+          fontSize: 12,
+        );
+      }
+
+      // Add data rows
+      for (int rowIndex = 0; rowIndex < filteredGcList.length; rowIndex++) {
+        final gc = filteredGcList[rowIndex];
+        for (int colIndex = 0; colIndex < fieldKeys.length; colIndex++) {
+          final key = fieldKeys[colIndex];
+          dynamic value = gc[key];
+
+          // Format currency fields
+          if (['HireAmount', 'AdvanceAmount', 'FreightCharge'].contains(key)) {
+            value = _parseDouble(value);
+            final cell = sheet.cell(excel.CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex + 1));
+            cell.value = excel.DoubleCellValue(value);
+            cell.cellStyle = excel.CellStyle(
+              fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
+              fontSize: 11,
+              numberFormat: excel.NumFormat.standard_2,
+            );
+          } else {
+            // Handle null values and convert to string
+            final displayValue = value?.toString() ?? '';
+            final cell = sheet.cell(excel.CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex + 1));
+            cell.value = excel.TextCellValue(displayValue);
+            cell.cellStyle = excel.CellStyle(
+              fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
+              fontSize: 11,
+            );
+          }
+        }
+      }
+
+      // Auto-fit columns (approximate width based on content)
+      for (int i = 0; i < headers.length; i++) {
+        sheet.setColumnWidth(i, 15.0); // Set reasonable width
+      }
+
+      // Get temporary directory for sharing
+      final directory = await getTemporaryDirectory();
+      final fileName = 'GC_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+      final filePath = '${directory.path}/$fileName';
+
+      // Save file
+      final fileBytes = workbook.encode();
+      if (fileBytes != null) {
+        final file = File(filePath);
+        await file.writeAsBytes(fileBytes);
+
+        // Share the file
+        final xFile = XFile(filePath);
+        await Share.shareXFiles([xFile], text: 'GC Report Export');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Excel file shared: $fileName')),
+        );
+      } else {
+        throw Exception('Failed to encode Excel file');
+      }
+    } catch (e) {
+      print('Excel share error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Share failed: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -215,6 +640,16 @@ class _GCReportPageState extends State<GCReportPage>
           icon: Icon(_isCardView ? Icons.table_chart : Icons.view_agenda),
           onPressed: () => setState(() => _isCardView = !_isCardView),
           tooltip: _isCardView ? 'Switch to Table View' : 'Switch to Card View',
+        ),
+        IconButton(
+          icon: const Icon(Icons.download),
+          onPressed: _downloadExcel,
+          tooltip: 'Download Excel',
+        ),
+        IconButton(
+          icon: const Icon(Icons.share),
+          onPressed: _shareExcel,
+          tooltip: 'Share Excel',
         ),
         IconButton(
           icon: const Icon(Icons.refresh),

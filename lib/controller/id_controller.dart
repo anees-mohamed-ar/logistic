@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:logistic/config/company_config.dart';
 
 class IdController extends GetxController {
   var userId = ''.obs;
@@ -87,7 +88,9 @@ class IdController extends GetxController {
 
   void setAllUserData(Map<String, dynamic> userData) {
     userId.value = userData['userId']?.toString() ?? '';
-    companyId.value = userData['company_id']?.toString() ?? '';
+    // Use hardcoded company data from CompanyConfig instead of user data
+    companyId.value = CompanyConfig.companyId.toString();
+    companyName.value = CompanyConfig.companyName;
     branchId.value =
         userData['branch_id']?.toString() ??
         userData['branchId']?.toString() ??
@@ -95,7 +98,6 @@ class IdController extends GetxController {
     fileName.value = userData['filename']?.toString() ?? '';
     userName.value = userData['userName']?.toString() ?? '';
     userEmail.value = userData['userEmail']?.toString() ?? '';
-    companyName.value = userData['companyName']?.toString() ?? '';
     bloodGroup.value = userData['bloodGroup']?.toString() ?? '';
     phoneNumber.value = userData['phoneNumber']?.toString() ?? '';
     userRole.value =

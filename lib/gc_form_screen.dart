@@ -6,7 +6,7 @@ import 'package:logistic/controller/id_controller.dart';
 import 'package:logistic/controller/temporary_gc_controller.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:logistic/widgets/gc_pdf.dart';
+import 'package:logistic/widgets/gc_pdf_factory.dart';
 // Note: WeightRate is now defined in gc_form_controller.dart,
 // so 'show WeightRate' import is redundant if not also needed from this file's context
 // import 'package:logistic/controller/gc_form_controller.dart' show WeightRate;
@@ -20,7 +20,8 @@ class GCFormScreen extends StatefulWidget {
 
 class _GCFormScreenState extends State<GCFormScreen> {
   late final TextEditingController searchCtrl;
-  final TemporaryGCController? tempController = Get.isRegistered<TemporaryGCController>()
+  final TemporaryGCController? tempController =
+      Get.isRegistered<TemporaryGCController>()
       ? Get.find<TemporaryGCController>()
       : null;
 
@@ -28,10 +29,10 @@ class _GCFormScreenState extends State<GCFormScreen> {
   void initState() {
     super.initState();
     searchCtrl = TextEditingController();
-    
+
     // Get the existing controller or create a new one if it doesn't exist
     final controller = Get.put(GCFormController(), permanent: true);
-    
+
     // Check access when the screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final idController = Get.find<IdController>();
@@ -52,7 +53,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
       if (controller.isTemporaryMode.value) {
         controller.clearForm();
         controller.prepareTemporaryGcForm();
-        
+
         // Skip GC usage warning for temporary GC creation - will be checked when filling
       } else if (controller.isFillTemporaryMode.value) {
         // When filling temporary GC, check GC usage first
@@ -142,10 +143,12 @@ class _GCFormScreenState extends State<GCFormScreen> {
 
     // Ensure consignors and consignees are fetched if not already
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!controller.consignorsLoading.value && controller.consignors.length <= 1) {
+      if (!controller.consignorsLoading.value &&
+          controller.consignors.length <= 1) {
         controller.fetchConsignors();
       }
-      if (!controller.consigneesLoading.value && controller.consignees.length <= 1) {
+      if (!controller.consigneesLoading.value &&
+          controller.consignees.length <= 1) {
         controller.fetchConsignees();
       }
     });
@@ -156,187 +159,195 @@ class _GCFormScreenState extends State<GCFormScreen> {
         return true;
       },
       child: Scaffold(
-      appBar: AppBar(
-        title: Obx(() {
-          final isTemporary = controller.isTemporaryMode.value || controller.isFillTemporaryMode.value;
+        appBar: AppBar(
+          title: Obx(() {
+            final isTemporary =
+                controller.isTemporaryMode.value ||
+                controller.isFillTemporaryMode.value;
 
-          if (!isTemporary) {
-            // Regular GC form - no timer
-            if (controller.isEditMode.value) {
-              return const Text('Edit GC');
-            } else {
-              return const Text('GC Shipment Form');
+            if (!isTemporary) {
+              // Regular GC form - no timer
+              if (controller.isEditMode.value) {
+                return const Text('Edit GC');
+              } else {
+                return const Text('GC Shipment Form');
+              }
             }
-          }
 
-          // Temporary GC mode - show timer
-          final minutes = controller.remainingTime.value.inMinutes;
-          final seconds = controller.remainingTime.value.inSeconds % 60;
-          final timeStr = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+            // Temporary GC mode - show timer
+            final minutes = controller.remainingTime.value.inMinutes;
+            final seconds = controller.remainingTime.value.inSeconds % 60;
+            final timeStr =
+                '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 
-          return Row(
-            children: [
-              // Timer display
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: controller.remainingTime.value.inSeconds > 60
-                      ? Colors.white
-                      : controller.remainingTime.value.inSeconds.isEven
-                          ? Colors.red.shade700
-                          : Colors.white,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(
-                    color: Colors.black.withOpacity(0.3),
-                    width: 1,
+            return Row(
+              children: [
+                // Timer display
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
                   ),
-                ),
-                child: Text(
-                  timeStr,
-                  style: TextStyle(
-                    color: controller.remainingTime.value.inSeconds > 60
-                        ? Colors.redAccent
-                        : controller.remainingTime.value.inSeconds.isEven
-                            ? Colors.white
-                            : Colors.redAccent,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace',
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Title text
-              Text(
-                controller.isTemporaryMode.value
-                    ? 'Create Temporary GC'
-                    : 'Fill Temporary GC',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          );
-        }),
-        backgroundColor: const Color(0xFF1E2A44),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf, size: 24),
-            tooltip: 'Export to PDF',
-            onPressed: () => GCPdfGenerator.showPdfPreview(context, controller),
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'export_pdf',
-                child: const Text('Save PDF to Device'),
-                onTap: () => GCPdfGenerator.savePdfToDevice(controller),
-              ),
-              PopupMenuItem(
-                value: 'share_pdf',
-                child: const Text('Share PDF'),
-                onTap: () => GCPdfGenerator.sharePdf(controller),
-              ),
-              PopupMenuItem(
-                value: 'print_pdf',
-                child: const Text('Print PDF'),
-                onTap: () => GCPdfGenerator.printPdf(controller),
-              ),
-              const PopupMenuDivider(),
-              PopupMenuItem(
-                value: 'help',
-                child: const Text('Help'),
-                onTap: () {
-                  Get.snackbar(
-                    'Help',
-                    'Fill all required fields and navigate through tabs',
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: Colors.blueGrey,
-                    colorText: Colors.white,
-                  );
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
-      backgroundColor: const Color(0xFFF7F9FC),
-      body: SafeArea(
-        child: Form(
-          key: controller.formKey,
-          child: Column(
-            children: [
-              Obx(
-                    () => Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
-                    color: theme.cardColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    color: controller.remainingTime.value.inSeconds > 60
+                        ? Colors.white
+                        : controller.remainingTime.value.inSeconds.isEven
+                        ? Colors.red.shade700
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(
+                      color: Colors.black.withOpacity(0.3),
+                      width: 1,
+                    ),
                   ),
-                  child: SingleChildScrollView(
-                    controller: controller.tabScrollController,
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: List.generate(
-                        4,
-                            (index) => GestureDetector(
-                          onTap: () {
-                            controller.changeTab(index);
-                            // Force UI rebuild
-                            setState(() {});
-                          },
-                          child: AnimatedContainer(
-                            duration: 300.ms,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            decoration: BoxDecoration(
-                              color: controller.currentTab.value == index
-                                  ? theme.primaryColor
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  [
-                                    Icons.local_shipping,
-                                    Icons.group,
-                                    Icons.inventory,
-                                    Icons.attach_file,
-                                  ][index],
-                                  size: 16,
-                                  color: controller.currentTab.value == index
-                                      ? Colors.white
-                                      : theme.hintColor,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  [
-                                    'Shipment',
-                                    'Parties',
-                                    'Goods',
-                                    'Attachments',
-                                  ][index],
-                                  style: theme.textTheme.labelLarge?.copyWith(
+                  child: Text(
+                    timeStr,
+                    style: TextStyle(
+                      color: controller.remainingTime.value.inSeconds > 60
+                          ? Colors.redAccent
+                          : controller.remainingTime.value.inSeconds.isEven
+                          ? Colors.white
+                          : Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Title text
+                Text(
+                  controller.isTemporaryMode.value
+                      ? 'Create Temporary GC'
+                      : 'Fill Temporary GC',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            );
+          }),
+          backgroundColor: const Color(0xFF1E2A44),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf, size: 24),
+              tooltip: 'Export to PDF',
+              onPressed: () => GCPdfFactory.showPdfPreview(context, controller),
+            ),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'export_pdf',
+                  child: const Text('Save PDF to Device'),
+                  onTap: () => GCPdfFactory.savePdfToDevice(controller),
+                ),
+                PopupMenuItem(
+                  value: 'share_pdf',
+                  child: const Text('Share PDF'),
+                  onTap: () => GCPdfFactory.sharePdf(controller),
+                ),
+                PopupMenuItem(
+                  value: 'print_pdf',
+                  child: const Text('Print PDF'),
+                  onTap: () => GCPdfFactory.printPdf(controller),
+                ),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'help',
+                  child: const Text('Help'),
+                  onTap: () {
+                    Get.snackbar(
+                      'Help',
+                      'Fill all required fields and navigate through tabs',
+                      snackPosition: SnackPosition.BOTTOM,
+                      backgroundColor: Colors.blueGrey,
+                      colorText: Colors.white,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFFF7F9FC),
+        body: SafeArea(
+          child: Form(
+            key: controller.formKey,
+            child: Column(
+              children: [
+                Obx(
+                  () => Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: theme.cardColor,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: SingleChildScrollView(
+                      controller: controller.tabScrollController,
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: List.generate(
+                          4,
+                          (index) => GestureDetector(
+                            onTap: () {
+                              controller.changeTab(index);
+                              // Force UI rebuild
+                              setState(() {});
+                            },
+                            child: AnimatedContainer(
+                              duration: 300.ms,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              decoration: BoxDecoration(
+                                color: controller.currentTab.value == index
+                                    ? theme.primaryColor
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    [
+                                      Icons.local_shipping,
+                                      Icons.group,
+                                      Icons.inventory,
+                                      Icons.attach_file,
+                                    ][index],
+                                    size: 16,
                                     color: controller.currentTab.value == index
                                         ? Colors.white
                                         : theme.hintColor,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    [
+                                      'Shipment',
+                                      'Parties',
+                                      'Goods',
+                                      'Attachments',
+                                    ][index],
+                                    style: theme.textTheme.labelLarge?.copyWith(
+                                      color:
+                                          controller.currentTab.value == index
+                                          ? Colors.white
+                                          : theme.hintColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -344,167 +355,176 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  child: Obx(
-                        () => AnimatedSwitcher(
-                      duration: 300.ms,
-                      child: [
-                        _buildShipmentTab(context, controller, isSmallScreen),
-                        _buildPartiesTab(context, controller, isSmallScreen),
-                        _buildGoodsTab(context, controller, isSmallScreen),
-                        _buildAttachmentsTab(context, controller, isSmallScreen),
-                      ][controller.currentTab.value.clamp(0, 3).toInt()],
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    child: Obx(
+                      () => AnimatedSwitcher(
+                        duration: 300.ms,
+                        child: [
+                          _buildShipmentTab(context, controller, isSmallScreen),
+                          _buildPartiesTab(context, controller, isSmallScreen),
+                          _buildGoodsTab(context, controller, isSmallScreen),
+                          _buildAttachmentsTab(
+                            context,
+                            controller,
+                            isSmallScreen,
+                          ),
+                        ][controller.currentTab.value.clamp(0, 3).toInt()],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Obx(
-                    () => Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: theme.cardColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          if (controller.currentTab.value > 0)
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  controller.navigateToPreviousTab();
-                                  // Force UI rebuild
-                                  setState(() {});
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: theme.primaryColor,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  side: BorderSide(
-                                    color: theme.primaryColor,
-                                  ),
-                                  elevation: 2,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.arrow_back, size: 16),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Previous',
-                                      style: theme.textTheme.labelLarge,
+                Obx(
+                  () => Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.cardColor,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 8,
+                          offset: const Offset(0, -2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            if (controller.currentTab.value > 0)
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () {
+                                    controller.navigateToPreviousTab();
+                                    // Force UI rebuild
+                                    setState(() {});
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
                                     ),
-                                  ],
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: theme.primaryColor,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    side: BorderSide(color: theme.primaryColor),
+                                    elevation: 2,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.arrow_back, size: 16),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Previous',
+                                        style: theme.textTheme.labelLarge,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          if (controller.currentTab.value > 0)
-                            const SizedBox(width: 12),
-                          if (controller.currentTab.value < 3)
-                            Expanded(
-                              flex: controller.currentTab.value > 0 ? 1 : 2,
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  controller.navigateToNextTab();
-                                  // Force UI rebuild
-                                  setState(() {});
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
+                            if (controller.currentTab.value > 0)
+                              const SizedBox(width: 12),
+                            if (controller.currentTab.value < 3)
+                              Expanded(
+                                flex: controller.currentTab.value > 0 ? 1 : 2,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    controller.navigateToNextTab();
+                                    // Force UI rebuild
+                                    setState(() {});
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    backgroundColor: theme.primaryColor,
                                   ),
-                                  backgroundColor: theme.primaryColor,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      'Next',
-                                      style: theme.textTheme.labelLarge
-                                          ?.copyWith(color: Colors.white),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Icon(
-                                      Icons.arrow_forward,
-                                      size: 16,
-                                      color: Colors.white,
-                                    ),
-                                  ],
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        'Next',
+                                        style: theme.textTheme.labelLarge
+                                            ?.copyWith(color: Colors.white),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Icon(
+                                        Icons.arrow_forward,
+                                        size: 16,
+                                        color: Colors.white,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          if (controller.currentTab.value == 3)
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: controller.isLoading.value
-                                    ? null
-                                    : controller.submitFormToBackend,
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
+                            if (controller.currentTab.value == 3)
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: controller.isLoading.value
+                                      ? null
+                                      : controller.submitFormToBackend,
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    backgroundColor: Colors.green,
                                   ),
-                                  backgroundColor: Colors.green,
+                                  child: controller.isLoading.value
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : Obx(
+                                          () => Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                controller.isTemporaryMode.value
+                                                    ? 'Create Temporary GC'
+                                                    : controller
+                                                          .isFillTemporaryMode
+                                                          .value
+                                                    ? 'Submit & Convert'
+                                                    : 'Submit Form',
+                                                style: theme
+                                                    .textTheme
+                                                    .labelLarge
+                                                    ?.copyWith(
+                                                      color: Colors.white,
+                                                    ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Icon(
+                                                Icons.check,
+                                                size: 16,
+                                                color: Colors.white,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                 ),
-                                child: controller.isLoading.value
-                                    ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                                    : Obx(() => Row(
-                                  mainAxisAlignment:
-                                  MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      controller.isTemporaryMode.value
-                                          ? 'Create Temporary GC'
-                                          : controller.isFillTemporaryMode.value
-                                              ? 'Submit & Convert'
-                                              : 'Submit Form',
-                                      style: theme.textTheme.labelLarge
-                                          ?.copyWith(color: Colors.white),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Icon(
-                                      Icons.check,
-                                      size: 16,
-                                      color: Colors.white,
-                                    ),
-                                  ],
-                                )),
                               ),
-                            ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -513,13 +533,15 @@ class _GCFormScreenState extends State<GCFormScreen> {
     final controller = Get.isRegistered<GCFormController>()
         ? Get.find<GCFormController>()
         : null;
-    
+
     if (controller != null) {
       // Unlock temporary GC if needed
-      if (tempController != null && controller.isFillTemporaryMode.value && controller.tempGcNumber.value.isNotEmpty) {
+      if (tempController != null &&
+          controller.isFillTemporaryMode.value &&
+          controller.tempGcNumber.value.isNotEmpty) {
         await tempController!.unlockTemporaryGC(controller.tempGcNumber.value);
       }
-      
+
       // Reset all temporary mode flags when closing the form
       controller.isTemporaryMode.value = false;
       controller.isFillTemporaryMode.value = false;
@@ -528,10 +550,10 @@ class _GCFormScreenState extends State<GCFormScreen> {
   }
 
   Widget _buildShipmentTab(
-      BuildContext context,
-      GCFormController controller,
-      bool isSmallScreen,
-      ) {
+    BuildContext context,
+    GCFormController controller,
+    bool isSmallScreen,
+  ) {
     return SingleChildScrollView(
       key: const ValueKey(0),
       child: Card(
@@ -584,7 +606,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   if (!isSmallScreen)
                     Expanded(
                       child: Obx(
-                            () => TextFormField(
+                        () => TextFormField(
                           readOnly: true,
                           controller: controller.gcDateCtrl,
                           decoration: _inputDecoration(
@@ -614,7 +636,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     context,
                     controller.gcDate,
                     textController: controller.gcDateCtrl,
-                    restrictToToday: true, // Only allow dates up to today for GC date
+                    restrictToToday:
+                        true, // Only allow dates up to today for GC date
                   ),
                   validator: null,
                 ),
@@ -641,7 +664,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   if (!isSmallScreen)
                     Expanded(
                       child: Obx(
-                            () => TextFormField(
+                        () => TextFormField(
                           readOnly: true,
                           controller: controller.deliveryDateCtrl,
                           decoration: _inputDecoration(
@@ -684,7 +707,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         items: controller.truckNumbers.toList(),
                         onChanged: (value) {
                           controller.selectedTruck.value = value!;
-                          controller.truckNumberCtrl.text = value; // keep submission compatibility
+                          controller.truckNumberCtrl.text =
+                              value; // keep submission compatibility
                         },
                         validator: null,
                         compact: true,
@@ -707,7 +731,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         ),
                         textInputAction: TextInputAction.next,
                         validator: (value) =>
-                        value == null || value.isEmpty ? 'Required' : null,
+                            value == null || value.isEmpty ? 'Required' : null,
                         onChanged: (_) {},
                         onFieldSubmitted: (_) {
                           controller.truckTypeFocus.requestFocus();
@@ -737,7 +761,11 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     child: TextFormField(
                       controller: controller.truckTypeCtrl,
                       focusNode: controller.truckTypeFocus,
-                      decoration: _inputDecoration('Truck Type', Icons.local_shipping, compact: isSmallScreen),
+                      decoration: _inputDecoration(
+                        'Truck Type',
+                        Icons.local_shipping,
+                        compact: isSmallScreen,
+                      ),
                       textInputAction: TextInputAction.next,
                       validator: null,
                       onChanged: (_) {},
@@ -754,30 +782,36 @@ class _GCFormScreenState extends State<GCFormScreen> {
                             .map((d) => d['driverName']?.toString() ?? '')
                             .where((name) => name.isNotEmpty)
                             .toList();
-                            
+
                         final selectedDriver = controller.selectedDriver.value;
-                        if (selectedDriver.isNotEmpty && !driverNames.contains(selectedDriver)) {
+                        if (selectedDriver.isNotEmpty &&
+                            !driverNames.contains(selectedDriver)) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             controller.selectedDriver.value = '';
                             controller.driverNameCtrl.clear();
                             controller.driverPhoneCtrl.clear();
                           });
                         }
-                        
+
                         return _buildDropdownField(
                           context: context,
                           label: 'Driver Name',
-                          value: driverNames.contains(selectedDriver) ? selectedDriver : '',
+                          value: driverNames.contains(selectedDriver)
+                              ? selectedDriver
+                              : '',
                           items: driverNames,
                           onChanged: (value) {
                             if (value != null && value.isNotEmpty) {
                               try {
                                 final driver = controller.drivers.firstWhere(
-                                  (d) => (d['driverName']?.toString() ?? '') == value,
+                                  (d) =>
+                                      (d['driverName']?.toString() ?? '') ==
+                                      value,
                                 );
                                 controller.selectedDriver.value = value;
                                 controller.driverNameCtrl.text = value;
-                                controller.driverPhoneCtrl.text = driver['phoneNumber']?.toString() ?? '';
+                                controller.driverPhoneCtrl.text =
+                                    driver['phoneNumber']?.toString() ?? '';
                               } catch (e) {
                                 controller.selectedDriver.value = '';
                                 controller.driverNameCtrl.clear();
@@ -807,20 +841,23 @@ class _GCFormScreenState extends State<GCFormScreen> {
                       .map((d) => d['driverName']?.toString() ?? '')
                       .where((name) => name.isNotEmpty)
                       .toList();
-                      
+
                   final selectedDriver = controller.selectedDriver.value;
-                  if (selectedDriver.isNotEmpty && !driverNames.contains(selectedDriver)) {
+                  if (selectedDriver.isNotEmpty &&
+                      !driverNames.contains(selectedDriver)) {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       controller.selectedDriver.value = '';
                       controller.driverNameCtrl.clear();
                       controller.driverPhoneCtrl.clear();
                     });
                   }
-                  
+
                   return _buildDropdownField(
                     context: context,
                     label: 'Driver Name',
-                    value: driverNames.contains(selectedDriver) ? selectedDriver : '',
+                    value: driverNames.contains(selectedDriver)
+                        ? selectedDriver
+                        : '',
                     items: driverNames,
                     onChanged: (value) {
                       if (value != null && value.isNotEmpty) {
@@ -830,7 +867,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                           );
                           controller.selectedDriver.value = value;
                           controller.driverNameCtrl.text = value;
-                          controller.driverPhoneCtrl.text = driver['phoneNumber']?.toString() ?? '';
+                          controller.driverPhoneCtrl.text =
+                              driver['phoneNumber']?.toString() ?? '';
                         } catch (e) {
                           controller.selectedDriver.value = '';
                           controller.driverNameCtrl.clear();
@@ -866,7 +904,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 ),
                 keyboardType: TextInputType.phone,
                 readOnly: true,
-                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                validator: (value) =>
+                    value == null || value.isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -889,10 +928,10 @@ class _GCFormScreenState extends State<GCFormScreen> {
   }
 
   Widget _buildPartiesTab(
-      BuildContext context,
-      GCFormController controller,
-      bool isSmallScreen,
-      ) {
+    BuildContext context,
+    GCFormController controller,
+    bool isSmallScreen,
+  ) {
     return SingleChildScrollView(
       key: const ValueKey(1),
       child: Card(
@@ -914,20 +953,23 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 final brokerList = controller.brokers
                     .where((b) => b != null && b.isNotEmpty)
                     .toList();
-                    
+
                 // If the selected broker is not in the list, clear it
                 final selectedBroker = controller.selectedBroker.value;
-                if (selectedBroker.isNotEmpty && !brokerList.contains(selectedBroker)) {
+                if (selectedBroker.isNotEmpty &&
+                    !brokerList.contains(selectedBroker)) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     controller.selectedBroker.value = '';
                     controller.brokerNameCtrl.clear();
                   });
                 }
-                
+
                 return _buildDropdownField(
                   context: context,
                   label: 'Broker Name',
-                  value: brokerList.contains(selectedBroker) ? selectedBroker : '',
+                  value: brokerList.contains(selectedBroker)
+                      ? selectedBroker
+                      : '',
                   items: brokerList,
                   onChanged: (value) {
                     if (value != null) {
@@ -967,16 +1009,23 @@ class _GCFormScreenState extends State<GCFormScreen> {
                             controller.consignorNameCtrl.text = value;
                             final info = controller.consignorInfo[value];
                             if (info != null) {
-                              controller.consignorGstCtrl.text = info['gst'] ?? '';
-                              controller.consignorAddressCtrl.text = info['address'] ?? '';
+                              controller.consignorGstCtrl.text =
+                                  info['gst'] ?? '';
+                              controller.consignorAddressCtrl.text =
+                                  info['address'] ?? '';
                               final location = info['location'] ?? '';
                               // Auto-fill From field with consignor's location when available, otherwise address
-                              controller.fromCtrl.text = location.isNotEmpty ? location : (info['address'] ?? '');
+                              controller.fromCtrl.text = location.isNotEmpty
+                                  ? location
+                                  : (info['address'] ?? '');
                             }
                           }
                         },
-                        validator: (value) => value == null || value.isEmpty || value == 'Select Consignor' 
-                            ? 'Required' 
+                        validator: (value) =>
+                            value == null ||
+                                value.isEmpty ||
+                                value == 'Select Consignor'
+                            ? 'Required'
                             : null,
                         compact: true,
                         searchable: true,
@@ -1132,11 +1181,14 @@ class _GCFormScreenState extends State<GCFormScreen> {
                             controller.consigneeNameCtrl.text = value;
                             final info = controller.consigneeInfo[value];
                             if (info != null) {
-                              controller.consigneeGstCtrl.text = info['gst'] ?? '';
+                              controller.consigneeGstCtrl.text =
+                                  info['gst'] ?? '';
                               final address = info['address'] ?? '';
                               controller.consigneeAddressCtrl.text = address;
                               final location = info['location'] ?? '';
-                              final toValue = location.isNotEmpty ? location : address;
+                              final toValue = location.isNotEmpty
+                                  ? location
+                                  : address;
                               // Auto-fill To field and Billing Address with consignee's location/address
                               controller.toCtrl.text = toValue;
                               controller.billingAddressCtrl.text = address;
@@ -1227,7 +1279,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   Icons.location_on,
                   hintText: 'Select a consignee to auto-fill',
                 ),
-                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                validator: (value) =>
+                    value == null || value.isEmpty ? 'Required' : null,
               ),
             ],
           ),
@@ -1237,18 +1290,20 @@ class _GCFormScreenState extends State<GCFormScreen> {
   }
 
   Widget _buildGoodsTab(
-      BuildContext context,
-      GCFormController controller,
-      bool isSmallScreen,
-      ) {
+    BuildContext context,
+    GCFormController controller,
+    bool isSmallScreen,
+  ) {
     // Access WeightRate from the controller
     WeightRate? selectedWeightValue = controller.selectedWeight.value;
 
     // Convert WeightRate list to a list of strings for the searchable dropdown
-    final List<String> weightOptions = controller.weightRates.map((w) => w.weight).toList();
+    final List<String> weightOptions = controller.weightRates
+        .map((w) => w.weight)
+        .toList();
     // Get the string representation of the currently selected WeightRate
-    final String currentSelectedWeightString = selectedWeightValue?.weight ?? 'Select Weight';
-
+    final String currentSelectedWeightString =
+        selectedWeightValue?.weight ?? 'Select Weight';
 
     return SingleChildScrollView(
       key: const ValueKey(2),
@@ -1264,6 +1319,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 'Goods Details',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
+
               // const SizedBox(height: 16),
 
               // // Select Weight dropdown (now searchable)
@@ -1300,11 +1356,11 @@ class _GCFormScreenState extends State<GCFormScreen> {
               //       controller: TextEditingController(text: 'Loading weight rates...'),
               //     );
               //   }
-                
-                // // Get the current selected weight string from the controller's selectedWeight
-                // final selectedWeight = controller.selectedWeight.value;
-                // final selectedWeightString = selectedWeight?.weight ?? 'Select Weight';
-                
+
+              // // Get the current selected weight string from the controller's selectedWeight
+              // final selectedWeight = controller.selectedWeight.value;
+              // final selectedWeightString = selectedWeight?.weight ?? 'Select Weight';
+
               //   return _buildDropdownField(
               //     context: context,
               //     label: 'Select Weight',
@@ -1327,7 +1383,6 @@ class _GCFormScreenState extends State<GCFormScreen> {
               //     searchable: true,
               //   );
               // }),
-
               const SizedBox(height: 16),
 
               // Number of Packages
@@ -1362,7 +1417,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         ),
                         textInputAction: TextInputAction.next,
                         validator: (value) =>
-                        value == null || value.isEmpty ? 'Required' : null,
+                            value == null || value.isEmpty ? 'Required' : null,
                         onChanged: (_) {},
                         onFieldSubmitted: (_) {
                           controller.methodPackageFocus.requestFocus();
@@ -1380,7 +1435,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         ),
                         textInputAction: TextInputAction.next,
                         validator: (value) =>
-                        value == null || value.isEmpty ? 'Required' : null,
+                            value == null || value.isEmpty ? 'Required' : null,
                         onChanged: (_) {},
                         onFieldSubmitted: (_) {
                           controller.customInvoiceFocus.requestFocus();
@@ -1389,7 +1444,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     ),
                   ],
                 )
-              else ...[ // For small screens, stack them vertically
+              else ...[
+                // For small screens, stack them vertically
                 TextFormField(
                   controller: controller.natureGoodsCtrl,
                   focusNode: controller.natureGoodsFocus,
@@ -1492,14 +1548,14 @@ class _GCFormScreenState extends State<GCFormScreen> {
               //   ),
               // )),
               const SizedBox(height: 16),
-              
+
               // Invoice Details Section
               Text(
                 'Invoice & E-way Bill Details',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 16),
-              
+
               // Customer Invoice Number and Invoice Value
               if (!isSmallScreen)
                 Row(
@@ -1530,7 +1586,9 @@ class _GCFormScreenState extends State<GCFormScreen> {
                           Icons.currency_rupee,
                           isOptional: true,
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         textInputAction: TextInputAction.next,
                         onChanged: (_) {},
                         onFieldSubmitted: (_) {
@@ -1564,7 +1622,9 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     Icons.currency_rupee,
                     isOptional: true,
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   textInputAction: TextInputAction.next,
                   onChanged: (_) {},
                   onFieldSubmitted: (_) {
@@ -1572,9 +1632,9 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   },
                 ),
               ],
-              
+
               const SizedBox(height: 16),
-              
+
               // E-way Bill Number
               TextFormField(
                 controller: controller.ewayBillCtrl,
@@ -1590,9 +1650,9 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   controller.actualWeightFocus.requestFocus();
                 },
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // E-way Bill Date and Expiry Date
               if (!isSmallScreen)
                 Row(
@@ -1663,9 +1723,9 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   ),
                 ),
               ],
-              
+
               const SizedBox(height: 24),
-              
+
               // Actual Weight field
               TextFormField(
                 controller: controller.actualWeightCtrl,
@@ -1682,15 +1742,17 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   controller.remarksFocus.requestFocus();
                 },
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // GST Payer dropdown
               Obx(() {
                 // Debug print to check the current selected value
-                debugPrint('Current GST Payer in UI: ${controller.selectedGstPayer.value}');
+                debugPrint(
+                  'Current GST Payer in UI: ${controller.selectedGstPayer.value}',
+                );
                 debugPrint('Available options: ${controller.gstPayerOptions}');
-                
+
                 return _buildDropdownField(
                   context: context,
                   label: 'GST Payer',
@@ -1706,27 +1768,29 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   searchable: false,
                 );
               }),
-              
+
               const SizedBox(height: 16),
-              
+
               // Payment Method dropdown
-              Obx(() => _buildDropdownField(
-                context: context,
-                label: 'Payment Method',
-                value: controller.selectedPayment.value,
-                items: [ ...controller.paymentOptions],
-                onChanged: (value) {
-                  if (value != null) {
-                    controller.selectedPayment.value = value;
-                  }
-                },
-                validator: null,
-                compact: true,
-                searchable: false,
-              )),
-              
+              Obx(
+                () => _buildDropdownField(
+                  context: context,
+                  label: 'Payment Method',
+                  value: controller.selectedPayment.value,
+                  items: [...controller.paymentOptions],
+                  onChanged: (value) {
+                    if (value != null) {
+                      controller.selectedPayment.value = value;
+                    }
+                  },
+                  validator: null,
+                  compact: true,
+                  searchable: false,
+                ),
+              ),
+
               const SizedBox(height: 24),
-              
+
               // Private Mark in its own row
               TextFormField(
                 controller: controller.remarksCtrl,
@@ -1763,10 +1827,10 @@ class _GCFormScreenState extends State<GCFormScreen> {
   }
 
   Widget _buildAttachmentsTab(
-      BuildContext context,
-      GCFormController controller,
-      bool isSmallScreen,
-      ) {
+    BuildContext context,
+    GCFormController controller,
+    bool isSmallScreen,
+  ) {
     return SingleChildScrollView(
       key: const ValueKey(3),
       child: Card(
@@ -1784,9 +1848,9 @@ class _GCFormScreenState extends State<GCFormScreen> {
               const SizedBox(height: 16),
               Text(
                 'Attach supporting documents for this GC. You can add documents to existing GCs or attach files before submission.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[600],
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
               ),
               const SizedBox(height: 24),
 
@@ -1799,7 +1863,10 @@ class _GCFormScreenState extends State<GCFormScreen> {
     );
   }
 
-  Widget _buildFileAttachmentsSection(BuildContext context, GCFormController controller) {
+  Widget _buildFileAttachmentsSection(
+    BuildContext context,
+    GCFormController controller,
+  ) {
     return Obx(() {
       final files = controller.attachedFiles;
       final existingFiles = controller.existingAttachments;
@@ -1829,9 +1896,9 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   if (files.isNotEmpty) ...[
                     Text(
                       '${files.length} new file${files.length == 1 ? '' : 's'}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[600],
-                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
                     ),
                     const SizedBox(width: 8),
                     TextButton.icon(
@@ -1867,7 +1934,9 @@ class _GCFormScreenState extends State<GCFormScreen> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.blue,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -1877,17 +1946,18 @@ class _GCFormScreenState extends State<GCFormScreen> {
                               children: [
                                 Text(
                                   controller.uploadStatus.value,
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w500),
                                 ),
-                                if (controller.currentUploadingFile.value.isNotEmpty) ...[
+                                if (controller
+                                    .currentUploadingFile
+                                    .value
+                                    .isNotEmpty) ...[
                                   const SizedBox(height: 4),
                                   Text(
                                     controller.currentUploadingFile.value,
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Colors.grey[600],
-                                    ),
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(color: Colors.grey[600]),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -1901,7 +1971,9 @@ class _GCFormScreenState extends State<GCFormScreen> {
                       LinearProgressIndicator(
                         value: controller.uploadProgress.value,
                         backgroundColor: Colors.blue.shade100,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Colors.blue,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -1928,7 +2000,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
               ],
 
               // Show error state
-              if (controller.attachmentsError.value.isNotEmpty && !controller.isLoadingAttachments.value) ...[
+              if (controller.attachmentsError.value.isNotEmpty &&
+                  !controller.isLoadingAttachments.value) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -1953,156 +2026,192 @@ class _GCFormScreenState extends State<GCFormScreen> {
               ],
 
               // Existing attachments section
-              Obx(() => controller.existingAttachments.isNotEmpty && !controller.isLoadingAttachments.value && (controller.isEditMode.value || controller.isFillTemporaryMode.value) ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Existing Attachments',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    constraints: const BoxConstraints(maxHeight: 150),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: controller.existingAttachments.length,
-                      itemBuilder: (context, index) {
-                        final file = controller.existingAttachments[index];
-                        final fileName = file['name'] as String? ?? 'Unknown';
-                        final fileSize = file['size'] as int? ?? 0;
-                        final filename = file['filename'] as String? ?? '';
-
-                        // Format file size
-                        String formatFileSize(int bytes) {
-                          if (bytes < 1024) return '$bytes B';
-                          if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-                          return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-                        }
-
-                        return ListTile(
-                          dense: true,
-                          leading: Icon(
-                            _getFileIcon(filename.split('.').last),
-                            color: _getFileColor(filename.split('.').last),
-                            size: 20,
+              Obx(
+                () =>
+                    controller.existingAttachments.isNotEmpty &&
+                        !controller.isLoadingAttachments.value &&
+                        (controller.isEditMode.value ||
+                            controller.isFillTemporaryMode.value)
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Existing Attachments',
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w600),
                           ),
-                          title: Text(
-                            fileName,
-                            style: const TextStyle(fontSize: 14),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            formatFileSize(fileSize),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
+                          const SizedBox(height: 8),
+                          Container(
+                            constraints: const BoxConstraints(maxHeight: 150),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey[300]!),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: controller.existingAttachments.length,
+                              itemBuilder: (context, index) {
+                                final file =
+                                    controller.existingAttachments[index];
+                                final fileName =
+                                    file['name'] as String? ?? 'Unknown';
+                                final fileSize = file['size'] as int? ?? 0;
+                                final filename =
+                                    file['filename'] as String? ?? '';
+
+                                // Format file size
+                                String formatFileSize(int bytes) {
+                                  if (bytes < 1024) return '$bytes B';
+                                  if (bytes < 1024 * 1024)
+                                    return '${(bytes / 1024).toStringAsFixed(1)} KB';
+                                  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+                                }
+
+                                return ListTile(
+                                  dense: true,
+                                  leading: Icon(
+                                    _getFileIcon(filename.split('.').last),
+                                    color: _getFileColor(
+                                      filename.split('.').last,
+                                    ),
+                                    size: 20,
+                                  ),
+                                  title: Text(
+                                    fileName,
+                                    style: const TextStyle(fontSize: 14),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Text(
+                                    formatFileSize(fileSize),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.visibility,
+                                          size: 16,
+                                        ),
+                                        onPressed: () =>
+                                            controller.previewAttachment(
+                                              filename,
+                                              context,
+                                              isTemporaryGC: controller
+                                                  .isFillTemporaryMode
+                                                  .value,
+                                            ),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                        tooltip: 'Preview',
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.download,
+                                          size: 16,
+                                        ),
+                                        onPressed: () =>
+                                            controller.downloadAttachment(
+                                              filename,
+                                              context,
+                                              isTemporaryGC: controller
+                                                  .isFillTemporaryMode
+                                                  .value,
+                                              originalName: fileName,
+                                            ),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                        tooltip: 'Download',
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.visibility, size: 16),
-                                onPressed: () => controller.previewAttachment(filename, context, isTemporaryGC: controller.isFillTemporaryMode.value),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                tooltip: 'Preview',
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.download, size: 16),
-                                onPressed: () => controller.downloadAttachment(
-                                  filename, 
-                                  context, 
-                                  isTemporaryGC: controller.isFillTemporaryMode.value,
-                                  originalName: fileName,
-                                ),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                tooltip: 'Download',
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              ) : const SizedBox.shrink()),
+                          const SizedBox(height: 16),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
 
               // New attachments section
-              Obx(() => controller.attachedFiles.isNotEmpty ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'New Attachments to Add',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    constraints: const BoxConstraints(maxHeight: 150),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: controller.attachedFiles.length,
-                      itemBuilder: (context, index) {
-                        final file = controller.attachedFiles[index];
-                        final fileName = file['name'] as String? ?? 'Unknown';
-                        final fileSize = file['size'] as int? ?? 0;
-                        final extension = file['extension'] as String? ?? '';
-
-                        // Format file size
-                        String formatFileSize(int bytes) {
-                          if (bytes < 1024) return '$bytes B';
-                          if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-                          return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-                        }
-
-                        return ListTile(
-                          dense: true,
-                          leading: Icon(
-                            _getFileIcon(extension),
-                            color: _getFileColor(extension),
-                            size: 20,
+              Obx(
+                () => controller.attachedFiles.isNotEmpty
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'New Attachments to Add',
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w600),
                           ),
-                          title: Text(
-                            fileName,
-                            style: const TextStyle(fontSize: 14),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            formatFileSize(fileSize),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
+                          const SizedBox(height: 8),
+                          Container(
+                            constraints: const BoxConstraints(maxHeight: 150),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey[300]!),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: controller.attachedFiles.length,
+                              itemBuilder: (context, index) {
+                                final file = controller.attachedFiles[index];
+                                final fileName =
+                                    file['name'] as String? ?? 'Unknown';
+                                final fileSize = file['size'] as int? ?? 0;
+                                final extension =
+                                    file['extension'] as String? ?? '';
+
+                                // Format file size
+                                String formatFileSize(int bytes) {
+                                  if (bytes < 1024) return '$bytes B';
+                                  if (bytes < 1024 * 1024)
+                                    return '${(bytes / 1024).toStringAsFixed(1)} KB';
+                                  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+                                }
+
+                                return ListTile(
+                                  dense: true,
+                                  leading: Icon(
+                                    _getFileIcon(extension),
+                                    color: _getFileColor(extension),
+                                    size: 20,
+                                  ),
+                                  title: Text(
+                                    fileName,
+                                    style: const TextStyle(fontSize: 14),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Text(
+                                    formatFileSize(fileSize),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.close, size: 16),
+                                    onPressed: () =>
+                                        controller.removeFile(index),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.close, size: 16),
-                            onPressed: () => controller.removeFile(index),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-              ) : const SizedBox.shrink()),
+                          const SizedBox(height: 12),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
 
               // Add files button
               SizedBox(
@@ -2150,7 +2259,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
   IconData _getFileIcon(String extension) {
     final ext = extension.toLowerCase();
     if (['pdf'].contains(ext)) return Icons.picture_as_pdf;
-    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(ext)) return Icons.image;
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(ext))
+      return Icons.image;
     if (['doc', 'docx'].contains(ext)) return Icons.description;
     if (['xls', 'xlsx'].contains(ext)) return Icons.table_chart;
     if (['txt'].contains(ext)) return Icons.text_snippet;
@@ -2160,7 +2270,8 @@ class _GCFormScreenState extends State<GCFormScreen> {
   Color _getFileColor(String extension) {
     final ext = extension.toLowerCase();
     if (['pdf'].contains(ext)) return Colors.red;
-    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(ext)) return Colors.blue;
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(ext))
+      return Colors.blue;
     if (['doc', 'docx'].contains(ext)) return Colors.blue[700]!;
     if (['xls', 'xlsx'].contains(ext)) return Colors.green;
     return Colors.grey;
@@ -2197,10 +2308,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             decoration: BoxDecoration(
-              border: Border.all(
-                color: theme.colorScheme.error,
-                width: 1.5,
-              ),
+              border: Border.all(color: theme.colorScheme.error, width: 1.5),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -2226,7 +2334,10 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     icon: const Icon(Icons.refresh, size: 16),
                     label: const Text('Retry'),
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
@@ -2244,18 +2355,12 @@ class _GCFormScreenState extends State<GCFormScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: theme.textTheme.bodyMedium,
-          ),
+          Text(label, style: theme.textTheme.bodyMedium),
           const SizedBox(height: 4),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             decoration: BoxDecoration(
-              border: Border.all(
-                color: theme.dividerColor,
-                width: 1,
-              ),
+              border: Border.all(color: theme.dividerColor, width: 1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -2326,19 +2431,16 @@ class _GCFormScreenState extends State<GCFormScreen> {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: theme.colorScheme.error,
-            width: 1.5,
-          ),
+          borderSide: BorderSide(color: theme.colorScheme.error, width: 1.5),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: theme.colorScheme.error,
-            width: 2,
-          ),
+          borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 14,
+        ),
       ),
       icon: Icon(
         Icons.arrow_drop_down,
@@ -2361,9 +2463,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
             }
           });
         },
-        child: AbsorbPointer(
-          child: dropdown,
-        ),
+        child: AbsorbPointer(child: dropdown),
       );
     }
 
@@ -2397,17 +2497,23 @@ class _GCFormScreenState extends State<GCFormScreen> {
             }
           },
           child: InputDecorator(
-            decoration: _inputDecoration(label, _getIconForLabel(label), compact: compact).copyWith(
-              errorText: state.errorText,
-            ),
+            decoration: _inputDecoration(
+              label,
+              _getIconForLabel(label),
+              compact: compact,
+            ).copyWith(errorText: state.errorText),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: Text(
-                    (value.isEmpty || value.startsWith('Select')) ? 'Select $label' : value,
+                    (value.isEmpty || value.startsWith('Select'))
+                        ? 'Select $label'
+                        : value,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: (value.isEmpty || value.startsWith('Select')) ? Theme.of(context).hintColor : null,
+                      color: (value.isEmpty || value.startsWith('Select'))
+                          ? Theme.of(context).hintColor
+                          : null,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -2489,28 +2595,38 @@ class _GCFormScreenState extends State<GCFormScreen> {
                       Expanded(
                         child: filtered.isEmpty
                             ? Center(
-                          child: Text(
-                            'No results',
-                            style: Theme.of(ctx).textTheme.bodyMedium,
-                          ),
-                        )
+                                child: Text(
+                                  'No results',
+                                  style: Theme.of(ctx).textTheme.bodyMedium,
+                                ),
+                              )
                             : ListView.separated(
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final val = filtered[index];
-                            final selected = val == current;
-                            return ListTile(
-                              dense: true,
-                              title: Text(val, overflow: TextOverflow.ellipsis),
-                              trailing: selected ? const Icon(Icons.check, color: Colors.green) : null,
-                              onTap: () {
-                                searchCtrl.clear(); // Clear search when item is selected
-                                Navigator.of(ctx).pop(val);
-                              },
-                            );
-                          },
-                        ),
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) =>
+                                    const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final val = filtered[index];
+                                  final selected = val == current;
+                                  return ListTile(
+                                    dense: true,
+                                    title: Text(
+                                      val,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    trailing: selected
+                                        ? const Icon(
+                                            Icons.check,
+                                            color: Colors.green,
+                                          )
+                                        : null,
+                                    onTap: () {
+                                      searchCtrl
+                                          .clear(); // Clear search when item is selected
+                                      Navigator.of(ctx).pop(val);
+                                    },
+                                  );
+                                },
+                              ),
                       ),
                     ],
                   ),
@@ -2551,17 +2667,24 @@ class _GCFormScreenState extends State<GCFormScreen> {
   }
 
   InputDecoration _inputDecoration(
-      String label,
-      IconData icon, {
-        String? hintText,
-        bool isOptional = false,
-        bool compact = false,
-      }) {
+    String label,
+    IconData icon, {
+    String? hintText,
+    bool isOptional = false,
+    bool compact = false,
+  }) {
     return InputDecoration(
       labelText: label + (isOptional ? ' (Optional)' : ''),
       hintText: hintText,
-      prefixIcon: Icon(icon, size: compact ? 18 : 20, color: const Color(0xFF6B7280)),
-      contentPadding: EdgeInsets.symmetric(vertical: compact ? 6 : 12, horizontal: compact ? 12 : 16),
+      prefixIcon: Icon(
+        icon,
+        size: compact ? 18 : 20,
+        color: const Color(0xFF6B7280),
+      ),
+      contentPadding: EdgeInsets.symmetric(
+        vertical: compact ? 6 : 12,
+        horizontal: compact ? 12 : 16,
+      ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(
@@ -2585,5 +2708,4 @@ class _GCFormScreenState extends State<GCFormScreen> {
       floatingLabelBehavior: FloatingLabelBehavior.auto,
     );
   }
-
 }

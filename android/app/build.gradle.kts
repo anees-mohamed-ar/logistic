@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        // Base application ID
         applicationId = "com.example.logistic"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -28,6 +28,23 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    flavorDimensions += "company"
+    
+    productFlavors {
+        create("cargo") {
+            dimension = "company"
+            applicationIdSuffix = ".cargo"
+            resValue("string", "app_name", "Sri Krishna Cargo")
+            resValue("string", "company_id", "7")
+        }
+        create("carrying") {
+            dimension = "company"
+            applicationIdSuffix = ".carrying"
+            resValue("string", "app_name", "Sri Krishna Carrying")
+            resValue("string", "company_id", "6")
+        }
     }
 
     buildTypes {

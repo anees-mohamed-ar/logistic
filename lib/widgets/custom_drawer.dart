@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:logistic/controller/id_controller.dart';
+import 'package:logistic/controller/login_controller.dart';
 import 'package:logistic/routes.dart';
 import 'package:logistic/api_config.dart';
 
@@ -673,9 +674,8 @@ class _CustomDrawerState extends State<CustomDrawer> {
     );
 
     if (confirm == true) {
-      final idController = Get.find<IdController>();
-      idController.clearUserData();
-      Get.offAllNamed(AppRoutes.login);
+      final loginController = Get.find<LoginController>();
+      await loginController.logout();
     }
   }
 }

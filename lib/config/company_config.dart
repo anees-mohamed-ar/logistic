@@ -1,22 +1,22 @@
 // Company Configuration
 // This file contains the global company settings for the application
 //
-// HOW TO CHANGE COMPANY:
-// 1. Update companyId and companyName below
-// 2. Update other company details as needed
-// 3. Test the app to ensure all features work with new company
-//
-// NOTE: This app is designed for single-company use.
-// For multi-company support, additional changes would be needed.
+// MULTI-COMPANY SUPPORT:
+// This file now uses FlavorConfig to dynamically select the company based on the build flavor
+// The app can be built for different companies using different flavors
+
+import 'package:flutter/material.dart';
+import 'package:logistic/config/flavor_config.dart';
+import 'package:logistic/controller/company_controller.dart';
 
 class CompanyConfig {
   // ========== COMPANY INFORMATION ==========
-  // Change these values to switch to a different company
-  static const int companyId = 6;
-  static const String companyName = 'Sri Krishna Carrying Corporation';
+  // These values are now dynamically set based on the flavor
+  static int get companyId => FlavorConfig.instance.companyId;
+  static String get companyName => FlavorConfig.instance.name;
 
   // ========== DISPLAY SETTINGS ==========
-  static const int primaryColor = 0xFF1E2A44;
+  static Color get primaryColor => FlavorConfig.instance.primaryColor;
   static const int secondaryColor = 0xFF4A90E2;
 
   // ========== CONTACT INFORMATION ==========
@@ -43,23 +43,26 @@ class CompanyConfig {
 
   // ========== FORM HELPERS ==========
   static Map<String, dynamic> getDefaultCompanyData() {
-    return {
-      'companyId': companyId,
-      'companyName': companyName,
-    };
+    return {'companyId': companyId, 'companyName': companyName};
   }
 
   static Map<String, dynamic> getDefaultBranchData() {
-    return {
-      ...getDefaultCompanyData(),
-      'status': defaultBranchStatus,
-    };
+    return {...getDefaultCompanyData(), 'status': defaultBranchStatus};
   }
 
   static Map<String, dynamic> getDefaultUserData() {
-    return {
-      ...getDefaultCompanyData(),
-      'user_role': defaultUserRole,
-    };
+    return {...getDefaultCompanyData(), 'user_role': defaultUserRole};
+  }
+
+  // ========== COMPANY OBJECT ==========
+  static Company getCompany() {
+    return Company(
+      id: companyId,
+      companyName: companyName,
+      address: address,
+      phoneNumber: phone,
+      email: email,
+      website: website,
+    );
   }
 }

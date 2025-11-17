@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:logistic/splash_screen.dart';
 import 'package:logistic/services/network_service.dart';
+import 'package:logistic/config/flavor_config.dart';
+import 'package:logistic/config/company_config.dart';
 
 import 'routes.dart';
 import 'controller/id_controller.dart';
@@ -17,6 +19,12 @@ import 'controller/broker_controller.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await GetStorage.init();
+
+  // Initialize flavor configuration
+  await FlavorConfig.initFromPlatform();
+  print(
+    'Running app with company: ${CompanyConfig.companyName} (ID: ${CompanyConfig.companyId})',
+  );
 
   await Get.putAsync<NetworkService>(() => NetworkService.init());
   await _initializeApp();
@@ -41,11 +49,11 @@ class LogisticsGCApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'Logistics GC',
+      title: CompanyConfig.companyName,
       theme: ThemeData(
-        primaryColor: const Color(0xFF1E2A44),
+        primaryColor: CompanyConfig.primaryColor,
         colorScheme: ColorScheme.fromSwatch().copyWith(
-          primary: const Color(0xFF1E2A44),
+          primary: CompanyConfig.primaryColor,
           secondary: const Color(0xFF4A90E2),
         ),
         scaffoldBackgroundColor: const Color(0xFFF7F9FC),

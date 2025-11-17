@@ -10,6 +10,7 @@ import 'package:logistic/routes.dart';
 import 'package:logistic/controller/id_controller.dart';
 import 'package:logistic/controller/company_controller.dart';
 import 'package:logistic/models/location_model.dart';
+import 'package:logistic/config/company_config.dart';
 
 class LoginController extends GetxController {
   final formKey = GlobalKey<FormState>();
@@ -22,8 +23,8 @@ class LoginController extends GetxController {
 
   var userId = ''.obs;
   var companyId = ''.obs;
-  var selectedCompany = Rx<Company?>(null);
-  var selectedBranch = Rx<Location?>(null);
+  var selectedCompany = CompanyConfig.getCompany();
+  Location? selectedBranch;
 
   final _box = GetStorage();
 
@@ -36,24 +37,13 @@ class LoginController extends GetxController {
       ipController.text = savedIp;
       ApiConfig.baseUrl = savedIp;
     }
-    // Set default company
+    // Set default company from config
     _setDefaultCompany();
   }
 
   void _setDefaultCompany() {
-    // Set default company ID 6 (Sri Krishna Carrying Corporation)
-    selectedCompany.value = Company(
-      id: 6,
-      companyName: 'Sri Krishna Carrying Corporation',
-      address: null,
-      phoneNumber: null,
-      email: null,
-      gst: null,
-      state: null,
-      country: null,
-      website: null,
-      contactPerson: null,
-    );
+    // Set default company from CompanyConfig
+    selectedCompany = CompanyConfig.getCompany();
   }
 
   void togglePasswordVisibility() {
@@ -92,52 +82,77 @@ class LoginController extends GetxController {
       _box.write('backend_ip', ip); // Save the IP
 
       try {
+        // Use the company from CompanyConfig (should always be set)
+        final companyToUse = selectedCompany;
+        if (companyToUse == null) {
+          Fluttertoast.showToast(
+            msg: 'Company configuration error. Please contact administrator.',
+            backgroundColor: Colors.red,
+          );
+          return;
+        }
+
         // Build query parameters
         final queryParams = {
           'userEmail': emailController.text.trim(),
           'password': passwordController.text.trim(),
-          'companyId': selectedCompany.value!.id.toString(),
+          'companyId': companyToUse.id.toString(),
         };
 
         // Add branchId only if selected (optional)
-        if (selectedBranch.value != null) {
-          queryParams['branchId'] = selectedBranch.value!.id.toString();
+        if (selectedBranch != null) {
+          queryParams['branchId'] = selectedBranch!.id.toString();
         }
 
-        final uri = Uri.parse('${ApiConfig.baseUrl}/profile/search?userEmail=${emailController.text.trim()}&password=${passwordController.text.trim()}&companyId=${selectedCompany.value!.id.toString()}');
+        final uri = Uri.parse(
+          '${ApiConfig.baseUrl}/profile/search?userEmail=${emailController.text.trim()}&password=${passwordController.text.trim()}&companyId=${companyToUse.id.toString()}',
+        );
 
-        final response = await http.get(uri).timeout(const Duration(seconds: 10));
+        final response = await http
+            .get(uri)
+            .timeout(const Duration(seconds: 10));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final userData = data[0];
 
+          // Debug: Log the received user data to verify company validation
+          print('Login successful for user: ${userData['userEmail']}');
+          print(
+            'User companyId: ${userData['companyId']}, Requested companyId: ${companyToUse.id}',
+          );
+
           final idController = Get.find<IdController>();
           idController.setAllUserData(userData);
-          idController.setCompanyId(selectedCompany.value!.id.toString());
-          if (selectedBranch.value != null) {
-            idController.setBranchId(selectedBranch.value!.id.toString());
+          idController.setCompanyId(companyToUse.id.toString());
+          if (selectedBranch != null) {
+            idController.setBranchId(selectedBranch!.id.toString());
           }
 
           await _box.write('userData', userData);
-          await _box.write('selectedCompany', selectedCompany.value!.toJson());
-          if (selectedBranch.value != null) {
-            await _box.write('selectedBranch', selectedBranch.value!.toJson());
+          await _box.write('selectedCompany', companyToUse.toJson());
+          if (selectedBranch != null) {
+            await _box.write('selectedBranch', selectedBranch!.toJson());
           }
 
           Fluttertoast.showToast(msg: "Login Successful!");
           Get.offNamed(AppRoutes.home);
-
         } else {
           final errorData = jsonDecode(response.body);
+          // Debug: Log error details
+          print('Login failed with status ${response.statusCode}');
+          print('Error message: ${errorData['error']}');
+
           Fluttertoast.showToast(
-              msg: errorData['error'] ?? 'Invalid credentials',
-              backgroundColor: Colors.red);
+            msg: errorData['error'] ?? 'Invalid credentials',
+            backgroundColor: Colors.red,
+          );
         }
       } catch (e) {
         Fluttertoast.showToast(
-            msg: 'Failed to connect: ${e.toString()}',
-            backgroundColor: Colors.red);
+          msg: 'Failed to connect: ${e.toString()}',
+          backgroundColor: Colors.red,
+        );
       } finally {
         isLoading.value = false;
       }
@@ -145,10 +160,25 @@ class LoginController extends GetxController {
   }
 
   Future<void> logout() async {
-    await _box.remove('userData');
-    // Also clear the controllers
-    // Get.find<IdController>().clearUserData();
+    print('LOGOUT: Starting logout process');
+
+    // Clear ALL stored data completely
+    await _box.erase();
+    print('LOGOUT: All storage erased using _box.erase()');
+
+    // Clear controller data
+    Get.find<IdController>().clearUserData();
+
+    // Reset local controller state to config defaults
+    selectedCompany = CompanyConfig.getCompany();
+    selectedBranch = null;
+    ipController.text = ApiConfig.baseUrl;
+
+    print('LOGOUT: Local state reset. selectedCompany.id: ${selectedCompany.id}');
+
+    // Navigate to login screen
     Get.offAllNamed(AppRoutes.login);
+    print('LOGOUT: Navigation to login completed');
   }
 
   bool isLoggedIn() {
@@ -156,24 +186,47 @@ class LoginController extends GetxController {
   }
 
   void tryAutoLogin() {
+    print('AUTO-LOGIN: Checking login status...');
+    print('AUTO-LOGIN: isLoggedIn(): ${isLoggedIn()}');
+
     if (isLoggedIn()) {
+      print('AUTO-LOGIN: User data found, attempting auto-login');
       final userData = _box.read('userData');
       final savedCompany = _box.read('selectedCompany');
       final savedBranch = _box.read('selectedBranch');
+
+      print('AUTO-LOGIN: userData: ${userData != null ? "present" : "null"}');
+      print(
+        'AUTO-LOGIN: savedCompany: ${savedCompany != null ? "present" : "null"}',
+      );
+      print(
+        'AUTO-LOGIN: savedBranch: ${savedBranch != null ? "present" : "null"}',
+      );
+
       if (userData != null) {
         final idController = Get.find<IdController>();
         idController.setAllUserData(userData);
         if (savedCompany != null) {
-          selectedCompany.value = Company.fromJson(savedCompany);
-          idController.setCompanyId(selectedCompany.value!.id.toString());
+          print('AUTO-LOGIN: Using saved company from storage');
+          selectedCompany = Company.fromJson(savedCompany);
+          idController.setCompanyId(selectedCompany.id.toString());
+        } else {
+          print('AUTO-LOGIN: Using company from config');
+          selectedCompany = CompanyConfig.getCompany();
+          idController.setCompanyId(selectedCompany.id.toString());
         }
         if (savedBranch != null) {
-          selectedBranch.value = Location.fromJson(savedBranch);
-          idController.setBranchId(selectedBranch.value!.id.toString());
+          selectedBranch = Location.fromJson(savedBranch);
+          idController.setBranchId(selectedBranch!.id.toString());
         }
+        print('AUTO-LOGIN: Navigating to home screen');
         Get.offNamed(AppRoutes.home);
+      } else {
+        print('AUTO-LOGIN: userData is null, going to login');
+        Get.offNamed(AppRoutes.login);
       }
     } else {
+      print('AUTO-LOGIN: No user data found, going to login screen');
       Get.offNamed(AppRoutes.login);
     }
   }

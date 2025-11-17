@@ -8,12 +8,14 @@ import android.net.Uri
 import android.util.Log
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.example.logistic/android_intent"
+    private val INTENT_CHANNEL = "com.example.logistic/android_intent"
+    private val FLAVOR_CHANNEL = "com.example.logistic/flavor"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        // Intent channel for URL launching
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, INTENT_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "launchUrl" -> {
                     val url = call.argument<String>("url")
@@ -30,6 +32,27 @@ class MainActivity : FlutterActivity() {
                         }
                     } else {
                         result.success(false)
+                    }
+                }
+                else -> {
+                    result.notImplemented()
+                }
+            }
+        }
+        
+        // Flavor channel for company configuration
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FLAVOR_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getCompanyId" -> {
+                    try {
+                        // Get company ID from resources (set by flavor)
+                        val companyId = resources.getString(R.string.company_id).toInt()
+                        Log.d("MainActivity", "Providing company ID: $companyId")
+                        result.success(companyId)
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Failed to get company ID", e)
+                        // Default to company ID 7 (Cargo) if there's an error
+                        result.success(7)
                     }
                 }
                 else -> {

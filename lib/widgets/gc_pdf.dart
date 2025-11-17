@@ -116,10 +116,6 @@ class GCPdfGenerator {
                   pw.Container(
                     width: 45,
                     height: 45,
-                    // decoration: pw.BoxDecoration(
-                    //   shape: pw.BoxShape.circle,
-                    //   border: pw.Border.all(width: 1.5),
-                    // ),
                     child: pw.ClipOval(
                       child: pw.Image(
                         logoImage,
@@ -135,7 +131,7 @@ class GCPdfGenerator {
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         pw.Text(
-                          'Sri Krishna Carrying Corporation',
+                          'Sri Krishna Cargo Corporation',
                           style: pw.TextStyle(
                             font: boldFont,
                             fontSize: 16,
@@ -182,7 +178,7 @@ class GCPdfGenerator {
 
             pw.SizedBox(width: 10),
 
-            // CENTER SECTION: Empty space (Jurisdiction moved to footer)
+            // CENTER SECTION: Empty space
             pw.Container(width: 70),
 
             pw.SizedBox(width: 10),
@@ -231,30 +227,30 @@ class GCPdfGenerator {
                                   controller.gcNumberCtrl.text,
                                   style: pw.TextStyle(
                                     font: boldFont,
-                                    fontSize: 11,
+                                    fontSize: 8,
                                   ),
                                 ),
                                 pw.Text(
                                   ' / ',
-                                  style: pw.TextStyle(font: font, fontSize: 9),
+                                  style: pw.TextStyle(font: font, fontSize: 8),
                                 ),
                                 pw.Text(
                                   '25-26',
-                                  style: pw.TextStyle(font: font, fontSize: 9),
+                                  style: pw.TextStyle(font: font, fontSize: 8),
                                 ),
                                 if (branchCode.isNotEmpty) ...[
                                   pw.Text(
                                     ' / ',
                                     style: pw.TextStyle(
                                       font: font,
-                                      fontSize: 9,
+                                      fontSize: 8,
                                     ),
                                   ),
                                   pw.Text(
                                     branchCode,
                                     style: pw.TextStyle(
                                       font: font,
-                                      fontSize: 9,
+                                      fontSize: 8,
                                     ),
                                   ),
                                 ],
@@ -585,7 +581,6 @@ class GCPdfGenerator {
                             pw.TextSpan(
                               text: controller.consignorNameCtrl.text,
                               style: pw.TextStyle(font: font, fontSize: 9),
-                              // style: pw.TextStyle(font: font, fontSize: 9),
                             ),
                           ],
                         ),
@@ -702,7 +697,6 @@ class GCPdfGenerator {
                             pw.TextSpan(
                               text: controller.consigneeNameCtrl.text,
                               style: pw.TextStyle(font: font, fontSize: 10),
-                              // style: pw.TextStyle(font: font, fontSize: 9),
                             ),
                           ],
                         ),
@@ -1051,7 +1045,7 @@ class GCPdfGenerator {
           ),
         ),
 
-        // Combined section: Left side (stacked tables) and Right side (certificate/freight)
+        // Combined section: Left side (stacked tables) and Right side (GSTIN payment/freight)
         pw.Container(
           decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
           child: pw.Row(
@@ -1242,7 +1236,7 @@ class GCPdfGenerator {
                       ),
                     ),
 
-                    // Row 3: Delivery Instructions
+                    // Row 3: Delivery Instructions (removed GSTIN to be paid by from here)
                     pw.Container(
                       height: 50,
                       decoration: pw.BoxDecoration(
@@ -1269,36 +1263,8 @@ class GCPdfGenerator {
                           pw.Text(
                             controller.deliveryInstructionsCtrl.text,
                             style: pw.TextStyle(font: font, fontSize: 7),
-                            maxLines: 2,
+                            maxLines: 3,
                             overflow: pw.TextOverflow.clip,
-                          ),
-                          pw.Spacer(),
-                          pw.Divider(height: 1),
-                          pw.SizedBox(height: 1),
-                          pw.RichText(
-                            text: pw.TextSpan(
-                              style: pw.TextStyle(font: font, fontSize: 9.5),
-                              children: [
-                                pw.TextSpan(text: 'GSTIN to be paid by : '),
-                                ..._buildGstPayerSelection(
-                                  'Consignor',
-                                  controller.selectedGstPayer.value,
-                                  font,
-                                ),
-                                pw.TextSpan(
-                                  text: ' / ',
-                                  style: pw.TextStyle(
-                                    font: font,
-                                    fontSize: 9.5,
-                                  ),
-                                ),
-                                ..._buildGstPayerSelection(
-                                  'Consignee',
-                                  controller.selectedGstPayer.value,
-                                  font,
-                                ),
-                              ],
-                            ),
                           ),
                         ],
                       ),
@@ -1307,12 +1273,12 @@ class GCPdfGenerator {
                 ),
               ),
 
-              // RIGHT SIDE: Certificate and Freight section
+              // RIGHT SIDE: GSTIN Payment and Freight section
               pw.Expanded(
                 flex: 9,
                 child: pw.Column(
                   children: [
-                    // Header row
+                    // Header row - MODIFIED: GSTIN to be paid by instead of "Not responsible"
                     pw.Container(
                       height: 22,
                       decoration: pw.BoxDecoration(
@@ -1320,7 +1286,7 @@ class GCPdfGenerator {
                       ),
                       child: pw.Row(
                         children: [
-                          // Not responsible for leakage
+                          // GSTIN to be paid by (replacing "Not responsible for leakage")
                           pw.Expanded(
                             flex: 5,
                             child: pw.Container(
@@ -1332,11 +1298,11 @@ class GCPdfGenerator {
                               ),
                               child: pw.Center(
                                 child: pw.Text(
-                                  'Not responsible for leakage or Breakage',
+                                  'GSTIN to be paid by :',
                                   style: pw.TextStyle(
                                     font: boldFont,
-                                    fontSize: 8,
-                                    color: PdfColors.red,
+                                    fontSize: 9,
+                                    color: PdfColors.black,
                                   ),
                                   textAlign: pw.TextAlign.center,
                                 ),
@@ -1401,7 +1367,7 @@ class GCPdfGenerator {
                       child: pw.Row(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          // Certificate column
+                          // GSTIN Payer Selection column (replacing certificate)
                           pw.Expanded(
                             flex: 5,
                             child: pw.Container(
@@ -1412,10 +1378,33 @@ class GCPdfGenerator {
                                 ),
                               ),
                               child: pw.Center(
-                                child: pw.Text(
-                                  '"Certified that the credit of Input Tax Charged on Goods and Services used in Supplying of GTA Services has not been Taken in view of Notification Issued under Goods & Service Tax"',
-                                  style: pw.TextStyle(font: font, fontSize: 9),
-                                  textAlign: pw.TextAlign.justify,
+                                child: pw.RichText(
+                                  textAlign: pw.TextAlign.center,
+                                  text: pw.TextSpan(
+                                    style: pw.TextStyle(
+                                      font: font,
+                                      fontSize: 10,
+                                    ),
+                                    children: [
+                                      ..._buildGstPayerSelection(
+                                        'Consignor',
+                                        controller.selectedGstPayer.value,
+                                        font,
+                                      ),
+                                      pw.TextSpan(
+                                        text: '   /   ',
+                                        style: pw.TextStyle(
+                                          font: font,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                      ..._buildGstPayerSelection(
+                                        'Consignee',
+                                        controller.selectedGstPayer.value,
+                                        font,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -1641,61 +1630,72 @@ class GCPdfGenerator {
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           crossAxisAlignment: pw.CrossAxisAlignment.end,
           children: [
-            pw.Column(
-              children: [
-                pw.Container(width: 150, height: 0.5, child: pw.Divider()),
-                pw.SizedBox(height: 2),
-                pw.Text(
-                  'Signature of Consignor or his Agent',
-                  style: pw.TextStyle(font: font, fontSize: 8),
-                ),
-              ],
-            ),
-            pw.Text(
-              copyTitle,
-              style: pw.TextStyle(
-                font: boldFont,
-                fontSize: 12,
-                color: PdfColors.red,
+            pw.Expanded(
+              child: pw.Column(
+                children: [
+                  pw.Container(width: 150, height: 0.5, child: pw.Divider()),
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    'Signature of Consignor or his Agent',
+                    style: pw.TextStyle(font: font, fontSize: 8),
+                  ),
+                ],
               ),
             ),
-            pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: [
-                // User name
-                pw.Text(
-                  bookingOfficerName.isNotEmpty
-                      ? bookingOfficerName
-                      : 'Booking Officer',
-                  style: pw.TextStyle(font: boldFont, fontSize: 7),
-                ),
-                pw.SizedBox(height: 1),
-                // Space for seal image (smaller bordered box)
-                pw.Container(
-                  width: 60,
-                  height: 30,
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(width: 0.5, color: PdfColors.grey400),
+            pw.Expanded(
+              child: pw.Center(
+                child: pw.Text(
+                  copyTitle,
+                  style: pw.TextStyle(
+                    font: boldFont,
+                    fontSize: 12,
+                    color: PdfColors.red,
                   ),
-                  child: pw.Center(
-                    child: pw.Text(
-                      'Seal',
-                      style: pw.TextStyle(
-                        font: font,
-                        fontSize: 6,
-                        color: PdfColors.grey600,
+                ),
+              ),
+            ),
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  // User name
+                  pw.Text(
+                    bookingOfficerName.isNotEmpty
+                        ? bookingOfficerName
+                        : 'Booking Officer',
+                    style: pw.TextStyle(font: boldFont, fontSize: 7),
+                  ),
+                  pw.SizedBox(height: 1),
+                  // Space for seal image (smaller bordered box)
+                  pw.Container(
+                    width: 60,
+                    height: 30,
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(
+                        width: 0.5,
+                        color: PdfColors.grey400,
+                      ),
+                    ),
+                    child: pw.Center(
+                      child: pw.Text(
+                        'Seal',
+                        style: pw.TextStyle(
+                          font: font,
+                          fontSize: 6,
+                          color: PdfColors.grey600,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                pw.SizedBox(height: 1),
-                // Divider line for signature
-                pw.Container(width: 120, height: 0.5, child: pw.Divider()),
-                pw.Text(
-                  'Signature of Booking Officer',
-                  style: pw.TextStyle(font: font, fontSize: 7),
-                ),
-              ],
+                  pw.SizedBox(height: 1),
+                  // Divider line for signature
+                  pw.Container(width: 120, height: 0.5, child: pw.Divider()),
+                  pw.Text(
+                    'Signature of Booking Officer',
+                    style: pw.TextStyle(font: font, fontSize: 7),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -1875,8 +1875,8 @@ class GCPdfGenerator {
         alignment: pw.Alignment.center,
         width: 12,
         height: 12,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 2),
-        decoration: pw.BoxDecoration(border: pw.Border.all(width: 0.9)),
+        margin: const pw.EdgeInsets.only(right: 4),
+        decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
         child: checked
             ? pw.SvgImage(
                 svg: checkmarkSvg,
@@ -1889,7 +1889,7 @@ class GCPdfGenerator {
     );
   }
 
-  // Helper for Consignor/Consignee selection with checkbox and strike-through
+  // Helper for Consignor/Consignee selection
   static List<pw.InlineSpan> _buildPayerSelection(
     String option,
     pw.Font boldFont,
@@ -1902,6 +1902,7 @@ class GCPdfGenerator {
     ];
   }
 
+  // Updated helper for GSTIN payer selection with larger checkboxes and text
   static List<pw.InlineSpan> _buildGstPayerSelection(
     String option,
     String selectedValue,
@@ -1910,34 +1911,43 @@ class GCPdfGenerator {
     final bool isSelected = selectedValue == option;
     final bool strikeThrough = selectedValue.isNotEmpty && !isSelected;
 
-    final textSpan = pw.TextSpan(
-      text: option,
-      style: pw.TextStyle(
-        font: font,
-        fontSize: 7.5,
-        decoration: strikeThrough
-            ? pw.TextDecoration.lineThrough
-            : pw.TextDecoration.none,
-        decorationColor: PdfColors.black,
-        decorationThickness: 1.5,
-      ),
-    );
-
     return [
       _buildPdfCheck(isSelected),
       if (isSelected) ...[
         pw.WidgetSpan(
           child: pw.Container(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 2),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 1),
             decoration: pw.BoxDecoration(
               color: PdfColors.green100,
               borderRadius: pw.BorderRadius.circular(2),
             ),
-            child: pw.RichText(text: textSpan),
+            child: pw.Text(
+              option,
+              style: pw.TextStyle(
+                font: font,
+                fontSize: 9,
+                decoration: strikeThrough
+                    ? pw.TextDecoration.lineThrough
+                    : pw.TextDecoration.none,
+                decorationColor: PdfColors.black,
+                decorationThickness: 1.5,
+              ),
+            ),
           ),
         ),
       ] else ...[
-        textSpan,
+        pw.TextSpan(
+          text: option,
+          style: pw.TextStyle(
+            font: font,
+            fontSize: 9,
+            decoration: strikeThrough
+                ? pw.TextDecoration.lineThrough
+                : pw.TextDecoration.none,
+            decorationColor: PdfColors.black,
+            decorationThickness: 1.5,
+          ),
+        ),
       ],
     ];
   }
@@ -1956,8 +1966,10 @@ class GCPdfGenerator {
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) =>
-              PDFPreviewScreen(pdfData: pdfData, filename: 'GC_$gcNumber.pdf'),
+          builder: (context) => PDFPreviewScreen(
+            pdfData: pdfData,
+            filename: 'GC_V2_$gcNumber.pdf',
+          ),
         ),
       );
     }
@@ -1970,9 +1982,9 @@ class GCPdfGenerator {
 
       String gcNumber = controller.gcNumberCtrl.text.trim();
       if (gcNumber.isEmpty) {
-        gcNumber = 'GC_${DateTime.now().millisecondsSinceEpoch}';
-      } else if (!gcNumber.toUpperCase().startsWith('GC_')) {
-        gcNumber = 'GC_$gcNumber';
+        gcNumber = 'GC_V2_${DateTime.now().millisecondsSinceEpoch}';
+      } else if (!gcNumber.toUpperCase().startsWith('GC_V2_')) {
+        gcNumber = 'GC_V2_$gcNumber';
       }
 
       if (!gcNumber.toLowerCase().endsWith('.pdf')) {
@@ -1995,10 +2007,10 @@ class GCPdfGenerator {
 
       String gcNumber = controller.gcNumberCtrl.text.trim();
       if (gcNumber.isEmpty) {
-        gcNumber = 'GC_${DateTime.now().millisecondsSinceEpoch}.pdf';
+        gcNumber = 'GC_V2_${DateTime.now().millisecondsSinceEpoch}.pdf';
       } else {
-        if (!gcNumber.toUpperCase().startsWith('GC_')) {
-          gcNumber = 'GC_$gcNumber';
+        if (!gcNumber.toUpperCase().startsWith('GC_V2_')) {
+          gcNumber = 'GC_V2_$gcNumber';
         }
         if (!gcNumber.toLowerCase().endsWith('.pdf')) {
           gcNumber = '$gcNumber.pdf';
@@ -2016,9 +2028,9 @@ class GCPdfGenerator {
     try {
       final pdfData = await generatePDF(controller);
 
-      String docName = 'GC_${controller.gcNumberCtrl.text.trim()}.pdf';
-      if (docName == 'GC_.pdf') {
-        docName = 'GC_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      String docName = 'GC_V2_${controller.gcNumberCtrl.text.trim()}.pdf';
+      if (docName == 'GC_V2_.pdf') {
+        docName = 'GC_V2_${DateTime.now().millisecondsSinceEpoch}.pdf';
       }
 
       await Printing.layoutPdf(
@@ -2050,7 +2062,7 @@ class PDFPreviewScreen extends StatelessWidget {
     if (filename.isNotEmpty) {
       displayName = filename.split('/').last;
     } else if (gcNumber.isNotEmpty) {
-      displayName = 'GC_$gcNumber';
+      displayName = 'GC_V2_$gcNumber';
       if (!displayName.toLowerCase().endsWith('.pdf')) {
         displayName = '$displayName.pdf';
       }
