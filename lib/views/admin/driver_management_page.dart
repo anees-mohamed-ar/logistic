@@ -31,7 +31,7 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
   final _panController = TextEditingController();
   final _bloodGroupController = TextEditingController();
   DateTime? _selectedDob;
-  
+
   List<Map<String, dynamic>> drivers = [];
   bool isLoading = true;
   bool isAddingDriver = false;
@@ -51,6 +51,26 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
     _loadStates();
   }
 
+  /// Safely parse a date string that may be in either
+  /// `yyyy-MM-dd` (API default) or `dd-MM-yyyy` (manual edits) format.
+  DateTime? _parseDob(dynamic value) {
+    if (value == null) return null;
+    final str = value.toString();
+    if (str.isEmpty) return null;
+
+    // Try ISO first
+    try {
+      return DateTime.parse(str);
+    } catch (_) {
+      // Fallback to dd-MM-yyyy
+      try {
+        return DateFormat('dd-MM-yyyy').parse(str);
+      } catch (_) {
+        return null;
+      }
+    }
+  }
+
   Widget _buildStateDropdown() {
     if (_statesLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -62,10 +82,7 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            'State *',
-            style: theme.textTheme.bodyMedium,
-          ),
+          Text('State *', style: theme.textTheme.bodyMedium),
           const SizedBox(height: 4),
           Align(
             alignment: Alignment.centerLeft,
@@ -90,10 +107,9 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
       isRequired: true,
       validator: (value) => value == null ? 'Please select a state' : null,
       items: _states
-          .map((s) => DropdownMenuItem<StateModel>(
-                value: s,
-                child: Text(s.name),
-              ))
+          .map(
+            (s) => DropdownMenuItem<StateModel>(value: s, child: Text(s.name)),
+          )
           .toList(),
       onChanged: (StateModel? value) {
         setState(() {
@@ -110,7 +126,7 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
         Uri.parse('$baseUrl/search/'),
         headers: {'Content-Type': 'application/json'},
       );
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> responseData = json.decode(response.body);
         if (responseData is List) {
@@ -139,7 +155,8 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
           Get.snackbar('Error', 'Invalid response format');
         }
       } else {
-        final error = json.decode(response.body)['error'] ?? 'Failed to load drivers';
+        final error =
+            json.decode(response.body)['error'] ?? 'Failed to load drivers';
         Get.snackbar('Error', error);
       }
     } catch (e) {
@@ -161,42 +178,48 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
     }
 
     setState(() => isAddingDriver = true);
-    
+
     try {
-      final url = isEditMode 
-          ? '$baseUrl/update/$editingDriverDlNumber' 
+      final url = isEditMode
+          ? '$baseUrl/update/$editingDriverDlNumber'
           : '$baseUrl/add';
-          
-      final method = isEditMode ? 'PUT' : 'POST';
-      
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'driverName': _nameController.text.trim(),
-          'driverAddress': _addressController.text.trim(),
-          'district': _districtController.text.trim(),
-          'state': _selectedState?.name ?? '',
-          'country': _countryController.text.trim(),
-          'dateofBirth': DateFormat('yyyy-MM-dd').format(_selectedDob!),
-          'dlNumber': _dlNumberController.text.trim(),
-          'email': _emailController.text.trim(),
-          'bloodGroup': _bloodGroupController.text.trim(),
-          'phoneNumber': _phoneController.text.trim(),
-          'mobileNumber': _mobileController.text.trim(),
-          'panNumber': _panController.text.trim(),
-          'CompanyId': Get.find<IdController>().companyId.value.toString(),
-        }),
-      );
+
+      final uri = Uri.parse(url);
+
+      final body = json.encode({
+        'driverName': _nameController.text.trim(),
+        'driverAddress': _addressController.text.trim(),
+        'district': _districtController.text.trim(),
+        'state': _selectedState?.name ?? '',
+        'country': _countryController.text.trim(),
+        'dateofBirth': DateFormat('yyyy-MM-dd').format(_selectedDob!),
+        'dlNumber': _dlNumberController.text.trim(),
+        'email': _emailController.text.trim(),
+        'bloodGroup': _bloodGroupController.text.trim(),
+        'phoneNumber': _phoneController.text.trim(),
+        'mobileNumber': _mobileController.text.trim(),
+        'panNumber': _panController.text.trim(),
+        'CompanyId': Get.find<IdController>().companyId.value.toString(),
+      });
+
+      final headers = {'Content-Type': 'application/json'};
+
+      final response = isEditMode
+          ? await http.put(uri, headers: headers, body: body)
+          : await http.post(uri, headers: headers, body: body);
 
       if (response.statusCode == 200) {
-        Get.snackbar('Success', isEditMode 
-            ? 'Driver updated successfully' 
-            : 'Driver added successfully');
+        Get.snackbar(
+          'Success',
+          isEditMode
+              ? 'Driver updated successfully'
+              : 'Driver added successfully',
+        );
         _resetForm();
         _fetchDrivers();
       } else {
-        final error = json.decode(response.body)['error'] ?? 
+        final error =
+            json.decode(response.body)['error'] ??
             'Failed to ${isEditMode ? 'update' : 'add'} driver';
         Get.snackbar('Error', error.toString());
       }
@@ -223,16 +246,14 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
             )
           : null;
       _countryController.text = driver['country'] ?? '';
-      if (driver['dateofBirth'] != null) {
-        _selectedDob = DateTime.parse(driver['dateofBirth']);
-      }
+      _selectedDob = _parseDob(driver['dateofBirth']);
       _emailController.text = driver['email'] ?? '';
       _bloodGroupController.text = driver['bloodGroup'] ?? '';
       _phoneController.text = driver['phoneNumber'] ?? '';
       _mobileController.text = driver['mobileNumber'] ?? '';
       _panController.text = driver['panNumber'] ?? '';
     });
-    
+
     // Scroll to form
     Scrollable.ensureVisible(
       context,
@@ -326,25 +347,37 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
                     children: [
                       Text(
                         isEditMode ? 'Edit Driver' : 'Add New Driver',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _nameController,
-                        decoration: const InputDecoration(labelText: 'Driver Name *'),
-                        validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Driver Name *',
+                        ),
+                        validator: (value) =>
+                            value?.isEmpty ?? true ? 'Required' : null,
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _dlNumberController,
-                        decoration: const InputDecoration(labelText: 'Driving License Number *'),
-                        validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Driving License Number *',
+                        ),
+                        validator: (value) =>
+                            value?.isEmpty ?? true ? 'Required' : null,
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _addressController,
-                        decoration: const InputDecoration(labelText: 'Address *'),
-                        validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Address *',
+                        ),
+                        validator: (value) =>
+                            value?.isEmpty ?? true ? 'Required' : null,
                         maxLines: 2,
                       ),
                       const SizedBox(height: 8),
@@ -353,21 +386,25 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
                           Expanded(
                             child: TextFormField(
                               controller: _districtController,
-                              decoration: const InputDecoration(labelText: 'District *'),
-                              validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                              decoration: const InputDecoration(
+                                labelText: 'District *',
+                              ),
+                              validator: (value) =>
+                                  value?.isEmpty ?? true ? 'Required' : null,
                             ),
                           ),
                           const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildStateDropdown(),
-                          ),
+                          Expanded(child: _buildStateDropdown()),
                         ],
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _countryController,
-                        decoration: const InputDecoration(labelText: 'Country *'),
-                        validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Country *',
+                        ),
+                        validator: (value) =>
+                            value?.isEmpty ?? true ? 'Required' : null,
                       ),
                       const SizedBox(height: 8),
                       GestureDetector(
@@ -376,14 +413,17 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
                           child: TextFormField(
                             controller: TextEditingController(
                               text: _selectedDob != null
-                                  ? DateFormat('dd-MM-yyyy').format(_selectedDob!)
+                                  ? DateFormat(
+                                      'dd-MM-yyyy',
+                                    ).format(_selectedDob!)
                                   : '',
                             ),
                             decoration: const InputDecoration(
                               labelText: 'Date of Birth *',
                               suffixIcon: Icon(Icons.calendar_today),
                             ),
-                            validator: (value) => _selectedDob == null ? 'Required' : null,
+                            validator: (value) =>
+                                _selectedDob == null ? 'Required' : null,
                           ),
                         ),
                       ),
@@ -399,18 +439,24 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
                           Expanded(
                             child: TextFormField(
                               controller: _phoneController,
-                              decoration: const InputDecoration(labelText: 'Phone Number *'),
+                              decoration: const InputDecoration(
+                                labelText: 'Phone Number *',
+                              ),
                               keyboardType: TextInputType.phone,
-                              validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                              validator: (value) =>
+                                  value?.isEmpty ?? true ? 'Required' : null,
                             ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: TextFormField(
                               controller: _mobileController,
-                              decoration: const InputDecoration(labelText: 'Mobile Number *'),
+                              decoration: const InputDecoration(
+                                labelText: 'Mobile Number *',
+                              ),
                               keyboardType: TextInputType.phone,
-                              validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                              validator: (value) =>
+                                  value?.isEmpty ?? true ? 'Required' : null,
                             ),
                           ),
                         ],
@@ -421,14 +467,18 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
                           Expanded(
                             child: TextFormField(
                               controller: _panController,
-                              decoration: const InputDecoration(labelText: 'PAN Number'),
+                              decoration: const InputDecoration(
+                                labelText: 'PAN Number',
+                              ),
                             ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: TextFormField(
                               controller: _bloodGroupController,
-                              decoration: const InputDecoration(labelText: 'Blood Group'),
+                              decoration: const InputDecoration(
+                                labelText: 'Blood Group',
+                              ),
                             ),
                           ),
                         ],
@@ -438,13 +488,17 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           ElevatedButton(
-                            onPressed: isAddingDriver ? null : _addOrUpdateDriver,
+                            onPressed: isAddingDriver
+                                ? null
+                                : _addOrUpdateDriver,
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                             child: isAddingDriver
                                 ? const CircularProgressIndicator()
-                                : Text(isEditMode ? 'Update Driver' : 'Add Driver'),
+                                : Text(
+                                    isEditMode ? 'Update Driver' : 'Add Driver',
+                                  ),
                           ),
                           if (isEditMode) ...[
                             const SizedBox(height: 8),
@@ -479,69 +533,86 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
             isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : drivers.isEmpty
-                    ? const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Text('No drivers found'),
-                        ),
-                      )
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: drivers.length,
-                        itemBuilder: (context, index) {
-                          final driver = drivers[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ExpansionTile(
-                              leading: CircleAvatar(
-                                child: Text(
-                                  (driver['driverName']?[0] ?? 'D').toUpperCase(),
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text('No drivers found'),
+                    ),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: drivers.length,
+                    itemBuilder: (context, index) {
+                      final driver = drivers[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ExpansionTile(
+                          leading: CircleAvatar(
+                            child: Text(
+                              (driver['driverName']?[0] ?? 'D').toUpperCase(),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
                               ),
-                              title: Text(
-                                driver['driverName'] ?? 'No Name',
-                                style: const TextStyle(fontWeight: FontWeight.w500),
-                              ),
-                              subtitle: Text(
-                                'DL: ${driver['dlNumber'] ?? 'N/A'}',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.edit, color: Colors.blue),
-                                onPressed: () => _editDriver(driver),
-                              ),
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      _buildDetailRow('Address', driver['driverAddress']),
-                                      _buildDetailRow('District', driver['district']),
-                                      _buildDetailRow('State', driver['state']),
-                                      _buildDetailRow('Country', driver['country']),
-                                      _buildDetailRow('Phone', driver['phoneNumber']),
-                                      _buildDetailRow('Mobile', driver['mobileNumber']),
-                                      _buildDetailRow('Email', driver['email']),
-                                      _buildDetailRow('PAN', driver['panNumber']),
-                                      _buildDetailRow('Blood Group', driver['bloodGroup']),
-                                      if (driver['dateofBirth'] != null)
-                                        _buildDetailRow(
-                                          'Date of Birth',
-                                          DateFormat('dd-MM-yyyy').format(
-                                            DateTime.parse(driver['dateofBirth']),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                          title: Text(
+                            driver['driverName'] ?? 'No Name',
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          subtitle: Text(
+                            'DL: ${driver['dlNumber'] ?? 'N/A'}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () => _editDriver(driver),
+                          ),
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildDetailRow(
+                                    'Address',
+                                    driver['driverAddress'],
+                                  ),
+                                  _buildDetailRow(
+                                    'District',
+                                    driver['district'],
+                                  ),
+                                  _buildDetailRow('State', driver['state']),
+                                  _buildDetailRow('Country', driver['country']),
+                                  _buildDetailRow(
+                                    'Phone',
+                                    driver['phoneNumber'],
+                                  ),
+                                  _buildDetailRow(
+                                    'Mobile',
+                                    driver['mobileNumber'],
+                                  ),
+                                  _buildDetailRow('Email', driver['email']),
+                                  _buildDetailRow('PAN', driver['panNumber']),
+                                  _buildDetailRow(
+                                    'Blood Group',
+                                    driver['bloodGroup'],
+                                  ),
+                                  if (_parseDob(driver['dateofBirth']) != null)
+                                    _buildDetailRow(
+                                      'Date of Birth',
+                                      DateFormat('dd-MM-yyyy').format(
+                                        _parseDob(driver['dateofBirth'])!,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
           ],
         ),
       ),
@@ -563,10 +634,7 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
           ),
           const Text(': ', style: TextStyle(fontWeight: FontWeight.bold)),
           Expanded(
-            child: Text(
-              value ?? 'N/A',
-              style: const TextStyle(fontSize: 13),
-            ),
+            child: Text(value ?? 'N/A', style: const TextStyle(fontSize: 13)),
           ),
         ],
       ),

@@ -127,9 +127,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
         width: double.infinity,
-        decoration: const BoxDecoration(
-          color: Color(0xFF1E2A44),
-        ),
+        decoration: const BoxDecoration(color: Color(0xFF1E2A44)),
         child: Column(
           children: [
             // Profile Picture
@@ -418,7 +416,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
                                       _navigateTo(AppRoutes.customerList),
                                 ),
                                 _buildSubMenuItem(
-                                  icon: Icons.inventory_2_outlined,
+                                  icon: Icons.inventory_outlined,
                                   title: 'Suppliers',
                                   route: AppRoutes.supplierList,
                                   onTap: () =>
@@ -432,7 +430,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
                                       _navigateTo(AppRoutes.driverManagement),
                                 ),
                                 _buildSubMenuItem(
-                                  icon: Icons.business_outlined,
+                                  icon: Icons.business_center_outlined,
                                   title: 'Consignors',
                                   route: AppRoutes.consignorList,
                                   onTap: () =>
@@ -466,7 +464,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
                                   onTap: () => _navigateTo(AppRoutes.gstList),
                                 ),
                                 _buildSubMenuItem(
-                                  icon: Icons.admin_panel_settings_outlined,
+                                  icon: Icons.people_alt_outlined,
                                   title: 'User Management',
                                   route: AppRoutes.userManagement,
                                   onTap: () =>
@@ -497,13 +495,19 @@ class _CustomDrawerState extends State<CustomDrawer> {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
         leading: Container(
-          width: 6,
-          height: 6,
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: isSelected
+                ? const Color(0xFF4A90E2).withOpacity(0.12)
+                : Colors.grey.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: isSelected
                 ? const Color(0xFF4A90E2)
-                : const Color(0xFFE2E8F0),
-            shape: BoxShape.circle,
+                : const Color(0xFF64748B),
           ),
         ),
         title: Text(
