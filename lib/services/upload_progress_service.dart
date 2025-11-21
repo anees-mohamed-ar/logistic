@@ -3,7 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 // Callback types for progress updates
-typedef UploadProgressCallback = void Function(double progress, String? fileName);
+typedef UploadProgressCallback =
+    void Function(double progress, String? fileName);
 typedef FileProgressCallback = void Function(String fileName, double progress);
 
 class UploadProgressService {
@@ -34,15 +35,13 @@ class UploadProgressService {
         final file = files[i];
         final filePath = file['path'];
         final fileName = file['name'] ?? 'file_$i';
+        final fieldName = (file['fieldName'] as String?) ?? 'attachments';
 
         if (filePath != null && filePath is String && filePath.isNotEmpty) {
           formDataObj.files.add(
             MapEntry(
-              'attachments',
-              await MultipartFile.fromFile(
-                filePath,
-                filename: fileName,
-              ),
+              fieldName,
+              await MultipartFile.fromFile(filePath, filename: fileName),
             ),
           );
         }
@@ -71,12 +70,15 @@ class UploadProgressService {
 
               // Calculate per-file progress if we have multiple files
               if (files.isNotEmpty && onFileProgress != null) {
-                final currentFileIndex = (overallProgress * files.length).floor().clamp(0, files.length - 1);
+                final currentFileIndex = (overallProgress * files.length)
+                    .floor()
+                    .clamp(0, files.length - 1);
                 final currentFile = files[currentFileIndex];
                 final fileName = currentFile['name'] ?? 'Unknown';
 
                 // Estimate progress for current file
-                final fileProgress = (overallProgress * files.length - currentFileIndex);
+                final fileProgress =
+                    (overallProgress * files.length - currentFileIndex);
                 onFileProgress(fileName, fileProgress.clamp(0.0, 1.0));
               }
 
@@ -85,7 +87,9 @@ class UploadProgressService {
           },
         );
 
-        debugPrint('Dio request successful, response status: ${response.statusCode}');
+        debugPrint(
+          'Dio request successful, response status: ${response.statusCode}',
+        );
 
         // Ensure progress reaches 100% on completion
         onProgress(1.0, null);
@@ -107,10 +111,7 @@ class UploadProgressService {
       }
     } catch (e) {
       debugPrint('GC upload failed with general exception: $e');
-      return {
-        'success': false,
-        'error': e.toString(),
-      };
+      return {'success': false, 'error': e.toString()};
     }
   }
 
@@ -140,10 +141,7 @@ class UploadProgressService {
       formData.files.add(
         MapEntry(
           fieldName,
-          await MultipartFile.fromFile(
-            filePath,
-            filename: fileName,
-          ),
+          await MultipartFile.fromFile(filePath, filename: fileName),
         ),
       );
 
@@ -185,10 +183,7 @@ class UploadProgressService {
       };
     } catch (e) {
       debugPrint('Single file upload failed with general exception: $e');
-      return {
-        'success': false,
-        'error': e.toString(),
-      };
+      return {'success': false, 'error': e.toString()};
     }
   }
 

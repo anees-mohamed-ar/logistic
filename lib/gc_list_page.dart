@@ -1497,13 +1497,28 @@ class _GCListPageState extends State<GCListPage> {
     controller.billToGstCtrl.text = gc['BillToGst']?.toString() ?? '';
     controller.billToAddressCtrl.text = gc['BillToAddress']?.toString() ?? '';
 
-    final weight = gc['ActualWeightKgs']?.toString() ?? '';
+    // Prefer TotalWeight (most up-to-date) and fall back to ActualWeightKgs
+    final rawWeight =
+        (gc['TotalWeight'] ?? gc['ActualWeightKgs'])?.toString() ?? '';
     final natureOfGoods = gc['GoodContain']?.toString() ?? '';
     final methodOfPkg = (gc['MethodofPkg']?.toString() ?? '').isNotEmpty
         ? gc['MethodofPkg'].toString()
         : 'Boxes';
 
-    controller.weightCtrl.text = weight;
+    final normalizedWeight = (() {
+      final raw = rawWeight.trim();
+      if (raw.isEmpty) return '';
+
+      final cleaned = raw.replaceAll(RegExp(r'[^0-9\.]'), '');
+      final parsed = double.tryParse(cleaned);
+      if (parsed == null) return raw;
+
+      // For the form field, we want only the integer part;
+      // the UI shows a fixed .000 suffix and the controller
+      // will append .000 on submit.
+      return parsed.toStringAsFixed(0);
+    })();
+    controller.weightCtrl.text = normalizedWeight;
     controller.natureOfGoodsCtrl.text = natureOfGoods;
     controller.natureGoodsCtrl.text = natureOfGoods;
 
@@ -1514,20 +1529,17 @@ class _GCListPageState extends State<GCListPage> {
     controller.selectedPackageMethod.value = formattedMethod;
 
     controller.packagesCtrl.text = gc['NumberofPkg']?.toString() ?? '';
-    controller.actualWeightCtrl.text = weight;
-    controller.remarksCtrl.text = gc['PrivateMark']?.toString() ?? '';
+    controller.actualWeightCtrl.text = normalizedWeight;
+    // PrivateMark is a fixed value in the UI
+    controller.remarksCtrl.text = 'O / R';
     controller.billingAddressCtrl.text = consigneeAddress;
 
-    controller.actualWeightCtrl.text = gc['ActualWeightKgs']?.toString() ?? '';
+    controller.actualWeightCtrl.text = normalizedWeight;
     controller.kmCtrl.text = gc['km']?.toString() ?? '';
     controller.rateCtrl.text = gc['Rate']?.toString() ?? '';
 
-    if (weight.isNotEmpty) {
-      controller.selectWeightForActualWeight(weight);
-    } else {
-      controller.selectedWeight.value = null;
-      controller.calculateRate();
-    }
+    // Do not auto-match actual weight to a predefined WeightRate when loading.
+    // Keep the stored actual weight as-is and leave rate selection unchanged.
 
     controller.update();
 

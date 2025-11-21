@@ -42,7 +42,7 @@ class _TruckFormPageState extends State<TruckFormPage> {
   final _micrCodeController = TextEditingController();
   final _branchCodeController = TextEditingController();
   final _insuranceController = TextEditingController();
-  
+
   // Date fields
   DateTime? _roadTaxExpDate;
   DateTime? _insuranceExpDate;
@@ -52,13 +52,13 @@ class _TruckFormPageState extends State<TruckFormPage> {
   void initState() {
     super.initState();
     _controller = Get.find<TruckController>();
-    
+
     // If a truck was passed in, make a copy of it to avoid modifying the original
     if (widget.truck != null) {
       print('📝 Initializing form with existing truck data');
       print('   - Vehicle Number: ${widget.truck!.vechileNumber}');
       print('   - Owner Name: ${widget.truck!.ownerName}');
-      
+
       _truck = Truck(
         id: widget.truck!.id,
         ownerName: widget.truck!.ownerName,
@@ -119,7 +119,7 @@ class _TruckFormPageState extends State<TruckFormPage> {
         companyId: null,
       );
     }
-    
+
     // Initialize form fields after setting up the truck object
     _initializeForm();
   }
@@ -129,7 +129,7 @@ class _TruckFormPageState extends State<TruckFormPage> {
     print('   - ID: ${_truck.id}');
     print('   - Vehicle Number: ${_truck.vechileNumber}');
     print('   - Owner Name: ${_truck.ownerName}');
-    
+
     // Reset all controllers to empty first
     _ownerNameController.clear();
     _ownerAddressController.clear();
@@ -152,7 +152,7 @@ class _TruckFormPageState extends State<TruckFormPage> {
     _micrCodeController.clear();
     _branchCodeController.clear();
     _insuranceController.clear();
-    
+
     // Set values from truck object
     _ownerNameController.text = _truck.ownerName;
     _ownerAddressController.text = _truck.ownerAddress;
@@ -186,7 +186,10 @@ class _TruckFormPageState extends State<TruckFormPage> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context, Function(DateTime) onDateSelected) async {
+  Future<void> _selectDate(
+    BuildContext context,
+    Function(DateTime) onDateSelected,
+  ) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -218,7 +221,10 @@ class _TruckFormPageState extends State<TruckFormPage> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(4.0),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 14,
+              ),
               suffixIcon: const Icon(Icons.calendar_today, size: 20),
             ),
             child: Text(
@@ -271,58 +277,129 @@ class _TruckFormPageState extends State<TruckFormPage> {
     try {
       final vehicleNumber = _vehicleNumberController.text.trim();
       print('🚛 Saving truck - Vehicle Number: $vehicleNumber');
-      
-      if (vehicleNumber.isEmpty) {
-        throw Exception('Vehicle number is required');
-      }
-      
+
       final truck = Truck(
-        id: _truck.id,  // This will be null for new trucks
+        id: _truck.id, // This will be null for new trucks
         ownerName: _ownerNameController.text.trim(),
         ownerAddress: _ownerAddressController.text.trim(),
-        ownerMobileNumber: _ownerMobileController.text.trim().isNotEmpty 
-          ? _ownerMobileController.text.trim() 
-          : null,
-        ownerEmail: _ownerEmailController.text.trim().isNotEmpty ? _ownerEmailController.text.trim() : null,
-        ownerPanNumber: _ownerPanController.text.trim().isNotEmpty ? _ownerPanController.text.trim() : null,
+        ownerMobileNumber: _ownerMobileController.text.trim().isNotEmpty
+            ? _ownerMobileController.text.trim()
+            : null,
+        ownerEmail: _ownerEmailController.text.trim().isNotEmpty
+            ? _ownerEmailController.text.trim()
+            : null,
+        ownerPanNumber: _ownerPanController.text.trim().isNotEmpty
+            ? _ownerPanController.text.trim()
+            : null,
         vechileNumber: _vehicleNumberController.text.trim(),
-        typeofVechile: _vehicleTypeController.text.trim().isNotEmpty ? _vehicleTypeController.text.trim() : null,
+        typeofVechile: _vehicleTypeController.text.trim().isNotEmpty
+            ? _vehicleTypeController.text.trim()
+            : null,
         lorryWeight: double.tryParse(_lorryWeightController.text),
         unladenWeight: double.tryParse(_unladenWeightController.text),
         overWeight: double.tryParse(_overWeightController.text),
-        engineeNumber: _engineNumberController.text.trim().isNotEmpty ? _engineNumberController.text.trim() : null,
-        chaseNumber: _chassisNumberController.text.trim().isNotEmpty ? _chassisNumberController.text.trim() : null,
-        roadTaxNumber: _roadTaxNumberController.text.trim().isNotEmpty ? _roadTaxNumberController.text.trim() : null,
+        engineeNumber: _engineNumberController.text.trim().isNotEmpty
+            ? _engineNumberController.text.trim()
+            : null,
+        chaseNumber: _chassisNumberController.text.trim().isNotEmpty
+            ? _chassisNumberController.text.trim()
+            : null,
+        roadTaxNumber: _roadTaxNumberController.text.trim().isNotEmpty
+            ? _roadTaxNumberController.text.trim()
+            : null,
         roadTaxExpDate: _roadTaxExpDate?.toIso8601String(),
-        bankName: _bankNameController.text.trim().isNotEmpty ? _bankNameController.text.trim() : null,
-        branchName: _branchNameController.text.trim().isNotEmpty ? _branchNameController.text.trim() : null,
-        accountNumber: _accountNumberController.text.trim().isNotEmpty ? _accountNumberController.text.trim() : null,
-        accountHolderName: _accountHolderNameController.text.trim().isNotEmpty ? _accountHolderNameController.text.trim() : null,
-        ifscCode: _ifscCodeController.text.trim().isNotEmpty ? _ifscCodeController.text.trim() : null,
-        micrCode: _micrCodeController.text.trim().isNotEmpty ? _micrCodeController.text.trim() : null,
-        branchCode: _branchCodeController.text.trim().isNotEmpty ? _branchCodeController.text.trim() : null,
-        insurance: _insuranceController.text.trim().isNotEmpty ? _insuranceController.text.trim() : null,
+        bankName: _bankNameController.text.trim().isNotEmpty
+            ? _bankNameController.text.trim()
+            : null,
+        branchName: _branchNameController.text.trim().isNotEmpty
+            ? _branchNameController.text.trim()
+            : null,
+        accountNumber: _accountNumberController.text.trim().isNotEmpty
+            ? _accountNumberController.text.trim()
+            : null,
+        accountHolderName: _accountHolderNameController.text.trim().isNotEmpty
+            ? _accountHolderNameController.text.trim()
+            : null,
+        ifscCode: _ifscCodeController.text.trim().isNotEmpty
+            ? _ifscCodeController.text.trim()
+            : null,
+        micrCode: _micrCodeController.text.trim().isNotEmpty
+            ? _micrCodeController.text.trim()
+            : null,
+        branchCode: _branchCodeController.text.trim().isNotEmpty
+            ? _branchCodeController.text.trim()
+            : null,
+        insurance: _insuranceController.text.trim().isNotEmpty
+            ? _insuranceController.text.trim()
+            : null,
         insuranceExpDate: _insuranceExpDate?.toIso8601String(),
         fcDate: _fcDate?.toIso8601String(),
         companyId: _truck.companyId,
       );
+      final bool isEdit = widget.truck != null;
+      final String? originalVehicleNumber = widget.truck?.vechileNumber;
+      print('🧭 _saveTruck: isEdit = $isEdit');
 
-      // For both add and update, we'll use the vehicle number as the key
-      // First check if we're adding a new truck or updating an existing one
-      final existingTruck = await _controller.getTruckByNumber(truck.vechileNumber);
-      final bool isUpdate = existingTruck != null;
-      
       bool success;
-      if (isUpdate) {
-        print('🔄 Updating existing truck with vehicle number: ${truck.vechileNumber}');
-        success = await _controller.updateTruck(truck);
+      if (isEdit) {
+        print(
+          '🔄 _saveTruck: calling updateTruck for ${truck.vechileNumber} (old: $originalVehicleNumber)',
+        );
+        success = await _controller.updateTruck(
+          truck,
+          oldVehicleNumber: originalVehicleNumber,
+        );
+        print('✅ _saveTruck: updateTruck returned $success');
+        if (success && mounted) {
+          print('🎯 _saveTruck: inside success branch for update');
+          Get.back(result: true);
+        } else {
+          print(
+            '⚠️ _saveTruck: updateTruck did not succeed or widget not mounted',
+          );
+        }
       } else {
         print('➕ Adding new truck with vehicle number: ${truck.vechileNumber}');
         success = await _controller.addTruck(truck);
-      }
-
-      if (success && mounted) {
-        Get.back();
+        if (success && mounted) {
+          Get.snackbar(
+            'Success',
+            'Truck added successfully',
+            snackPosition: SnackPosition.BOTTOM,
+          );
+          _truck = Truck(
+            id: null,
+            ownerName: '',
+            ownerAddress: '',
+            ownerMobileNumber: null,
+            ownerEmail: null,
+            ownerPanNumber: null,
+            vechileNumber: '',
+            typeofVechile: null,
+            lorryWeight: null,
+            unladenWeight: null,
+            overWeight: null,
+            engineeNumber: null,
+            chaseNumber: null,
+            roadTaxNumber: null,
+            roadTaxExpDate: null,
+            bankName: null,
+            branchName: null,
+            accountNumber: null,
+            accountHolderName: null,
+            ifscCode: null,
+            micrCode: null,
+            branchCode: null,
+            insurance: null,
+            insuranceExpDate: null,
+            fcDate: null,
+            companyId: null,
+          );
+          _roadTaxExpDate = null;
+          _insuranceExpDate = null;
+          _fcDate = null;
+          _initializeForm();
+        }
       }
     } catch (e) {
       Get.snackbar('Error', 'Failed to save truck: ${e.toString()}');
@@ -341,7 +418,9 @@ class _TruckFormPageState extends State<TruckFormPage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E2A44),
         foregroundColor: Colors.white,
-        title: Text(widget.truck == null ? 'Add New Truck' : 'Edit Truck Details'),
+        title: Text(
+          widget.truck == null ? 'Add New Truck' : 'Edit Truck Details',
+        ),
         actions: [
           IconButton(
             color: Colors.white,
@@ -574,7 +653,6 @@ class _TruckFormPageState extends State<TruckFormPage> {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1E2A44),
-
                       ),
                       onPressed: _isLoading ? null : _saveTruck,
                       child: _isLoading
@@ -583,7 +661,9 @@ class _TruckFormPageState extends State<TruckFormPage> {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             )
                           : const Text('SAVE TRUCK DETAILS'),

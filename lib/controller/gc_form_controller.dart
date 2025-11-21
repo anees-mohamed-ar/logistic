@@ -13,7 +13,7 @@ import 'dart:math';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:flutter/services.dart';
-import 'dart:io' show Platform, Directory;
+import 'dart:io' show Platform, Directory, File;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
@@ -143,6 +143,410 @@ class GCFormController extends GetxController {
               ),
             ],
           ),
+        );
+      }
+    }
+  }
+
+  // Preview dedicated invoice attachment using /gc/attachments/invoice/file/:GcNumber
+  Future<void> previewInvoiceAttachment(BuildContext context) async {
+    final gcNumber = editingGcNumber.value.isNotEmpty
+        ? editingGcNumber.value
+        : gcNumberCtrl.text;
+    final companyId = _idController.companyId.value;
+
+    if (gcNumber.isEmpty || companyId.isEmpty) {
+      _showToast(
+        'Cannot preview invoice: missing GC number or company ID',
+        backgroundColor: Colors.red,
+      );
+      return;
+    }
+
+    final url =
+        '${ApiConfig.baseUrl}/gc/attachments/invoice/file/$gcNumber?companyId=$companyId';
+
+    try {
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        throw Exception('Invalid URL format: $url');
+      }
+
+      debugPrint('Attempting to preview invoice attachment: $url');
+
+      final canLaunch = await canLaunchUrlString(url);
+      if (canLaunch) {
+        await launchUrlString(url, mode: LaunchMode.externalApplication);
+        return;
+      } else {
+        throw Exception('URL cannot be launched: $url');
+      }
+    } catch (e) {
+      debugPrint('Failed to preview invoice attachment: $e');
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Preview Failed'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Unable to open the invoice attachment.'),
+                const SizedBox(height: 8),
+                Text(
+                  'Error: ${e.toString()}',
+                  style: const TextStyle(fontSize: 12, color: Colors.red),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Try copying the URL and opening it manually in your browser.',
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: url));
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Invoice URL copied to clipboard'),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Copy URL'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> previewEwayAttachment(BuildContext context) async {
+    final gcNumber = editingGcNumber.value.isNotEmpty
+        ? editingGcNumber.value
+        : gcNumberCtrl.text;
+    final companyId = _idController.companyId.value;
+
+    if (gcNumber.isEmpty || companyId.isEmpty) {
+      _showToast(
+        'Cannot preview e-way bill: missing GC number or company ID',
+        backgroundColor: Colors.red,
+      );
+      return;
+    }
+
+    final url =
+        '${ApiConfig.baseUrl}/gc/attachments/e-way/file/$gcNumber?companyId=$companyId';
+
+    try {
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        throw Exception('Invalid URL format: $url');
+      }
+
+      debugPrint('Attempting to preview e-way attachment: $url');
+
+      final canLaunch = await canLaunchUrlString(url);
+      if (canLaunch) {
+        await launchUrlString(url, mode: LaunchMode.externalApplication);
+        return;
+      } else {
+        throw Exception('URL cannot be launched: $url');
+      }
+    } catch (e) {
+      debugPrint('Failed to preview e-way attachment: $e');
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Preview Failed'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Unable to open the e-way bill attachment.'),
+                const SizedBox(height: 8),
+                Text(
+                  'Error: ${e.toString()}',
+                  style: const TextStyle(fontSize: 12, color: Colors.red),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Try copying the URL and opening it manually in your browser.',
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: url));
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('E-way URL copied to clipboard'),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Copy URL'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> downloadInvoiceAttachment(BuildContext context) async {
+    final gcNumber = editingGcNumber.value.isNotEmpty
+        ? editingGcNumber.value
+        : gcNumberCtrl.text;
+    final companyId = _idController.companyId.value;
+
+    if (gcNumber.isEmpty || companyId.isEmpty) {
+      _showToast(
+        'Cannot download invoice: missing GC number or company ID',
+        backgroundColor: Colors.red,
+      );
+      return;
+    }
+
+    final url =
+        '${ApiConfig.baseUrl}/gc/attachments/invoice/file/$gcNumber?companyId=$companyId';
+    final originalName =
+        invoiceAttachment.value?['name']?.toString() ?? 'invoice_$gcNumber.pdf';
+
+    await _downloadFromUrl(url, context, originalName: originalName);
+  }
+
+  Future<void> downloadEwayAttachment(BuildContext context) async {
+    final gcNumber = editingGcNumber.value.isNotEmpty
+        ? editingGcNumber.value
+        : gcNumberCtrl.text;
+    final companyId = _idController.companyId.value;
+
+    if (gcNumber.isEmpty || companyId.isEmpty) {
+      _showToast(
+        'Cannot download e-way bill: missing GC number or company ID',
+        backgroundColor: Colors.red,
+      );
+      return;
+    }
+
+    final url =
+        '${ApiConfig.baseUrl}/gc/attachments/e-way/file/$gcNumber?companyId=$companyId';
+    final originalName =
+        ewayAttachment.value?['name']?.toString() ?? 'eway_$gcNumber.pdf';
+
+    await _downloadFromUrl(url, context, originalName: originalName);
+  }
+
+  // Internal helper to download a file from a direct URL, mirroring downloadAttachment
+  Future<void> _downloadFromUrl(
+    String url,
+    BuildContext context, {
+    String? originalName,
+  }) async {
+    Directory? downloadDir;
+
+    try {
+      // Validate URL format
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        throw Exception('Invalid URL format: $url');
+      }
+
+      debugPrint('Attempting to download attachment from direct URL: $url');
+
+      // Request storage permissions (same as downloadAttachment)
+      if (Platform.isAndroid) {
+        debugPrint('Checking Android storage permission...');
+
+        // First show explanation dialog
+        final shouldRequest = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Storage Permission Required'),
+            content: const Text(
+              'This app needs storage permission to download and save files to your device. '
+              'Files will be saved to your Downloads folder.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldRequest != true) {
+          debugPrint('User cancelled permission request');
+          return;
+        }
+
+        // Directly request permission - this will show the system permission dialog
+        PermissionStatus status = await Permission.storage.request();
+        debugPrint('WRITE_EXTERNAL_STORAGE permission result: $status');
+
+        // If WRITE_EXTERNAL_STORAGE is denied, try MANAGE_EXTERNAL_STORAGE for Android 11+
+        if (!status.isGranted) {
+          debugPrint(
+            'WRITE_EXTERNAL_STORAGE denied, trying MANAGE_EXTERNAL_STORAGE...',
+          );
+          status = await Permission.manageExternalStorage.request();
+          debugPrint('MANAGE_EXTERNAL_STORAGE permission result: $status');
+        }
+
+        if (!status.isGranted) {
+          debugPrint('Permission not granted, showing snackbar...');
+          if (context.mounted) {
+            final permanentlyDenied = status.isPermanentlyDenied;
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  permanentlyDenied
+                      ? 'Storage permission is required to download files. Please enable it in app settings.'
+                      : 'Storage permission is required to download files.',
+                ),
+                action: permanentlyDenied
+                    ? SnackBarAction(
+                        label: 'Settings',
+                        onPressed: () async {
+                          await openAppSettings();
+                        },
+                      )
+                    : null,
+                duration: const Duration(seconds: 8),
+              ),
+            );
+          }
+          return;
+        } else {
+          debugPrint('Permission granted, proceeding with download...');
+        }
+      }
+
+      // Choose download directory (mirror downloadAttachment)
+      if (Platform.isAndroid) {
+        // Try Downloads folder first
+        downloadDir = Directory('/storage/emulated/0/Download');
+
+        if (!await downloadDir.exists()) {
+          // Fallback to external storage directory
+          final externalDir = await getExternalStorageDirectory();
+
+          if (externalDir != null && await externalDir.exists()) {
+            downloadDir = externalDir;
+          } else {
+            // Final fallback: app documents directory
+            downloadDir = await getApplicationDocumentsDirectory();
+          }
+        }
+
+        // Create Download subfolder in app documents if using app directory
+        if (downloadDir.path.contains('app_flutter')) {
+          downloadDir = Directory('${downloadDir.path}/Downloads');
+          if (!await downloadDir.exists()) {
+            await downloadDir.create(recursive: true);
+          }
+        }
+      } else {
+        // iOS and other platforms
+        downloadDir = await getApplicationDocumentsDirectory();
+        downloadDir = Directory('${downloadDir.path}/Downloads');
+        if (!await downloadDir.exists()) {
+          await downloadDir.create(recursive: true);
+        }
+      }
+
+      // Build filename
+      final baseFileName = originalName ?? url.split('/').last;
+      final filePath = '${downloadDir.path}/$baseFileName';
+
+      debugPrint('Downloading to: $filePath');
+
+      // Show download progress dialog
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => const AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Downloading file...'),
+              ],
+            ),
+          ),
+        );
+      }
+
+      // Download file using Dio
+      final dio = Dio();
+      await dio.download(
+        url,
+        filePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            debugPrint(
+              'Direct download progress: '
+              '${(received / total * 100).toStringAsFixed(0)}%',
+            );
+          }
+        },
+      );
+
+      // Close progress dialog
+      if (context.mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      // Show success message
+      if (context.mounted) {
+        final location =
+            downloadDir.path.contains('Download') ||
+                downloadDir.path.contains('Downloads')
+            ? 'Downloads folder'
+            : 'app storage';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'File downloaded successfully to $location: $baseFileName',
+            ),
+          ),
+        );
+      }
+
+      debugPrint('Successfully downloaded file: $filePath');
+    } catch (e) {
+      debugPrint('Failed to download attachment from direct URL: $e');
+
+      // Close progress dialog if open
+      if (context.mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      // Show error message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: ${e.toString()}')),
         );
       }
     }
@@ -486,7 +890,7 @@ class GCFormController extends GetxController {
   final actualWeightCtrl = TextEditingController();
   final kmCtrl = TextEditingController();
   final rateCtrl = TextEditingController();
-  final remarksCtrl = TextEditingController();
+  final remarksCtrl = TextEditingController(text: 'O / R');
   final fromLocationCtrl =
       TextEditingController(); // Used for KM lookup input (if separate from 'fromCtrl')
   final toLocationCtrl =
@@ -654,11 +1058,38 @@ class GCFormController extends GetxController {
       <Map<String, dynamic>>[].obs;
   final RxBool isPickingFiles = false.obs;
 
+  // Typed attachment slots
+  final Rxn<Map<String, dynamic>> invoiceAttachment =
+      Rxn<Map<String, dynamic>>();
+  final Rxn<Map<String, dynamic>> ewayAttachment = Rxn<Map<String, dynamic>>();
+  final RxList<Map<String, dynamic>> otherAttachments =
+      <Map<String, dynamic>>[].obs;
+
   // Existing attachments variables (for editing GCs)
   final RxList<Map<String, dynamic>> existingAttachments =
       <Map<String, dynamic>>[].obs;
   final RxBool isLoadingAttachments = false.obs;
   final RxString attachmentsError = ''.obs;
+
+  // Public helper to pick a typed attachment (invoice / eway)
+  Future<void> pickTypedAttachment(
+    BuildContext context, {
+    required String type,
+  }) async {
+    final picked = await _pickSingleFile(context, type: type);
+    if (picked == null) return;
+
+    if (type.toLowerCase() == 'invoice') {
+      invoiceAttachment.value = picked;
+      // Force refresh so any Obx listeners rebuild immediately
+      invoiceAttachment.refresh();
+    } else if (type.toLowerCase() == 'eway') {
+      ewayAttachment.value = picked;
+      // Force refresh so any Obx listeners rebuild immediately
+      ewayAttachment.refresh();
+    }
+  }
+
   // Start the lock timer based on lockedAt timestamp
   void startLockTimer() {
     _timer?.cancel();
@@ -960,7 +1391,8 @@ class GCFormController extends GetxController {
       deliveryAddressCtrl.text = tempGC.deliveryAddress!;
     if (tempGC.deliveryFromSpecial != null)
       deliveryInstructionsCtrl.text = tempGC.deliveryFromSpecial!;
-    if (tempGC.privateMark != null) remarksCtrl.text = tempGC.privateMark!;
+    // PrivateMark is now a fixed value in the UI; ignore any stored value
+    remarksCtrl.text = 'O / R';
 
     // Set lockedAt timestamp for timer
     if (tempGC.lockedAt != null) {
@@ -1248,6 +1680,17 @@ class GCFormController extends GetxController {
       if (textController != null) {
         textController.text = DateFormat('dd-MMM-yyyy').format(picked);
       }
+
+      // If GC Date was picked and E-way Bill Date is still empty,
+      // default E-way Bill Date to the same date. User can later
+      // change E-way Bill Date explicitly from the form.
+      if (identical(targetDate, gcDate) &&
+          ewayBillDate.value == null &&
+          ewayBillDateCtrl.text.trim().isEmpty) {
+        ewayBillDate.value = picked;
+        ewayBillDateCtrl.text = DateFormat('dd-MMM-yyyy').format(picked);
+      }
+
       // Re-compute delivery date in case GC date changed
       updateDeliveryDateFromInputs();
     }
@@ -1826,11 +2269,22 @@ class GCFormController extends GetxController {
     final rate = pickWeightRateForActualWeight(weightStr);
     selectedWeight.value = rate;
     if (rate != null) {
+      // Only override the field if we have a concrete matching rate.
+      // If there's no matching WeightRate, keep whatever weight was loaded/entered.
       actualWeightCtrl.text = rate.weight;
-    } else {
-      actualWeightCtrl.clear();
     }
     calculateRate();
+  }
+
+  String _normalizeActualWeight(String value) {
+    final raw = value.trim();
+    if (raw.isEmpty) return '';
+
+    final cleaned = raw.replaceAll(RegExp(r'[^0-9\.]'), '');
+    final parsed = double.tryParse(cleaned);
+    if (parsed == null) return raw;
+
+    return parsed.toStringAsFixed(3);
   }
 
   WeightRate? pickWeightRateForActualWeight(String weightStr) {
@@ -2097,7 +2551,8 @@ class GCFormController extends GetxController {
     actualWeightCtrl.clear();
     kmCtrl.clear();
     rateCtrl.clear();
-    remarksCtrl.clear();
+    // Reset PrivateMark to fixed default
+    remarksCtrl.text = 'O / R';
     hireAmountCtrl.clear();
     advanceAmountCtrl.clear();
     deliveryAddressCtrl.clear();
@@ -2147,11 +2602,96 @@ class GCFormController extends GetxController {
     editingCompanyId.value = companyId;
 
     // Fetch existing attachments for this GC
-    await fetchExistingAttachments(gcNumber);
+    await Future.wait([
+      fetchExistingAttachments(gcNumber),
+      fetchInvoiceEwayAttachments(gcNumber),
+    ]);
   }
 
   String formatDate(DateTime date) {
     return DateFormat('dd-MMM-yyyy').format(date);
+  }
+
+  // Fetch dedicated invoice and e-way attachments for a GC
+  Future<void> fetchInvoiceEwayAttachments(String gcNumber) async {
+    try {
+      final companyId = _idController.companyId.value;
+      if (companyId.isEmpty) {
+        debugPrint(
+          '❌ [fetchInvoiceEwayAttachments] Company ID is empty, aborting',
+        );
+        return;
+      }
+
+      final url = Uri.parse(
+        '${ApiConfig.baseUrl}/gc/attachments/invoice-e-way/$gcNumber',
+      ).replace(queryParameters: {'companyId': companyId});
+
+      debugPrint('[fetchInvoiceEwayAttachments] GET $url');
+
+      final response = await http.get(
+        url,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      debugPrint(
+        '[fetchInvoiceEwayAttachments] Response status: ${response.statusCode}',
+      );
+
+      if (response.statusCode != 200) {
+        debugPrint(
+          '[fetchInvoiceEwayAttachments] Non-200 response: ${response.body}',
+        );
+        return;
+      }
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (body['success'] != true || body['data'] == null) {
+        debugPrint(
+          '[fetchInvoiceEwayAttachments] success!=true or data missing: $body',
+        );
+        return;
+      }
+
+      final data = body['data'] as Map<String, dynamic>;
+      final inv = data['invoiceAttachment'] as Map<String, dynamic>?;
+      final eway = data['eWayAttachment'] as Map<String, dynamic>?;
+
+      // Only populate from server if the user has not already picked
+      // a local file for that slot. This prevents the UI from reverting
+      // back to old metadata after the user selects a new file.
+      if (inv != null && invoiceAttachment.value == null) {
+        invoiceAttachment.value = {
+          'name': inv['originalName']?.toString() ?? 'Invoice',
+          'filename': inv['filename']?.toString() ?? '',
+          'size': inv['size'] ?? 0,
+          'mimeType': inv['mimeType']?.toString() ?? 'unknown',
+          'path': inv['path']?.toString() ?? '',
+          'uploadedAt': inv['uploadDate']?.toString() ?? '',
+          'uploadedBy': inv['uploadedBy']?.toString() ?? '',
+          'slotType': 'invoice',
+        };
+      }
+
+      if (eway != null && ewayAttachment.value == null) {
+        ewayAttachment.value = {
+          'name': eway['originalName']?.toString() ?? 'E-way bill',
+          'filename': eway['filename']?.toString() ?? '',
+          'size': eway['size'] ?? 0,
+          'mimeType': eway['mimeType']?.toString() ?? 'unknown',
+          'path': eway['path']?.toString() ?? '',
+          'uploadedAt': eway['uploadDate']?.toString() ?? '',
+          'uploadedBy': eway['uploadedBy']?.toString() ?? '',
+          'slotType': 'eway',
+        };
+      }
+
+      debugPrint(
+        '[fetchInvoiceEwayAttachments] Loaded invoice=${invoiceAttachment.value != null}, eway=${ewayAttachment.value != null}',
+      );
+    } catch (e) {
+      debugPrint('[fetchInvoiceEwayAttachments] Error: $e');
+    }
   }
 
   Future<void> checkGCUsageAndWarn(String userId) async {
@@ -2465,6 +3005,9 @@ class GCFormController extends GetxController {
 
     isLoading.value = true;
 
+    // Normalize actual weight to three decimals for submission
+    actualWeightCtrl.text = _normalizeActualWeight(actualWeightCtrl.text);
+
     final Map<String, dynamic> data = {
       'Branch': selectedBranch.value,
       'BranchCode': selectedBranchCode.value,
@@ -2572,12 +3115,19 @@ class GCFormController extends GetxController {
         throw Exception('Company ID not found. Please login again.');
       }
 
-      // Check if we have attached files
-      final hasFiles = attachedFiles.isNotEmpty;
+      // Check if we have any files (typed slots or general attachments)
+      final hasFiles =
+          attachedFiles.isNotEmpty ||
+          invoiceAttachment.value != null ||
+          ewayAttachment.value != null;
 
       if (hasFiles) {
+        final totalFiles =
+            attachedFiles.length +
+            (invoiceAttachment.value != null ? 1 : 0) +
+            (ewayAttachment.value != null ? 1 : 0);
         debugPrint(
-          'Starting GC ${isEditMode.value ? 'update' : 'creation'} with ${attachedFiles.length} file(s)',
+          'Starting GC ${isEditMode.value ? 'update' : 'creation'} with $totalFiles file(s)',
         );
       }
 
@@ -2600,10 +3150,32 @@ class GCFormController extends GetxController {
           debugPrint('GC Number: ${editingGcNumber.value}');
           debugPrint('Query params: $queryParams');
 
+          final mergedFiles = <Map<String, dynamic>>[];
+          if (invoiceAttachment.value != null) {
+            mergedFiles.add({
+              ...invoiceAttachment.value!,
+              'fieldName': 'invoice',
+            });
+          }
+          if (ewayAttachment.value != null) {
+            mergedFiles.add({...ewayAttachment.value!, 'fieldName': 'e_way'});
+          }
+          mergedFiles.addAll(
+            attachedFiles
+                .map((file) => {...file, 'fieldName': 'attachments'})
+                .toList(),
+          );
+
+          // Build attachmentTypes array so backend can tag files
+          final attachmentTypes = mergedFiles
+              .map((file) => (file['slotType'] ?? 'other').toString())
+              .toList();
+          data['attachmentTypes'] = attachmentTypes;
+
           final uploadResult = await _uploadGCWithProgress(
             fullUrl,
             data,
-            attachedFiles,
+            mergedFiles,
             method: 'PUT',
           );
 
@@ -2659,10 +3231,31 @@ class GCFormController extends GetxController {
             throw Exception('Lost lock on the temporary GC. Please try again.');
           }
 
+          final mergedFiles = <Map<String, dynamic>>[];
+          if (invoiceAttachment.value != null) {
+            mergedFiles.add({
+              ...invoiceAttachment.value!,
+              'fieldName': 'invoice',
+            });
+          }
+          if (ewayAttachment.value != null) {
+            mergedFiles.add({...ewayAttachment.value!, 'fieldName': 'e_way'});
+          }
+          mergedFiles.addAll(
+            attachedFiles
+                .map((file) => {...file, 'fieldName': 'attachments'})
+                .toList(),
+          );
+
+          final attachmentTypes = mergedFiles
+              .map((file) => (file['slotType'] ?? 'other').toString())
+              .toList();
+          data['attachmentTypes'] = attachmentTypes;
+
           final uploadResult = await _uploadGCWithProgress(
             url,
             data,
-            attachedFiles,
+            mergedFiles,
             method: 'POST',
           );
 
@@ -2711,10 +3304,31 @@ class GCFormController extends GetxController {
             url,
           ).replace(queryParameters: queryParams).toString();
 
+          final mergedFiles = <Map<String, dynamic>>[];
+          if (invoiceAttachment.value != null) {
+            mergedFiles.add({
+              ...invoiceAttachment.value!,
+              'fieldName': 'invoice',
+            });
+          }
+          if (ewayAttachment.value != null) {
+            mergedFiles.add({...ewayAttachment.value!, 'fieldName': 'e_way'});
+          }
+          mergedFiles.addAll(
+            attachedFiles
+                .map((file) => {...file, 'fieldName': 'attachments'})
+                .toList(),
+          );
+
+          final attachmentTypes = mergedFiles
+              .map((file) => (file['slotType'] ?? 'other').toString())
+              .toList();
+          data['attachmentTypes'] = attachmentTypes;
+
           final uploadResult = await _uploadGCWithProgress(
             fullUrl,
             data,
-            attachedFiles,
+            mergedFiles,
             method: 'POST',
           );
 
@@ -2740,10 +3354,24 @@ class GCFormController extends GetxController {
             data['branchId'] = _idController.branchId.value;
           }
 
+          final mergedFiles = <Map<String, dynamic>>[];
+          if (invoiceAttachment.value != null) {
+            mergedFiles.add(invoiceAttachment.value!);
+          }
+          if (ewayAttachment.value != null) {
+            mergedFiles.add(ewayAttachment.value!);
+          }
+          mergedFiles.addAll(attachedFiles);
+
+          final attachmentTypes = mergedFiles
+              .map((file) => (file['slotType'] ?? 'other').toString())
+              .toList();
+          data['attachmentTypes'] = attachmentTypes;
+
           final uploadResult = await _uploadGCWithProgress(
             url,
             data,
-            attachedFiles,
+            mergedFiles,
             method: 'POST',
           );
 
@@ -3011,6 +3639,50 @@ class GCFormController extends GetxController {
     }
   }
 
+  // Internal helper to pick a single file with optional type tag
+  Future<Map<String, dynamic>?> _pickSingleFile(
+    BuildContext context, {
+    String? type,
+  }) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: false,
+        withData: false,
+        withReadStream: false,
+      );
+
+      if (result == null || result.files.isEmpty) {
+        return null;
+      }
+
+      final file = result.files.first;
+
+      if (file.size > 10 * 1024 * 1024) {
+        _showToast(
+          'File "${file.name}" is too large. Maximum size is 10MB.',
+          backgroundColor: Colors.red,
+        );
+        return null;
+      }
+
+      return {
+        'name': file.name,
+        'path': file.path,
+        'size': file.size,
+        'extension': file.extension,
+        'bytes': file.bytes,
+        if (type != null) 'slotType': type,
+      };
+    } catch (e) {
+      _showToast(
+        'Failed to pick file. Please try again.',
+        backgroundColor: Colors.red,
+      );
+      return null;
+    }
+  }
+
   // File attachment methods
   Future<void> pickFiles(BuildContext context) async {
     try {
@@ -3055,6 +3727,7 @@ class GCFormController extends GetxController {
             'size': file.size,
             'extension': file.extension,
             'bytes': file.bytes,
+            // No slotType here: these are general attachments
           });
           addedCount++;
         }
@@ -3206,20 +3879,76 @@ class GCFormController extends GetxController {
             '🔍 [fetchExistingAttachments] Found ${attachments.length} attachments',
           );
 
-          existingAttachments.assignAll(
-            attachments
-                .map(
-                  (attachment) => {
-                    'name': attachment['originalName']?.toString() ?? 'Unknown',
-                    'filename': attachment['filename']?.toString() ?? '',
-                    'size': attachment['size'] ?? 0,
-                    'type': attachment['mimeType']?.toString() ?? 'unknown',
-                    'uploadedAt': attachment['uploadDate']?.toString() ?? '',
-                    'uploadedBy': attachment['uploadedBy']?.toString() ?? '',
-                  },
-                )
-                .toList(),
-          );
+          final mapped = attachments
+              .map(
+                (attachment) => {
+                  'name': attachment['originalName']?.toString() ?? 'Unknown',
+                  'filename': attachment['filename']?.toString() ?? '',
+                  'size': attachment['size'] ?? 0,
+                  'mimeType': attachment['mimeType']?.toString() ?? 'unknown',
+                  'uploadedAt': attachment['uploadDate']?.toString() ?? '',
+                  'uploadedBy': attachment['uploadedBy']?.toString() ?? '',
+                  'slotType': attachment['type']?.toString(),
+                },
+              )
+              .toList();
+
+          existingAttachments.assignAll(mapped);
+
+          // Classify into invoice / eway / other slots
+          Map<String, dynamic>? latestInvoice;
+          Map<String, dynamic>? latestEway;
+          final others = <Map<String, dynamic>>[];
+
+          DateTime? _parseDate(String? value) {
+            if (value == null || value.isEmpty) return null;
+            try {
+              return DateTime.parse(value);
+            } catch (_) {
+              return null;
+            }
+          }
+
+          for (final a in existingAttachments) {
+            final slotType = (a['slotType'] ?? '').toString().toLowerCase();
+            if (slotType == 'invoice') {
+              final currentDate = _parseDate(a['uploadedAt'] as String?);
+              final bestDate = _parseDate(
+                latestInvoice != null
+                    ? latestInvoice!['uploadedAt'] as String?
+                    : null,
+              );
+              if (latestInvoice == null ||
+                  (currentDate != null &&
+                      bestDate != null &&
+                      currentDate.isAfter(bestDate))) {
+                latestInvoice = a;
+              } else if (latestInvoice == null) {
+                latestInvoice = a;
+              }
+            } else if (slotType == 'eway') {
+              final currentDate = _parseDate(a['uploadedAt'] as String?);
+              final bestDate = _parseDate(
+                latestEway != null
+                    ? latestEway!['uploadedAt'] as String?
+                    : null,
+              );
+              if (latestEway == null ||
+                  (currentDate != null &&
+                      bestDate != null &&
+                      currentDate.isAfter(bestDate))) {
+                latestEway = a;
+              } else if (latestEway == null) {
+                latestEway = a;
+              }
+            } else {
+              others.add(a);
+            }
+          }
+
+          invoiceAttachment.value = latestInvoice;
+          ewayAttachment.value = latestEway;
+          otherAttachments.assignAll(others);
 
           debugPrint(
             '✅ [fetchExistingAttachments] Successfully loaded ${existingAttachments.length} attachments',

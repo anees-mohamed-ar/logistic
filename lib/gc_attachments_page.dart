@@ -29,6 +29,8 @@ class _GCAttachmentsPageState extends State<GCAttachmentsPage> {
   List<Map<String, dynamic>> attachments = [];
   bool isLoading = true;
   String? error;
+  Map<String, dynamic>? invoiceAttachment;
+  Map<String, dynamic>? ewayAttachment;
 
   @override
   void initState() {
@@ -53,15 +55,16 @@ class _GCAttachmentsPageState extends State<GCAttachmentsPage> {
             },
           );
 
-      debugPrint('🔍 Fetching attachments from: $url');
+      debugPrint('🔍 Fetching general attachments from: $url');
 
       final response = await http.get(
         url,
         headers: {'Content-Type': 'application/json'},
       );
 
-      debugPrint('📥 Response status: ${response.statusCode}');
-      debugPrint('📥 Response body: ${response.body}');
+      debugPrint('📥 General attachments status: ${response.statusCode}');
+
+      List<Map<String, dynamic>> loadedAttachments = [];
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -70,35 +73,88 @@ class _GCAttachmentsPageState extends State<GCAttachmentsPage> {
           final attachmentsList =
               data['data']['attachments'] as List<dynamic>? ?? [];
 
-          setState(() {
-            attachments = attachmentsList
-                .map(
-                  (attachment) => {
-                    'name': attachment['originalName']?.toString() ?? 'Unknown',
-                    'filename': attachment['filename']?.toString() ?? '',
-                    'size': attachment['size'] ?? 0,
-                    'type': attachment['mimeType']?.toString() ?? 'unknown',
-                    'uploadedAt': attachment['uploadDate']?.toString() ?? '',
-                    'uploadedBy': attachment['uploadedBy']?.toString() ?? '',
-                  },
-                )
-                .toList();
-            isLoading = false;
-          });
+          loadedAttachments = attachmentsList
+              .map(
+                (attachment) => {
+                  'name': attachment['originalName']?.toString() ?? 'Unknown',
+                  'filename': attachment['filename']?.toString() ?? '',
+                  'size': attachment['size'] ?? 0,
+                  'type': attachment['mimeType']?.toString() ?? 'unknown',
+                  'uploadedAt': attachment['uploadDate']?.toString() ?? '',
+                  'uploadedBy': attachment['uploadedBy']?.toString() ?? '',
+                },
+              )
+              .toList();
 
-          debugPrint('✅ Loaded ${attachments.length} attachments');
-        } else {
-          setState(() {
-            error = 'No attachments found';
-            isLoading = false;
-          });
+          debugPrint(
+            '✅ Loaded ${loadedAttachments.length} general attachments',
+          );
         }
-      } else {
-        setState(() {
-          error = 'Failed to load attachments: ${response.statusCode}';
-          isLoading = false;
-        });
       }
+
+      // Fetch dedicated invoice and e-way attachments
+      final typedUrl =
+          Uri.parse(
+            '${ApiConfig.baseUrl}/gc/attachments/invoice-e-way/${widget.gcNumber}',
+          ).replace(
+            queryParameters: {
+              'companyId': widget.companyId,
+              if (widget.branchId.isNotEmpty) 'branchId': widget.branchId,
+            },
+          );
+
+      debugPrint('🔍 Fetching invoice/e-way attachments from: $typedUrl');
+
+      Map<String, dynamic>? loadedInvoice;
+      Map<String, dynamic>? loadedEway;
+
+      final typedResponse = await http.get(
+        typedUrl,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      debugPrint('📥 Invoice/e-way status: ${typedResponse.statusCode}');
+
+      if (typedResponse.statusCode == 200) {
+        final typedBody =
+            jsonDecode(typedResponse.body) as Map<String, dynamic>;
+        final typedData = typedBody['data'] as Map<String, dynamic>?;
+
+        if (typedBody['success'] == true && typedData != null) {
+          final inv = typedData['invoiceAttachment'] as Map<String, dynamic>?;
+          final eway = typedData['eWayAttachment'] as Map<String, dynamic>?;
+
+          if (inv != null && inv.isNotEmpty) {
+            loadedInvoice = {
+              'name': inv['originalName']?.toString() ?? 'Invoice',
+              'filename': inv['filename']?.toString() ?? '',
+              'size': inv['size'] ?? 0,
+              'type': inv['mimeType']?.toString() ?? 'unknown',
+              'uploadedAt': inv['uploadDate']?.toString() ?? '',
+              'uploadedBy': inv['uploadedBy']?.toString() ?? '',
+            };
+          }
+
+          if (eway != null && eway.isNotEmpty) {
+            loadedEway = {
+              'name': eway['originalName']?.toString() ?? 'E-way bill',
+              'filename': eway['filename']?.toString() ?? '',
+              'size': eway['size'] ?? 0,
+              'type': eway['mimeType']?.toString() ?? 'unknown',
+              'uploadedAt': eway['uploadDate']?.toString() ?? '',
+              'uploadedBy': eway['uploadedBy']?.toString() ?? '',
+            };
+          }
+        }
+      }
+
+      setState(() {
+        attachments = loadedAttachments;
+        invoiceAttachment = loadedInvoice;
+        ewayAttachment = loadedEway;
+        isLoading = false;
+        error = null;
+      });
     } catch (e) {
       debugPrint('❌ Error fetching attachments: $e');
       setState(() {
@@ -349,6 +405,265 @@ class _GCAttachmentsPageState extends State<GCAttachmentsPage> {
     }
   }
 
+  Future<void> _previewInvoiceAttachment() async {
+    final gcNumber = widget.gcNumber;
+    final companyId = widget.companyId;
+
+    try {
+      final url =
+          '${ApiConfig.baseUrl}/gc/attachments/invoice/file/$gcNumber?companyId=$companyId';
+      final uri = Uri.parse(url);
+
+      debugPrint('🔍 Opening invoice attachment: $url');
+
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        Fluttertoast.showToast(
+          msg: 'Cannot open invoice attachment',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error opening invoice attachment: $e');
+      Fluttertoast.showToast(
+        msg: 'Error opening invoice attachment: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+    }
+  }
+
+  Future<void> _previewEwayAttachment() async {
+    final gcNumber = widget.gcNumber;
+    final companyId = widget.companyId;
+
+    try {
+      final url =
+          '${ApiConfig.baseUrl}/gc/attachments/e-way/file/$gcNumber?companyId=$companyId';
+      final uri = Uri.parse(url);
+
+      debugPrint('🔍 Opening e-way bill attachment: $url');
+
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        Fluttertoast.showToast(
+          msg: 'Cannot open e-way bill attachment',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error opening e-way bill attachment: $e');
+      Fluttertoast.showToast(
+        msg: 'Error opening e-way bill attachment: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+    }
+  }
+
+  Future<void> _downloadTypedAttachment({
+    required String type,
+    required String originalName,
+  }) async {
+    Directory? downloadDir;
+
+    try {
+      final gcNumber = widget.gcNumber;
+      final companyId = widget.companyId;
+
+      final basePath = type == 'invoice' ? 'invoice' : 'e-way';
+      final url =
+          '${ApiConfig.baseUrl}/gc/attachments/$basePath/file/$gcNumber?companyId=$companyId';
+
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        throw Exception('Invalid URL format: $url');
+      }
+
+      debugPrint('📥 Attempting to download $type attachment: $url');
+
+      // Request storage permissions (same as downloadFile)
+      if (Platform.isAndroid) {
+        debugPrint('Checking Android storage permission...');
+
+        final shouldRequest = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Storage Permission Required'),
+            content: const Text(
+              'This app needs storage permission to download and save files to your device. '
+              'Files will be saved to your Downloads folder.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldRequest != true) {
+          debugPrint('User cancelled permission request');
+          return;
+        }
+
+        PermissionStatus status = await Permission.storage.request();
+
+        debugPrint('WRITE_EXTERNAL_STORAGE permission result: $status');
+
+        if (!status.isGranted) {
+          debugPrint(
+            'WRITE_EXTERNAL_STORAGE denied, trying MANAGE_EXTERNAL_STORAGE...',
+          );
+          status = await Permission.manageExternalStorage.request();
+          debugPrint('MANAGE_EXTERNAL_STORAGE permission result: $status');
+        }
+
+        debugPrint('Final permission granted: ${status.isGranted}');
+
+        if (!status.isGranted) {
+          debugPrint('Permission not granted, showing snackbar...');
+          if (mounted) {
+            final permanentlyDenied = status.isPermanentlyDenied;
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  permanentlyDenied
+                      ? 'Storage permission is required to download files. Please enable it in app settings.'
+                      : 'Storage permission is required to download files.',
+                ),
+                action: permanentlyDenied
+                    ? SnackBarAction(
+                        label: 'Settings',
+                        onPressed: () async {
+                          await openAppSettings();
+                        },
+                      )
+                    : null,
+                duration: const Duration(seconds: 8),
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      // Get download directory (same logic as downloadFile)
+      if (Platform.isAndroid) {
+        downloadDir = Directory('/storage/emulated/0/Download');
+
+        if (!await downloadDir.exists()) {
+          final externalDir = await getExternalStorageDirectory();
+
+          if (externalDir != null && await externalDir.exists()) {
+            downloadDir = externalDir;
+          } else {
+            downloadDir = await getApplicationDocumentsDirectory();
+          }
+        }
+
+        if (downloadDir.path.contains('app_flutter')) {
+          downloadDir = Directory('${downloadDir.path}/Downloads');
+          if (!await downloadDir.exists()) {
+            await downloadDir.create(recursive: true);
+          }
+        }
+      } else {
+        downloadDir = await getApplicationDocumentsDirectory();
+        downloadDir = Directory('${downloadDir.path}/Downloads');
+        if (!await downloadDir.exists()) {
+          await downloadDir.create(recursive: true);
+        }
+      }
+
+      final fileName = 'GC_${widget.gcNumber}_$originalName';
+      final filePath = '${downloadDir.path}/$fileName';
+
+      debugPrint('Downloading $type attachment to: $filePath');
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => const AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Downloading file...'),
+              ],
+            ),
+          ),
+        );
+      }
+
+      final dio = Dio();
+      await dio.download(
+        url,
+        filePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            debugPrint(
+              'Download progress ($type): '
+              '${(received / total * 100).toStringAsFixed(0)}%',
+            );
+          }
+        },
+      );
+
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      if (mounted) {
+        final location =
+            downloadDir.path.contains('Download') ||
+                downloadDir.path.contains('Downloads')
+            ? 'Downloads folder'
+            : 'app storage';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'File downloaded successfully to $location: $fileName',
+            ),
+          ),
+        );
+      }
+
+      debugPrint('Successfully downloaded $type attachment: $filePath');
+    } catch (e) {
+      debugPrint('❌ Failed to download $type attachment: $e');
+
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
   String _formatFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
@@ -492,7 +807,12 @@ class _GCAttachmentsPageState extends State<GCAttachmentsPage> {
       );
     }
 
-    if (attachments.isEmpty) {
+    final hasAnyAttachments =
+        attachments.isNotEmpty ||
+        invoiceAttachment != null ||
+        ewayAttachment != null;
+
+    if (!hasAnyAttachments) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -517,13 +837,169 @@ class _GCAttachmentsPageState extends State<GCAttachmentsPage> {
       );
     }
 
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.all(16),
-      itemCount: attachments.length,
-      itemBuilder: (context, index) {
-        final attachment = attachments[index];
-        return _buildAttachmentCard(attachment);
-      },
+      children: [
+        if (invoiceAttachment != null || ewayAttachment != null) ...[
+          Text(
+            'Invoice & E-way Bill',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (invoiceAttachment != null)
+            _buildTypedAttachmentCard(
+              invoiceAttachment!,
+              label: 'Invoice',
+              type: 'invoice',
+            ),
+          if (ewayAttachment != null)
+            _buildTypedAttachmentCard(
+              ewayAttachment!,
+              label: 'E-way Bill',
+              type: 'e-way',
+            ),
+          const SizedBox(height: 16),
+          Divider(color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+        ],
+        Text(
+          'General Attachments',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (attachments.isEmpty)
+          Text(
+            'No general attachments',
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+          )
+        else ...[
+          for (final attachment in attachments)
+            _buildAttachmentCard(attachment),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildTypedAttachmentCard(
+    Map<String, dynamic> attachment, {
+    required String label,
+    required String type,
+  }) {
+    final name = attachment['name'] as String;
+    final size = attachment['size'] as int;
+    final mimeType = attachment['type'] as String;
+    final uploadedAt = attachment['uploadedAt'] as String;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: _getFileColor(mimeType).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            _getFileIcon(mimeType),
+            color: _getFileColor(mimeType),
+            size: 28,
+          ),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              name,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              _formatFileSize(size),
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            ),
+            if (uploadedAt.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Uploaded: ${_formatDate(uploadedAt)}',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              ),
+            ],
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.visibility, size: 20),
+              onPressed: () {
+                if (type == 'invoice') {
+                  _previewInvoiceAttachment();
+                } else {
+                  _previewEwayAttachment();
+                }
+              },
+              tooltip: 'Preview',
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.blue.withOpacity(0.1),
+                foregroundColor: Colors.blue,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.download, size: 20),
+              onPressed: () =>
+                  _downloadTypedAttachment(type: type, originalName: name),
+              tooltip: 'Download',
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.green.withOpacity(0.1),
+                foregroundColor: Colors.green,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

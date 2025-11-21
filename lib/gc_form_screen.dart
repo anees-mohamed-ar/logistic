@@ -155,8 +155,34 @@ class _GCFormScreenState extends State<GCFormScreen> {
 
     return WillPopScope(
       onWillPop: () async {
-        await _unlockIfNeeded();
-        return true;
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('Exit GC Form?'),
+              content: const Text(
+                'Are you sure you want to exit? Any unsaved data in this form will be cleared.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: const Text('Exit'),
+                ),
+              ],
+            );
+          },
+        );
+
+        if (shouldExit == true) {
+          await _unlockIfNeeded();
+          return true;
+        }
+
+        return false;
       },
       child: Scaffold(
         appBar: AppBar(
@@ -648,7 +674,10 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     child: TextFormField(
                       controller: controller.eDaysCtrl,
                       focusNode: controller.eDaysFocus,
-                      decoration: _inputDecoration('E-Days', Icons.schedule),
+                      decoration: _inputDecoration(
+                        'Transit Days',
+                        Icons.schedule,
+                      ),
                       keyboardType: TextInputType.number,
                       textInputAction: TextInputAction.next,
                       validator: null,
@@ -695,6 +724,48 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 'Vehicle & Driver Details',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
+              const SizedBox(height: 16),
+              // Broker, Vehicle & Driver combined details
+              Obx(() {
+                // Get the list of brokers, ensuring no empty names
+                final brokerList = controller.brokers
+                    .where((b) => b.isNotEmpty)
+                    .toList();
+
+                // If the selected broker is not in the list, clear it
+                final selectedBroker = controller.selectedBroker.value;
+                if (selectedBroker.isNotEmpty &&
+                    !brokerList.contains(selectedBroker)) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    controller.selectedBroker.value = '';
+                    controller.brokerNameCtrl.clear();
+                  });
+                }
+
+                return _buildDropdownField(
+                  context: context,
+                  label: 'Broker Name',
+                  value: brokerList.contains(selectedBroker)
+                      ? selectedBroker
+                      : '',
+                  items: brokerList,
+                  onChanged: (value) {
+                    if (value != null) {
+                      controller.selectedBroker.value = value;
+                      controller.brokerNameCtrl.text = value;
+                    } else {
+                      controller.selectedBroker.value = '';
+                      controller.brokerNameCtrl.clear();
+                    }
+                  },
+                  validator: null,
+                  compact: true,
+                  searchable: true,
+                  isLoading: controller.brokersLoading.value,
+                  error: controller.brokersError.value,
+                  onRetry: () => controller.fetchBrokers(),
+                );
+              }),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -880,12 +951,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         controller.driverPhoneCtrl.clear();
                       }
                     },
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Required';
-                      }
-                      return null;
-                    },
+                    validator: null,
                     compact: true,
                     searchable: true,
                     isLoading: controller.driversLoading.value,
@@ -904,8 +970,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 ),
                 keyboardType: TextInputType.phone,
                 readOnly: true,
-                validator: (value) =>
-                    value == null || value.isEmpty ? 'Required' : null,
+                validator: null,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -942,53 +1007,6 @@ class _GCFormScreenState extends State<GCFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Broker Details',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 16),
-              // Broker field only
-              Obx(() {
-                // Get the list of brokers, ensuring no empty or null names
-                final brokerList = controller.brokers
-                    .where((b) => b != null && b.isNotEmpty)
-                    .toList();
-
-                // If the selected broker is not in the list, clear it
-                final selectedBroker = controller.selectedBroker.value;
-                if (selectedBroker.isNotEmpty &&
-                    !brokerList.contains(selectedBroker)) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    controller.selectedBroker.value = '';
-                    controller.brokerNameCtrl.clear();
-                  });
-                }
-
-                return _buildDropdownField(
-                  context: context,
-                  label: 'Broker Name',
-                  value: brokerList.contains(selectedBroker)
-                      ? selectedBroker
-                      : '',
-                  items: brokerList,
-                  onChanged: (value) {
-                    if (value != null) {
-                      controller.selectedBroker.value = value;
-                      controller.brokerNameCtrl.text = value;
-                    } else {
-                      controller.selectedBroker.value = '';
-                      controller.brokerNameCtrl.clear();
-                    }
-                  },
-                  validator: null,
-                  compact: true,
-                  searchable: true,
-                  isLoading: controller.brokersLoading.value,
-                  error: controller.brokersError.value,
-                  onRetry: () => controller.fetchBrokers(),
-                );
-              }),
-              const SizedBox(height: 24),
               Text(
                 'Consignor Details',
                 style: Theme.of(context).textTheme.titleMedium,
@@ -1670,6 +1688,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                           context,
                           controller.ewayBillDate,
                           textController: controller.ewayBillDateCtrl,
+                          restrictToToday: true,
                         ),
                       ),
                     ),
@@ -1705,6 +1724,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     context,
                     controller.ewayBillDate,
                     textController: controller.ewayBillDateCtrl,
+                    restrictToToday: true,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -1734,8 +1754,9 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   'Actual Weight (Kgs)',
                   Icons.scale,
                   isOptional: true,
-                ),
-                keyboardType: TextInputType.text,
+                ).copyWith(suffixText: '.000'),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 textInputAction: TextInputAction.next,
                 onChanged: (_) {},
                 onFieldSubmitted: (_) {
@@ -1791,20 +1812,23 @@ class _GCFormScreenState extends State<GCFormScreen> {
 
               const SizedBox(height: 24),
 
-              // Private Mark in its own row
+              // Private Mark - fixed non-editable value
               TextFormField(
-                controller: controller.remarksCtrl,
-                focusNode: controller.remarksFocus,
+                readOnly: true,
+                initialValue: 'O / R',
                 decoration: _inputDecoration(
                   'Private Mark',
-                  Icons.note_alt_outlined,
+                  Icons.info_outline,
                   isOptional: true,
                 ),
+                maxLines: 1,
                 textInputAction: TextInputAction.next,
-                onChanged: (_) {},
+                onTap: () {
+                  // Skip focus to next field since this is non-editable
+                  controller.ewayBillFocus.requestFocus();
+                },
                 onFieldSubmitted: (_) {
-                  // Last field in Goods tab - move to next tab
-                  controller.navigateToNextTab();
+                  controller.ewayBillFocus.requestFocus();
                 },
               ),
               const SizedBox(height: 16),
@@ -1914,6 +1938,98 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 ],
               ),
               const SizedBox(height: 12),
+
+              // Typed attachment slots: Invoice & E-way bill
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isNarrow = constraints.maxWidth < 600;
+
+                  if (isNarrow) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Obx(
+                          () => _buildTypedAttachmentSlot(
+                            context: context,
+                            label: 'Invoice',
+                            icon: Icons.receipt_long,
+                            attachment: controller.invoiceAttachment.value,
+                            onTap: () => controller.pickTypedAttachment(
+                              context,
+                              type: 'invoice',
+                            ),
+                            onPreview: () =>
+                                controller.previewInvoiceAttachment(context),
+                            onDownload: () =>
+                                controller.downloadInvoiceAttachment(context),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Obx(
+                          () => _buildTypedAttachmentSlot(
+                            context: context,
+                            label: 'E-way bill',
+                            icon: Icons.article_outlined,
+                            attachment: controller.ewayAttachment.value,
+                            onTap: () => controller.pickTypedAttachment(
+                              context,
+                              type: 'eway',
+                            ),
+                            onPreview: () =>
+                                controller.previewEwayAttachment(context),
+                            onDownload: () =>
+                                controller.downloadEwayAttachment(context),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Obx(
+                          () => _buildTypedAttachmentSlot(
+                            context: context,
+                            label: 'Invoice',
+                            icon: Icons.receipt_long,
+                            attachment: controller.invoiceAttachment.value,
+                            onTap: () => controller.pickTypedAttachment(
+                              context,
+                              type: 'invoice',
+                            ),
+                            onPreview: () =>
+                                controller.previewInvoiceAttachment(context),
+                            onDownload: () =>
+                                controller.downloadInvoiceAttachment(context),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Obx(
+                          () => _buildTypedAttachmentSlot(
+                            context: context,
+                            label: 'E-way bill',
+                            icon: Icons.article_outlined,
+                            attachment: controller.ewayAttachment.value,
+                            onTap: () => controller.pickTypedAttachment(
+                              context,
+                              type: 'eway',
+                            ),
+                            onPreview: () =>
+                                controller.previewEwayAttachment(context),
+                            onDownload: () =>
+                                controller.downloadEwayAttachment(context),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
 
               // Upload progress indicator
               if (controller.isUploading.value) ...[
@@ -2213,32 +2329,31 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     : const SizedBox.shrink(),
               ),
 
-              // Add files button
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: controller.isPickingFiles.value
-                      ? null
-                      : () => controller.pickFiles(context),
-                  icon: controller.isPickingFiles.value
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.attach_file),
-                  label: Text(
-                    controller.isPickingFiles.value
-                        ? 'Selecting files...'
-                        : 'Add Files',
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(color: Theme.of(context).primaryColor),
-                  ),
-                ),
-              ),
-
+              // // Add files button
+              // SizedBox(
+              //   width: double.infinity,
+              //   child: OutlinedButton.icon(
+              //     onPressed: controller.isPickingFiles.value
+              //         ? null
+              //         : () => controller.pickFiles(context),
+              //     icon: controller.isPickingFiles.value
+              //         ? const SizedBox(
+              //             width: 16,
+              //             height: 16,
+              //             child: CircularProgressIndicator(strokeWidth: 2),
+              //           )
+              //         : const Icon(Icons.attach_file),
+              //     label: Text(
+              //       controller.isPickingFiles.value
+              //           ? 'Selecting files...'
+              //           : 'Add Files',
+              //     ),
+              //     style: OutlinedButton.styleFrom(
+              //       padding: const EdgeInsets.symmetric(vertical: 12),
+              //       side: BorderSide(color: Theme.of(context).primaryColor),
+              //     ),
+              //   ),
+              // ),
               const SizedBox(height: 8),
               Text(
                 'You can attach any type of file (PDF, images, documents, etc.). Maximum 10 files, 10MB each.\n\n'
@@ -2254,6 +2369,143 @@ class _GCFormScreenState extends State<GCFormScreen> {
         ),
       );
     });
+  }
+
+  Widget _buildTypedAttachmentSlot({
+    required BuildContext context,
+    required String label,
+    required IconData icon,
+    required Map<String, dynamic>? attachment,
+    required VoidCallback onTap,
+    VoidCallback? onPreview,
+    VoidCallback? onDownload,
+  }) {
+    final theme = Theme.of(context);
+    final hasFile =
+        attachment != null &&
+        (attachment['name']?.toString().isNotEmpty ?? false);
+    final fileName = hasFile
+        ? (attachment['name']?.toString() ?? 'Selected file')
+        : 'Tap to upload';
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: hasFile ? theme.colorScheme.primary : Colors.grey.shade300,
+          ),
+          color: hasFile ? theme.colorScheme.primary.withOpacity(0.04) : null,
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: hasFile
+                    ? theme.colorScheme.primary.withOpacity(0.1)
+                    : Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: hasFile
+                    ? theme.colorScheme.primary
+                    : Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: hasFile
+                              ? Colors.green.withOpacity(0.12)
+                              : Colors.grey.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          hasFile ? 'Uploaded' : 'Not uploaded',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: hasFile
+                                ? Colors.green.shade700
+                                : Colors.grey.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    fileName,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: hasFile ? Colors.black87 : Colors.grey[600],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (hasFile && (onPreview != null || onDownload != null))
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (onPreview != null)
+                            IconButton(
+                              icon: const Icon(Icons.visibility, size: 18),
+                              tooltip: 'Preview',
+                              onPressed: onPreview,
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          if (onDownload != null)
+                            IconButton(
+                              icon: const Icon(Icons.download, size: 18),
+                              tooltip: 'Download',
+                              onPressed: onDownload,
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.upload_file,
+              size: 18,
+              color: hasFile ? theme.colorScheme.primary : Colors.grey[500],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   IconData _getFileIcon(String extension) {

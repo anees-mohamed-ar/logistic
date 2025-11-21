@@ -237,7 +237,16 @@ class _TruckListPageState extends State<TruckListPage> {
           children: [
             IconButton(
               icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-              onPressed: () => Get.to(() => TruckFormPage(truck: truck)),
+              onPressed: () async {
+                final result = await Get.to(() => TruckFormPage(truck: truck));
+                if (result == true) {
+                  Get.snackbar(
+                    'Success',
+                    'Truck updated successfully',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                }
+              },
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
             ),
@@ -250,9 +259,18 @@ class _TruckListPageState extends State<TruckListPage> {
             // ),
           ],
         ),
-        onTap: () {
-          Get.put(GCFormController()); // Initialize controller before navigating
-          Get.to(() => TruckFormPage(truck: truck));
+        onTap: () async {
+          Get.put(
+            GCFormController(),
+          ); // Initialize controller before navigating
+          final result = await Get.to(() => TruckFormPage(truck: truck));
+          if (result == true) {
+            Get.snackbar(
+              'Success',
+              'Truck updated successfully',
+              snackPosition: SnackPosition.BOTTOM,
+            );
+          }
         },
       ),
     );

@@ -317,169 +317,162 @@ class _CustomDrawerState extends State<CustomDrawer> {
   Widget _buildExpandableSection() {
     final idController = Get.find<IdController>();
 
-    return Obx(
-      () => idController.userRole.value == 'admin'
-          ? Column(
-              children: [
-                // Management Header (Expandable)
-                Container(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: _isManagementExpanded
-                        ? const Color(0xFF4A90E2).withOpacity(0.05)
-                        : null,
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 4,
-                    ),
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF8B5CF6).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.admin_panel_settings_outlined,
-                        size: 20,
-                        color: Color(0xFF8B5CF6),
-                      ),
-                    ),
-                    title: const Text(
-                      'Management',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF475569),
-                      ),
-                    ),
-                    trailing: AnimatedRotation(
-                      turns: _isManagementExpanded ? 0.5 : 0,
-                      duration: const Duration(milliseconds: 200),
-                      child: const Icon(
-                        Icons.expand_more,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                    onTap: () {
-                      setState(() {
-                        _isManagementExpanded = !_isManagementExpanded;
-                      });
-                    },
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
+    return Obx(() {
+      final isAdmin = idController.userRole.value == 'admin';
 
-                // Expandable Management Items
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  height: _isManagementExpanded ? null : 0,
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 300),
-                    opacity: _isManagementExpanded ? 1.0 : 0.0,
-                    child: _isManagementExpanded
-                        ? Container(
-                            margin: const EdgeInsets.only(left: 16),
-                            child: Column(
-                              children: [
-                                _buildSubMenuItem(
-                                  icon: Icons.local_shipping_outlined,
-                                  title: 'Truck Management',
-                                  route: AppRoutes.truckList,
-                                  onTap: () => _navigateTo(AppRoutes.truckList),
-                                ),
-                                _buildSubMenuItem(
-                                  icon: Icons.speed_outlined,
-                                  title: 'KM Management',
-                                  route: AppRoutes.kmList,
-                                  onTap: () => _navigateTo(AppRoutes.kmList),
-                                ),
-                                _buildSubMenuItem(
-                                  icon: Icons.location_on_outlined,
-                                  title: 'Locations',
-                                  route: AppRoutes.locationList,
-                                  onTap: () =>
-                                      _navigateTo(AppRoutes.locationList),
-                                ),
-                                _buildSubMenuItem(
-                                  icon: Icons.people_outline,
-                                  title: 'Customers',
-                                  route: AppRoutes.customerList,
-                                  onTap: () =>
-                                      _navigateTo(AppRoutes.customerList),
-                                ),
-                                _buildSubMenuItem(
-                                  icon: Icons.inventory_outlined,
-                                  title: 'Suppliers',
-                                  route: AppRoutes.supplierList,
-                                  onTap: () =>
-                                      _navigateTo(AppRoutes.supplierList),
-                                ),
-                                _buildSubMenuItem(
-                                  icon: Icons.person_outline,
-                                  title: 'Drivers',
-                                  route: AppRoutes.driverManagement,
-                                  onTap: () =>
-                                      _navigateTo(AppRoutes.driverManagement),
-                                ),
-                                _buildSubMenuItem(
-                                  icon: Icons.business_center_outlined,
-                                  title: 'Consignors',
-                                  route: AppRoutes.consignorList,
-                                  onTap: () =>
-                                      _navigateTo(AppRoutes.consignorList),
-                                ),
-                                _buildSubMenuItem(
-                                  icon: Icons.person_pin_outlined,
-                                  title: 'Consignees',
-                                  route: AppRoutes.consigneeList,
-                                  onTap: () =>
-                                      _navigateTo(AppRoutes.consigneeList),
-                                ),
-                                _buildSubMenuItem(
-                                  icon: Icons.assignment_ind_outlined,
-                                  title: 'Broker Management',
-                                  route: AppRoutes.brokerList,
-                                  onTap: () =>
-                                      _navigateTo(AppRoutes.brokerList),
-                                ),
-                                _buildSubMenuItem(
-                                  icon: Icons.scale_outlined,
-                                  title: 'Weight Management',
-                                  route: AppRoutes.weightRateList,
-                                  onTap: () =>
-                                      _navigateTo(AppRoutes.weightRateList),
-                                ),
-                                _buildSubMenuItem(
-                                  icon: Icons.receipt_long_outlined,
-                                  title: 'GST Management',
-                                  route: AppRoutes.gstList,
-                                  onTap: () => _navigateTo(AppRoutes.gstList),
-                                ),
-                                _buildSubMenuItem(
-                                  icon: Icons.people_alt_outlined,
-                                  title: 'User Management',
-                                  route: AppRoutes.userManagement,
-                                  onTap: () =>
-                                      _navigateTo(AppRoutes.userManagement),
-                                ),
-                              ],
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
+      return Column(
+        children: [
+          // Management Header (Expandable)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: _isManagementExpanded
+                  ? const Color(0xFF4A90E2).withOpacity(0.05)
+                  : null,
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
+              ),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ],
-            )
-          : const SizedBox.shrink(),
-    );
+                child: const Icon(
+                  Icons.admin_panel_settings_outlined,
+                  size: 20,
+                  color: Color(0xFF8B5CF6),
+                ),
+              ),
+              title: const Text(
+                'Management',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF475569),
+                ),
+              ),
+              trailing: AnimatedRotation(
+                turns: _isManagementExpanded ? 0.5 : 0,
+                duration: const Duration(milliseconds: 200),
+                child: const Icon(Icons.expand_more, color: Color(0xFF64748B)),
+              ),
+              onTap: () {
+                setState(() {
+                  _isManagementExpanded = !_isManagementExpanded;
+                });
+              },
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+
+          // Expandable Management Items
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            height: _isManagementExpanded ? null : 0,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 300),
+              opacity: _isManagementExpanded ? 1.0 : 0.0,
+              child: _isManagementExpanded
+                  ? Container(
+                      margin: const EdgeInsets.only(left: 16),
+                      child: Column(
+                        children: [
+                          // Common management items (visible to all roles)
+                          _buildSubMenuItem(
+                            icon: Icons.person_outline,
+                            title: 'Drivers',
+                            route: AppRoutes.driverManagement,
+                            onTap: () =>
+                                _navigateTo(AppRoutes.driverManagement),
+                          ),
+                          _buildSubMenuItem(
+                            icon: Icons.business_center_outlined,
+                            title: 'Consignors',
+                            route: AppRoutes.consignorList,
+                            onTap: () => _navigateTo(AppRoutes.consignorList),
+                          ),
+                          _buildSubMenuItem(
+                            icon: Icons.person_pin_outlined,
+                            title: 'Consignees',
+                            route: AppRoutes.consigneeList,
+                            onTap: () => _navigateTo(AppRoutes.consigneeList),
+                          ),
+
+                          // Admin-only management items
+                          if (isAdmin) ...[
+                            _buildSubMenuItem(
+                              icon: Icons.local_shipping_outlined,
+                              title: 'Truck Management',
+                              route: AppRoutes.truckList,
+                              onTap: () => _navigateTo(AppRoutes.truckList),
+                            ),
+                            _buildSubMenuItem(
+                              icon: Icons.speed_outlined,
+                              title: 'KM Management',
+                              route: AppRoutes.kmList,
+                              onTap: () => _navigateTo(AppRoutes.kmList),
+                            ),
+                            _buildSubMenuItem(
+                              icon: Icons.location_on_outlined,
+                              title: 'Locations',
+                              route: AppRoutes.locationList,
+                              onTap: () => _navigateTo(AppRoutes.locationList),
+                            ),
+                            _buildSubMenuItem(
+                              icon: Icons.people_outline,
+                              title: 'Customers',
+                              route: AppRoutes.customerList,
+                              onTap: () => _navigateTo(AppRoutes.customerList),
+                            ),
+                            _buildSubMenuItem(
+                              icon: Icons.inventory_outlined,
+                              title: 'Suppliers',
+                              route: AppRoutes.supplierList,
+                              onTap: () => _navigateTo(AppRoutes.supplierList),
+                            ),
+                            _buildSubMenuItem(
+                              icon: Icons.assignment_ind_outlined,
+                              title: 'Broker Management',
+                              route: AppRoutes.brokerList,
+                              onTap: () => _navigateTo(AppRoutes.brokerList),
+                            ),
+                            _buildSubMenuItem(
+                              icon: Icons.scale_outlined,
+                              title: 'Weight Management',
+                              route: AppRoutes.weightRateList,
+                              onTap: () =>
+                                  _navigateTo(AppRoutes.weightRateList),
+                            ),
+                            _buildSubMenuItem(
+                              icon: Icons.receipt_long_outlined,
+                              title: 'GST Management',
+                              route: AppRoutes.gstList,
+                              onTap: () => _navigateTo(AppRoutes.gstList),
+                            ),
+                            _buildSubMenuItem(
+                              icon: Icons.people_alt_outlined,
+                              title: 'User Management',
+                              route: AppRoutes.userManagement,
+                              onTap: () =>
+                                  _navigateTo(AppRoutes.userManagement),
+                            ),
+                          ],
+                        ],
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ),
+        ],
+      );
+    });
   }
 
   Widget _buildSubMenuItem({

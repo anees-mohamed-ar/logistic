@@ -11,7 +11,13 @@ const fs = require('fs');
 // Configure multer for GC file uploads
 const gcUploadStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/gc_attachments/');
+    if (file.fieldname === 'invoice') {
+      cb(null, 'uploads/invoice/');
+    } else if (file.fieldname === 'e_way') {
+      cb(null, 'uploads/e-way/');
+    } else {
+      cb(null, 'uploads/gc_attachments/');
+    }
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -278,6 +284,187 @@ router.get('/files/:filename', (req, res) => {
     }
 });
 
+// Fetch invoice and e-way bill attachment metadata for a GC
+router.get('/attachments/invoice-e-way/:GcNumber', (req, res) => {
+    const { GcNumber } = req.params;
+    const companyId = req.query.companyId;
+
+    if (!companyId) {
+        return res.status(400).json({
+            success: false,
+            message: 'companyId is required as a query parameter'
+        });
+    }
+
+    const sql = `SELECT invoice_attachment, e_way_attachment FROM gc_creation WHERE GcNumber = ? AND CompanyId = ? LIMIT 1`;
+    db.query(sql, [GcNumber, companyId], (err, rows) => {
+        if (err) {
+            console.error('Error fetching invoice/e-way attachments:', err);
+            return res.status(500).json({
+                success: false,
+                message: 'Database error fetching attachments',
+                error: err.message
+            });
+        }
+
+        if (!rows || rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'GC not found for given companyId and GcNumber'
+            });
+        }
+
+        let invoiceAttachment = null;
+        let eWayAttachment = null;
+
+        try {
+            if (rows[0].invoice_attachment) {
+                invoiceAttachment = JSON.parse(rows[0].invoice_attachment);
+            }
+        } catch (e) {
+            console.error('Error parsing invoice_attachment JSON:', e);
+        }
+
+        try {
+            if (rows[0].e_way_attachment) {
+                eWayAttachment = JSON.parse(rows[0].e_way_attachment);
+            }
+        } catch (e) {
+            console.error('Error parsing e_way_attachment JSON:', e);
+        }
+
+        return res.json({
+            success: true,
+            data: {
+                GcNumber,
+                companyId: parseInt(companyId, 10),
+                invoiceAttachment,
+                eWayAttachment
+            }
+        });
+    });
+});
+
+// Serve invoice attachment file for a GC
+router.get('/attachments/invoice/file/:GcNumber', (req, res) => {
+    const { GcNumber } = req.params;
+    const companyId = req.query.companyId;
+
+    if (!companyId) {
+        return res.status(400).json({
+            success: false,
+            message: 'companyId is required as a query parameter'
+        });
+    }
+
+    const sql = `SELECT invoice_attachment FROM gc_creation WHERE GcNumber = ? AND CompanyId = ? LIMIT 1`;
+    db.query(sql, [GcNumber, companyId], (err, rows) => {
+        if (err) {
+            console.error('Error fetching invoice attachment:', err);
+            return res.status(500).json({
+                success: false,
+                message: 'Database error fetching invoice attachment',
+                error: err.message
+            });
+        }
+
+        if (!rows || rows.length === 0 || !rows[0].invoice_attachment) {
+            return res.status(404).json({
+                success: false,
+                message: 'Invoice attachment not found for this GC'
+            });
+        }
+
+        let info;
+        try {
+            info = JSON.parse(rows[0].invoice_attachment);
+        } catch (e) {
+            console.error('Error parsing invoice_attachment JSON:', e);
+            return res.status(500).json({
+                success: false,
+                message: 'Invalid invoice attachment data'
+            });
+        }
+
+        if (!info || !info.path) {
+            return res.status(404).json({
+                success: false,
+                message: 'Invoice attachment path not available'
+            });
+        }
+
+        const filePath = path.join(__dirname, info.path);
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({
+                success: false,
+                message: 'Invoice file not found on server'
+            });
+        }
+
+        return res.sendFile(filePath);
+    });
+});
+
+// Serve e-way bill attachment file for a GC
+router.get('/attachments/e-way/file/:GcNumber', (req, res) => {
+    const { GcNumber } = req.params;
+    const companyId = req.query.companyId;
+
+    if (!companyId) {
+        return res.status(400).json({
+            success: false,
+            message: 'companyId is required as a query parameter'
+        });
+    }
+
+    const sql = `SELECT e_way_attachment FROM gc_creation WHERE GcNumber = ? AND CompanyId = ? LIMIT 1`;
+    db.query(sql, [GcNumber, companyId], (err, rows) => {
+        if (err) {
+            console.error('Error fetching e-way attachment:', err);
+            return res.status(500).json({
+                success: false,
+                message: 'Database error fetching e-way attachment',
+                error: err.message
+            });
+        }
+
+        if (!rows || rows.length === 0 || !rows[0].e_way_attachment) {
+            return res.status(404).json({
+                success: false,
+                message: 'E-way attachment not found for this GC'
+            });
+        }
+
+        let info;
+        try {
+            info = JSON.parse(rows[0].e_way_attachment);
+        } catch (e) {
+            console.error('Error parsing e_way_attachment JSON:', e);
+            return res.status(500).json({
+                success: false,
+                message: 'Invalid e-way attachment data'
+            });
+        }
+
+        if (!info || !info.path) {
+            return res.status(404).json({
+                success: false,
+                message: 'E-way attachment path not available'
+            });
+        }
+
+        const filePath = path.join(__dirname, info.path);
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({
+                success: false,
+                message: 'E-way file not found on server'
+            });
+        }
+
+        return res.sendFile(filePath);
+    });
+});
+
 
 function formatDate(dateStr) {
     const date = new Date(dateStr);
@@ -355,142 +542,158 @@ console.log("req",req.body);
 
     db.query(sql, values, async (err, result) => {
         if (err) {
-            console.error("Database error:", err);
-            return res.status(500).json({ error: "Internal server error" });
-            
-        }
-           console.log("DB Query Result:", result); // IMPORTANT: Log the result object
-        console.log("Affected Rows:", result ? result.affectedRows : 'No result object'); // Check affected rows
-           if (result && result.affectedRows === 0) {
-            console.warn(`No rows updated for ID: ${id}. Check if the ID exists or if values are unchanged.`);
-            // You might want to send a different status code or message here
-            // return res.status(404).json({ message: "No record found or no changes made for the given ID." });
+            console.error("Database error while updating GC:", err);
+            return res.status(500).json({
+                success: false,
+                message: "Failed to update GC in database",
+                error: "Internal server error"
+            });
         }
 
-    
+        console.log("DB Query Result:", result);
+        console.log("Affected Rows:", result ? result.affectedRows : 'No result object');
+
+        if (!result || result.affectedRows === 0) {
+            console.warn(`No GC rows updated for ID: ${id}, CompanyId: ${companyId}.`);
+            return res.status(404).json({
+                success: false,
+                message: "GC not found or no changes applied"
+            });
+        }
         console.log(gc);
-        
 
-        const tallyRequestXML = `
-            <ENVELOPE>
-                <HEADER>
-                    <TALLYREQUEST>Import Data</TALLYREQUEST>
-                </HEADER>
-                <BODY>
-                    <IMPORTDATA>
-                        <REQUESTDESC>
-                            <REPORTNAME>All Masters</REPORTNAME>
-                            <STATICVARIABLES>
-                                <SVCURRENTCOMPANY>Globe Transport Corporation HO</SVCURRENTCOMPANY>
-                            </STATICVARIABLES>
-                        </REQUESTDESC>
-                        <REQUESTDATA>
-                            <TALLYMESSAGE xmlns:UDF="TallyUDF">
-                                <STOCKITEM NAME="${gc}" RESERVEDNAME="">
-                                    <ACTION>Alter</ACTION>
-                                    <NAME.LIST>
-                                        <NAME>${gc}</NAME>
-                                    </NAME.LIST>
+        // Successful DB update response (no Tally integration)
+        return res.status(200).json({
+            success: true,
+            message: "GC data updated successfully",
+            data: {
+                id: parseInt(id, 10),
+                companyId: parseInt(companyId, 10)
+            }
+        });
+
+//         const tallyRequestXML = `
+//             <ENVELOPE>
+//                 <HEADER>
+//                     <TALLYREQUEST>Import Data</TALLYREQUEST>
+//                 </HEADER>
+//                 <BODY>
+//                     <IMPORTDATA>
+//                         <REQUESTDESC>
+//                             <REPORTNAME>All Masters</REPORTNAME>
+//                             <STATICVARIABLES>
+//                                 <SVCURRENTCOMPANY>Globe Transport Corporation HO</SVCURRENTCOMPANY>
+//                             </STATICVARIABLES>
+//                         </REQUESTDESC>
+//                         <REQUESTDATA>
+//                             <TALLYMESSAGE xmlns:UDF="TallyUDF">
+//                                 <STOCKITEM NAME="${gc}" RESERVEDNAME="">
+//                                     <ACTION>Alter</ACTION>
+//                                     <NAME.LIST>
+//                                         <NAME>${gc}</NAME>
+//                                     </NAME.LIST>
                                 
                                   
-                                    <UDF:SKDELDY1DT.LIST DESC="'SkDelDy1Dt'" ISLIST="YES" TYPE="Date" INDEX="5564">
-                                    <UDF:SKDELDY1DT DESC="'SkDelDy1Dt'">${formatDate(Day1)}</UDF:SKDELDY1DT>
-                                    </UDF:SKDELDY1DT.LIST>
-                                    <UDF:SKDELDY2DT.LIST DESC="'SkDelDy2Dt'" ISLIST="YES" TYPE="Date" INDEX="5564">
-                                    <UDF:SKDELDY2DT DESC="'SkDelDy2Dt'">${formatDate(Day2)}</UDF:SKDELDY2DT>
-                                    </UDF:SKDELDY2DT.LIST>
-                                    <UDF:SKDELDY3DT.LIST DESC="'SkDelDy3Dt'" ISLIST="YES" TYPE="Date" INDEX="5566">
-                                    <UDF:SKDELDY3DT DESC="'SkDelDy3Dt'">${formatDate(Day3)}</UDF:SKDELDY3DT>
-                                    </UDF:SKDELDY3DT.LIST>
-                                    <UDF:SKDELDY4DT.LIST DESC="'SkDelDy4Dt'" ISLIST="YES" TYPE="Date" INDEX="5568">
-                                    <UDF:SKDELDY4DT DESC="'SkDelDy4Dt'">${formatDate(Day4)}</UDF:SKDELDY4DT>
-                                    </UDF:SKDELDY4DT.LIST>
-                                    <UDF:SKDELDY5DT.LIST DESC="'SkDelDy5Dt'" ISLIST="YES" TYPE="Date" INDEX="5570">
-                                    <UDF:SKDELDY5DT DESC="'SkDelDy5Dt'">${formatDate(Day5)}</UDF:SKDELDY5DT>
-                                    </UDF:SKDELDY5DT.LIST>
-                                    <UDF:SKDELDY6DT.LIST DESC="'SkDelDy6Dt'" ISLIST="YES" TYPE="Date" INDEX="5572">
-                                    <UDF:SKDELDY6DT DESC="'SkDelDy6Dt'">${formatDate(Day6)}</UDF:SKDELDY6DT>
-                                    </UDF:SKDELDY6DT.LIST>
-                                    <UDF:SKDELDY7DT.LIST DESC="'SkDelDy7Dt'" ISLIST="YES" TYPE="Date" INDEX="5574">
-                                    <UDF:SKDELDY7DT DESC="'SkDelDy7Dt'">${formatDate(Day7)}</UDF:SKDELDY7DT>
-                                    </UDF:SKDELDY7DT.LIST>
-                                    <UDF:SKDELDY8DT.LIST DESC="'SkDelDy8Dt'" ISLIST="YES" TYPE="Date" INDEX="5581">
-                                    <UDF:SKDELDY8DT DESC="'SkDelDy8Dt'">${formatDate(Day8)}</UDF:SKDELDY8DT>
-                                    </UDF:SKDELDY8DT.LIST>
+//                                     <UDF:SKDELDY1DT.LIST DESC="'SkDelDy1Dt'" ISLIST="YES" TYPE="Date" INDEX="5564">
+//                                     <UDF:SKDELDY1DT DESC="'SkDelDy1Dt'">${formatDate(Day1)}</UDF:SKDELDY1DT>
+//                                     </UDF:SKDELDY1DT.LIST>
+//                                     <UDF:SKDELDY2DT.LIST DESC="'SkDelDy2Dt'" ISLIST="YES" TYPE="Date" INDEX="5564">
+//                                     <UDF:SKDELDY2DT DESC="'SkDelDy2Dt'">${formatDate(Day2)}</UDF:SKDELDY2DT>
+//                                     </UDF:SKDELDY2DT.LIST>
+//                                     <UDF:SKDELDY3DT.LIST DESC="'SkDelDy3Dt'" ISLIST="YES" TYPE="Date" INDEX="5566">
+//                                     <UDF:SKDELDY3DT DESC="'SkDelDy3Dt'">${formatDate(Day3)}</UDF:SKDELDY3DT>
+//                                     </UDF:SKDELDY3DT.LIST>
+//                                     <UDF:SKDELDY4DT.LIST DESC="'SkDelDy4Dt'" ISLIST="YES" TYPE="Date" INDEX="5568">
+//                                     <UDF:SKDELDY4DT DESC="'SkDelDy4Dt'">${formatDate(Day4)}</UDF:SKDELDY4DT>
+//                                     </UDF:SKDELDY4DT.LIST>
+//                                     <UDF:SKDELDY5DT.LIST DESC="'SkDelDy5Dt'" ISLIST="YES" TYPE="Date" INDEX="5570">
+//                                     <UDF:SKDELDY5DT DESC="'SkDelDy5Dt'">${formatDate(Day5)}</UDF:SKDELDY5DT>
+//                                     </UDF:SKDELDY5DT.LIST>
+//                                     <UDF:SKDELDY6DT.LIST DESC="'SkDelDy6Dt'" ISLIST="YES" TYPE="Date" INDEX="5572">
+//                                     <UDF:SKDELDY6DT DESC="'SkDelDy6Dt'">${formatDate(Day6)}</UDF:SKDELDY6DT>
+//                                     </UDF:SKDELDY6DT.LIST>
+//                                     <UDF:SKDELDY7DT.LIST DESC="'SkDelDy7Dt'" ISLIST="YES" TYPE="Date" INDEX="5574">
+//                                     <UDF:SKDELDY7DT DESC="'SkDelDy7Dt'">${formatDate(Day7)}</UDF:SKDELDY7DT>
+//                                     </UDF:SKDELDY7DT.LIST>
+//                                     <UDF:SKDELDY8DT.LIST DESC="'SkDelDy8Dt'" ISLIST="YES" TYPE="Date" INDEX="5581">
+//                                     <UDF:SKDELDY8DT DESC="'SkDelDy8Dt'">${formatDate(Day8)}</UDF:SKDELDY8DT>
+//                                     </UDF:SKDELDY8DT.LIST>
                               
-                                     <UDF:SKDELDY2LOC.LIST DESC="'SkDelDy2Loc'" ISLIST="YES" TYPE="String" INDEX="5563">
-       <UDF:SKDELDY2LOC DESC="'SkDelDy2Loc'">${Day2Place}</UDF:SKDELDY2LOC>
-      </UDF:SKDELDY2LOC.LIST>
-      <UDF:SKDELDY3LOC.LIST DESC="'SkDelDyLoc'" ISLIST="YES" TYPE="String" INDEX="5563">
-       <UDF:SKDELDY3LOC DESC="'SkDelDy3Loc'">${Day3Place}</UDF:SKDELDY3LOC>
-      </UDF:SKDELDY3LOC.LIST>
-       <UDF:SKDELDY4LOC.LIST DESC="'SkDelDy4Loc'" ISLIST="YES" TYPE="String" INDEX="5563">
-       <UDF:SKDELDY4LOC DESC="'SkDelDy4Loc'">${Day4Place}</UDF:SKDELDY4LOC>
-      </UDF:SKDELDY4LOC.LIST>
+//                                      <UDF:SKDELDY2LOC.LIST DESC="'SkDelDy2Loc'" ISLIST="YES" TYPE="String" INDEX="5563">
+//        <UDF:SKDELDY2LOC DESC="'SkDelDy2Loc'">${Day2Place}</UDF:SKDELDY2LOC>
+//       </UDF:SKDELDY2LOC.LIST>
+//       <UDF:SKDELDY3LOC.LIST DESC="'SkDelDyLoc'" ISLIST="YES" TYPE="String" INDEX="5563">
+//        <UDF:SKDELDY3LOC DESC="'SkDelDy3Loc'">${Day3Place}</UDF:SKDELDY3LOC>
+//       </UDF:SKDELDY3LOC.LIST>
+//        <UDF:SKDELDY4LOC.LIST DESC="'SkDelDy4Loc'" ISLIST="YES" TYPE="String" INDEX="5563">
+//        <UDF:SKDELDY4LOC DESC="'SkDelDy4Loc'">${Day4Place}</UDF:SKDELDY4LOC>
+//       </UDF:SKDELDY4LOC.LIST>
 
-       <UDF:SKDELDY5LOC.LIST DESC="'SkDelDy5Loc'" ISLIST="YES" TYPE="String" INDEX="5563">
-       <UDF:SKDELDY5LOC DESC="'SkDelDy5Loc'">${Day5Place}</UDF:SKDELDY5LOC>
-      </UDF:SKDELDY5LOC.LIST>
+//        <UDF:SKDELDY5LOC.LIST DESC="'SkDelDy5Loc'" ISLIST="YES" TYPE="String" INDEX="5563">
+//        <UDF:SKDELDY5LOC DESC="'SkDelDy5Loc'">${Day5Place}</UDF:SKDELDY5LOC>
+//       </UDF:SKDELDY5LOC.LIST>
 
-       <UDF:SKDELDY6LOC.LIST DESC="'SkDelDy6Loc'" ISLIST="YES" TYPE="String" INDEX="5563">
-       <UDF:SKDELDY6LOC DESC="'SkDelDy6Loc'">${Day6Place}</UDF:SKDELDY6LOC>
-      </UDF:SKDELDY6LOC.LIST>
+//        <UDF:SKDELDY6LOC.LIST DESC="'SkDelDy6Loc'" ISLIST="YES" TYPE="String" INDEX="5563">
+//        <UDF:SKDELDY6LOC DESC="'SkDelDy6Loc'">${Day6Place}</UDF:SKDELDY6LOC>
+//       </UDF:SKDELDY6LOC.LIST>
 
-       <UDF:SKDELDY7LOC.LIST DESC="'SkDelDy7Loc'" ISLIST="YES" TYPE="String" INDEX="5563">
-       <UDF:SKDELDY7LOC DESC="'SkDelDy7Loc'">${Day7Place}</UDF:SKDELDY7LOC>
-      </UDF:SKDELDY7LOC.LIST>
+//        <UDF:SKDELDY7LOC.LIST DESC="'SkDelDy7Loc'" ISLIST="YES" TYPE="String" INDEX="5563">
+//        <UDF:SKDELDY7LOC DESC="'SkDelDy7Loc'">${Day7Place}</UDF:SKDELDY7LOC>
+//       </UDF:SKDELDY7LOC.LIST>
 
-       <UDF:SKDELDY8LOC.LIST DESC="'SkDelDy8Loc'" ISLIST="YES" TYPE="String" INDEX="5563">
-       <UDF:SKDELDY8LOC DESC="'SkDelDy8Loc'">${Day8Place}</UDF:SKDELDY8LOC>
-      </UDF:SKDELDY8LOC.LIST>
+//        <UDF:SKDELDY8LOC.LIST DESC="'SkDelDy8Loc'" ISLIST="YES" TYPE="String" INDEX="5563">
+//        <UDF:SKDELDY8LOC DESC="'SkDelDy8Loc'">${Day8Place}</UDF:SKDELDY8LOC>
+//       </UDF:SKDELDY8LOC.LIST>
 
-       <UDF:MAMULAMT.LIST DESC="'MamulAmt'" ISLIST="YES" TYPE="Amount" INDEX="5585">
-       <UDF:MAMULAMT DESC="'MamulAmt'">0</UDF:MAMULAMT>
-      </UDF:MAMULAMT.LIST>
+//        <UDF:MAMULAMT.LIST DESC="'MamulAmt'" ISLIST="YES" TYPE="Amount" INDEX="5585">
+//        <UDF:MAMULAMT DESC="'MamulAmt'">0</UDF:MAMULAMT>
+//       </UDF:MAMULAMT.LIST>
 
-       <UDF:SKRPTDT.LIST DESC="'SkRptDt'" ISLIST="YES" TYPE="Date" INDEX="5560">
-       <UDF:SKRPTDT DESC="'SkRptDt'">${ReportDate ? formatDate(ReportDate) : ''}</UDF:SKRPTDT>
-      </UDF:SKRPTDT.LIST>
-        <UDF:SKUNLOADDT.LIST DESC="'SkUnloadDt'" ISLIST="YES" TYPE="Date" INDEX="5561">
-       <UDF:SKUNLOADDT DESC="'SkUnloadDt'">${UnloadedDate ? formatDate(UnloadedDate) : ''}</UDF:SKUNLOADDT>
-      </UDF:SKUNLOADDT.LIST>
-          <UDF:TRANSPORTREMARKS.LIST DESC="'TransportRemarks'" ISLIST="YES" TYPE="String" INDEX="4175">
-       <UDF:TRANSPORTREMARKS DESC="'TransportRemarks'">${UnloadedRemark}</UDF:TRANSPORTREMARKS>
-      </UDF:TRANSPORTREMARKS.LIST>
-      <UDF:TRANSPORTRECEIPTDATE.LIST DESC="'TransportReceiptDate'" ISLIST="YES" TYPE="Date" INDEX="4174">
-       <UDF:TRANSPORTRECEIPTDATE DESC="'TransportReceiptDate'">${NewReceiptDate ? formatDate(NewReceiptDate) : ''}</UDF:TRANSPORTRECEIPTDATE>
-      </UDF:TRANSPORTRECEIPTDATE.LIST>
-      <UDF:UPDATERECEPITREMARK.LIST DESC="'UpdateRecepitRemark'" ISLIST="YES" TYPE="String" INDEX="8895">
-       <UDF:UPDATERECEPITREMARK DESC="'UpdateRecepitRemark'">${ReceiptRemarks}</UDF:UPDATERECEPITREMARK>
-      </UDF:UPDATERECEPITREMARK.LIST>
+//        <UDF:SKRPTDT.LIST DESC="'SkRptDt'" ISLIST="YES" TYPE="Date" INDEX="5560">
+//        <UDF:SKRPTDT DESC="'SkRptDt'">${ReportDate ? formatDate(ReportDate) : ''}</UDF:SKRPTDT>
+//       </UDF:SKRPTDT.LIST>
+//         <UDF:SKUNLOADDT.LIST DESC="'SkUnloadDt'" ISLIST="YES" TYPE="Date" INDEX="5561">
+//        <UDF:SKUNLOADDT DESC="'SkUnloadDt'">${UnloadedDate ? formatDate(UnloadedDate) : ''}</UDF:SKUNLOADDT>
+//       </UDF:SKUNLOADDT.LIST>
+//           <UDF:TRANSPORTREMARKS.LIST DESC="'TransportRemarks'" ISLIST="YES" TYPE="String" INDEX="4175">
+//        <UDF:TRANSPORTREMARKS DESC="'TransportRemarks'">${UnloadedRemark}</UDF:TRANSPORTREMARKS>
+//       </UDF:TRANSPORTREMARKS.LIST>
+//       <UDF:TRANSPORTRECEIPTDATE.LIST DESC="'TransportReceiptDate'" ISLIST="YES" TYPE="Date" INDEX="4174">
+//        <UDF:TRANSPORTRECEIPTDATE DESC="'TransportReceiptDate'">${NewReceiptDate ? formatDate(NewReceiptDate) : ''}</UDF:TRANSPORTRECEIPTDATE>
+//       </UDF:TRANSPORTRECEIPTDATE.LIST>
+//       <UDF:UPDATERECEPITREMARK.LIST DESC="'UpdateRecepitRemark'" ISLIST="YES" TYPE="String" INDEX="8895">
+//        <UDF:UPDATERECEPITREMARK DESC="'UpdateRecepitRemark'">${ReceiptRemarks}</UDF:UPDATERECEPITREMARK>
+//       </UDF:UPDATERECEPITREMARK.LIST>
 
-                                </STOCKITEM>
-                            </TALLYMESSAGE>
-                        </REQUESTDATA>
-                    </IMPORTDATA>
-                </BODY>
-            </ENVELOPE>`;
+//                                 </STOCKITEM>
+//                             </TALLYMESSAGE>
+//                         </REQUESTDATA>
+//                     </IMPORTDATA>
+//                 </BODY>
+//             </ENVELOPE>`;
 
-        // Make Tally API request
-        try {
-            const response = await axios.post('http://localhost:12000', tallyRequestXML, {
-                headers: { 'Content-Type': 'text/xml' }
-            });
-            // console.log(tallyRequestXML);
+//         // Make Tally API request
+//         try {
+//             const response = await axios.post('http://localhost:12000', tallyRequestXML, {
+//                 headers: { 'Content-Type': 'text/xml' }
+//             });
+//             // console.log(tallyRequestXML);
 
-            if (response.status === 200) {
-                res.status(200).json({ 
-                    message: "GC data and Tally entry Updated successfully",
-                    companyId: parseInt(companyId, 10),
-                    branchId: branchId ? parseInt(branchId, 10) : null
-                });
-            } else {
-                res.status(500).json({ error: "Failed to updated Tally entry" });
-            }
-        } catch (tallyError) {
-            console.error("Tally request error:", tallyError);
-            res.status(500).json({ error: "Failed to updated Tally entry" });
-        }
+//             if (response.status === 200) {
+//                 res.status(200).json({ 
+//                     message: "GC data and Tally entry Updated successfully",
+//                     companyId: parseInt(companyId, 10),
+//                     branchId: branchId ? parseInt(branchId, 10) : null
+//                 });
+//             } else {
+//                 res.status(500).json({ error: "Failed to updated Tally entry" });
+//             }
+//         } catch (tallyError) {
+//             console.error("Tally request error:", tallyError);
+//             res.status(500).json({ error: "Failed to updated Tally entry" });
+//         }
+//     });
+// });
     });
 });
 
@@ -502,7 +705,11 @@ function formatDate1(dateStr) {
     return `${year}${month}${day}`;
 }
 
-router.put('/updateGC/:GcNumber', gcUpload.array('attachments', 10), (req, res) => {
+router.put('/updateGC/:GcNumber', gcUpload.fields([
+    { name: 'attachments', maxCount: 10 },
+    { name: 'invoice', maxCount: 1 },
+    { name: 'e_way', maxCount: 1 }
+]), (req, res) => {
     const requestId = `GC_UPDATE_${Date.now()}`;
     const requestStartTime = new Date();
     const GcNumber = req.params.GcNumber;
@@ -528,7 +735,7 @@ router.put('/updateGC/:GcNumber', gcUpload.array('attachments', 10), (req, res) 
         Rate2, Total2, Rate3, Total3, Rate4, Total4, PoNumber, TripId,
         DeliveryFromSpecial, DeliveryAddress, ServiceTax, ReceiptBillNo, 
         ReceiptBillNoAmount, ReceiptBillNoDate, TotalRate, TotalWeight,
-        HireAmount, AdvanceAmount, BalanceAmount, FreightCharge, branch_id
+        HireAmount, AdvanceAmount, BalanceAmount, FreightCharge, branch_id, booking_officer_name
     } = req.body;
 
     // Input validation
@@ -580,7 +787,7 @@ router.put('/updateGC/:GcNumber', gcUpload.array('attachments', 10), (req, res) 
                 PaymentDetails=?, LcNo=?, DeliveryDate=?, EBillDate=?, EBillExpDate=?, 
                 DriverNameShow=?, DriverName=?, DriverPhoneNumber=?, Consignor=?, 
                 ConsignorName=?, ConsignorAddress=?, ConsignorGst=?, Consignee=?, 
-                ConsigneeName=?, ConsigneeAddress=?, ConsigneeGst=?, CustInvNo=?, 
+                ConsigneeName=?, ConsigneeAddress=?, ConsigneeGst=?, BillTo=?, BillToName=?, BillToAddress=?, BillToGst=?, CustInvNo=?, 
                 InvValue=?, EInv=?, EInvDate=?, Eda=IFNULL(?, ''), NumberofPkg=?, 
                 MethodofPkg=?, ActualWeightKgs=?, NumberofPkg2=?, MethodofPkg2=?, 
                 ActualWeightKgs2=?, km=?, km2=?, km3=?, km4=?, NumberofPkg3=?, 
@@ -592,7 +799,7 @@ router.put('/updateGC/:GcNumber', gcUpload.array('attachments', 10), (req, res) 
                 Total4=?, PoNumber=?, TripId=?, DeliveryFromSpecial=?, DeliveryAddress=?, 
                 ServiceTax=?, ReceiptBillNo=?, ReceiptBillNoAmount=?, ReceiptBillNoDate=?, 
                 TotalRate=?, TotalWeight=?, HireAmount=?, AdvanceAmount=?, 
-                BalanceAmount=?, FreightCharge=?, branch_id=?, updated_at=CURRENT_TIMESTAMP 
+                BalanceAmount=?, FreightCharge=?, branch_id=?, booking_officer_name=?, updated_at=CURRENT_TIMESTAMP 
                 WHERE CompanyId=? AND GcNumber=?`;
 
             const values = [
@@ -612,7 +819,7 @@ router.put('/updateGC/:GcNumber', gcUpload.array('attachments', 10), (req, res) 
                 DeliveryFromSpecial, DeliveryAddress, ServiceTax, ReceiptBillNo, 
                 ReceiptBillNoAmount, ReceiptBillNoDate, TotalRate, TotalWeight,
                 HireAmount, AdvanceAmount, BalanceAmount, FreightCharge,
-                branch_id, CompanyId, GcNumber
+                branch_id, booking_officer_name, CompanyId, GcNumber
             ];
 
             // Execute the update
@@ -633,6 +840,19 @@ router.put('/updateGC/:GcNumber', gcUpload.array('attachments', 10), (req, res) 
                     });
                 }
 
+                if (!result || result.affectedRows === 0) {
+                    console.warn(`[${new Date().toISOString()}] [${requestId}] No GC row updated`, {
+                        GcNumber,
+                        CompanyId
+                    });
+                    console.log(`[${new Date().toISOString()}] [${requestId}] Response: 404 - GC not found or no changes applied`);
+                    return res.status(404).json({
+                        success: false,
+                        message: 'GC not found or no changes applied',
+                        requestId
+                    });
+                }
+
                 console.log(`[${new Date().toISOString()}] [${requestId}] Successfully updated GC`, {
                     GcNumber,
                     CompanyId,
@@ -641,7 +861,8 @@ router.put('/updateGC/:GcNumber', gcUpload.array('attachments', 10), (req, res) 
                 });
 
                 // Process uploaded files if any
-                if (req.files && req.files.length > 0) {
+                const attachmentFileArray = req.files && Array.isArray(req.files) ? req.files : (req.files && req.files.attachments) ? req.files.attachments : [];
+                if (attachmentFileArray && attachmentFileArray.length > 0) {
                     // First, fetch existing attachments
                     const fetchExistingSql = 'SELECT attachment_files FROM gc_creation WHERE GcNumber = ? AND CompanyId = ?';
                     db.query(fetchExistingSql, [GcNumber, CompanyId], (fetchErr, fetchResult) => {
@@ -649,14 +870,26 @@ router.put('/updateGC/:GcNumber', gcUpload.array('attachments', 10), (req, res) 
                         if (fetchErr) {
                             console.error(`[${new Date().toISOString()}] [${requestId}] Error fetching existing attachments:`, fetchErr);
                             // Continue with just new files if fetch fails
-                            attachmentFiles = req.files.map(file => ({
-                                filename: file.filename,
-                                originalName: file.originalname,
-                                mimeType: file.mimetype,
-                                size: file.size,
-                                uploadDate: new Date().toISOString(),
-                                uploadedBy: req.query.userId || 'unknown'
-                            }));
+                            attachmentFiles = attachmentFileArray.map((file, index) => {
+                                // Determine attachment type from body if provided (per-file type array or single type)
+                                let attachmentType = null;
+                                const bodyTypes = req.body.attachmentTypes || req.body.attachmentType;
+                                if (Array.isArray(bodyTypes)) {
+                                    attachmentType = bodyTypes[index] || null;
+                                } else if (typeof bodyTypes === 'string') {
+                                    attachmentType = bodyTypes;
+                                }
+
+                                return {
+                                    filename: file.filename,
+                                    originalName: file.originalname,
+                                    mimeType: file.mimetype,
+                                    size: file.size,
+                                    uploadDate: new Date().toISOString(),
+                                    uploadedBy: req.query.userId || 'unknown',
+                                    type: attachmentType
+                                };
+                            });
                         } else {
                             // Parse existing attachments
                             let existingAttachments = [];
@@ -668,15 +901,41 @@ router.put('/updateGC/:GcNumber', gcUpload.array('attachments', 10), (req, res) 
                                 }
                             }
 
-                            // Create new attachment objects
-                            const newAttachments = req.files.map(file => ({
-                                filename: file.filename,
-                                originalName: file.originalname,
-                                mimeType: file.mimetype,
-                                size: file.size,
-                                uploadDate: new Date().toISOString(),
-                                uploadedBy: req.query.userId || 'unknown'
-                            }));
+                            // Create new attachment objects with optional type
+                            const newAttachments = attachmentFileArray.map((file, index) => {
+                                let attachmentType = null;
+                                const bodyTypes = req.body.attachmentTypes || req.body.attachmentType;
+                                if (Array.isArray(bodyTypes)) {
+                                    attachmentType = bodyTypes[index] || null;
+                                } else if (typeof bodyTypes === 'string') {
+                                    attachmentType = bodyTypes;
+                                }
+
+                                return {
+                                    filename: file.filename,
+                                    originalName: file.originalname,
+                                    mimeType: file.mimetype,
+                                    size: file.size,
+                                    uploadDate: new Date().toISOString(),
+                                    uploadedBy: req.query.userId || 'unknown',
+                                    type: attachmentType
+                                };
+                            });
+
+                            // If type is provided, keep only the latest file per type
+                            // Remove existing attachments with the same type as any new attachment
+                            const typesToReplace = new Set(
+                                newAttachments
+                                    .map(a => (a.type ? String(a.type).toLowerCase() : null))
+                                    .filter(t => t)
+                            );
+
+                            if (typesToReplace.size > 0) {
+                                existingAttachments = existingAttachments.filter(old => {
+                                    const oldType = old.type ? String(old.type).toLowerCase() : null;
+                                    return !oldType || !typesToReplace.has(oldType);
+                                });
+                            }
 
                             // Combine existing and new attachments
                             attachmentFiles = [...existingAttachments, ...newAttachments];
@@ -692,6 +951,107 @@ router.put('/updateGC/:GcNumber', gcUpload.array('attachments', 10), (req, res) 
                                 console.log(`[${new Date().toISOString()}] [${requestId}] Successfully updated GC with ${attachmentFiles.length} attachments`);
                             }
 
+                            // Handle invoice and e-way attachments separately
+                            const invoiceFile = req.files && req.files.invoice && req.files.invoice[0] ? req.files.invoice[0] : null;
+                            const eWayFile = req.files && req.files.e_way && req.files.e_way[0] ? req.files.e_way[0] : null;
+
+                            const invoiceInfo = invoiceFile ? {
+                                filename: invoiceFile.filename,
+                                originalName: invoiceFile.originalname,
+                                mimeType: invoiceFile.mimetype,
+                                size: invoiceFile.size,
+                                path: `uploads/invoice/${invoiceFile.filename}`,
+                                uploadDate: new Date().toISOString(),
+                                uploadedBy: req.query.userId || 'unknown'
+                            } : null;
+
+                            const eWayInfo = eWayFile ? {
+                                filename: eWayFile.filename,
+                                originalName: eWayFile.originalname,
+                                mimeType: eWayFile.mimetype,
+                                size: eWayFile.size,
+                                path: `uploads/e-way/${eWayFile.filename}`,
+                                uploadDate: new Date().toISOString(),
+                                uploadedBy: req.query.userId || 'unknown'
+                            } : null;
+
+                            if (invoiceInfo || eWayInfo) {
+                                const updateInvoiceSql = 'UPDATE gc_creation SET invoice_attachment = ?, e_way_attachment = ? WHERE GcNumber = ? AND CompanyId = ?';
+                                db.query(updateInvoiceSql, [invoiceInfo ? JSON.stringify(invoiceInfo) : null, eWayInfo ? JSON.stringify(eWayInfo) : null, GcNumber, CompanyId], (invErr) => {
+                                    if (invErr) {
+                                        console.error(`[${new Date().toISOString()}] [${requestId}] Error updating invoice/e-way attachments:`, invErr);
+                                    } else {
+                                        console.log(`[${new Date().toISOString()}] [${requestId}] Successfully updated invoice/e-way attachments`);
+                                    }
+
+                                    console.log(`[${new Date().toISOString()}] [${requestId}] Response: 200 - GC updated successfully`);
+                                    return res.status(200).json({
+                                        success: true,
+                                        message: 'GC updated successfully',
+                                        data: {
+                                            GcNumber,
+                                            CompanyId,
+                                            updated: true,
+                                            attachments: attachmentFiles,
+                                            attachmentCount: attachmentFiles.length,
+                                            invoiceAttachment: invoiceInfo,
+                                            eWayAttachment: eWayInfo
+                                        },
+                                        requestId
+                                    });
+                                });
+                            } else {
+                                console.log(`[${new Date().toISOString()}] [${requestId}] Response: 200 - GC updated successfully`);
+                                return res.status(200).json({
+                                    success: true,
+                                    message: 'GC updated successfully',
+                                    data: {
+                                        GcNumber,
+                                        CompanyId,
+                                        updated: true,
+                                        attachments: attachmentFiles,
+                                        attachmentCount: attachmentFiles.length,
+                                        invoiceAttachment: null,
+                                        eWayAttachment: null
+                                    },
+                                    requestId
+                                });
+                            }
+                        });
+                    });
+                } else {
+                    const invoiceFile = req.files && req.files.invoice && req.files.invoice[0] ? req.files.invoice[0] : null;
+                    const eWayFile = req.files && req.files.e_way && req.files.e_way[0] ? req.files.e_way[0] : null;
+
+                    const invoiceInfo = invoiceFile ? {
+                        filename: invoiceFile.filename,
+                        originalName: invoiceFile.originalname,
+                        mimeType: invoiceFile.mimetype,
+                        size: invoiceFile.size,
+                        path: `uploads/invoice/${invoiceFile.filename}`,
+                        uploadDate: new Date().toISOString(),
+                        uploadedBy: req.query.userId || 'unknown'
+                    } : null;
+
+                    const eWayInfo = eWayFile ? {
+                        filename: eWayFile.filename,
+                        originalName: eWayFile.originalname,
+                        mimeType: eWayFile.mimetype,
+                        size: eWayFile.size,
+                        path: `uploads/e-way/${eWayFile.filename}`,
+                        uploadDate: new Date().toISOString(),
+                        uploadedBy: req.query.userId || 'unknown'
+                    } : null;
+
+                    if (invoiceInfo || eWayInfo) {
+                        const updateInvoiceSql = 'UPDATE gc_creation SET invoice_attachment = ?, e_way_attachment = ? WHERE GcNumber = ? AND CompanyId = ?';
+                        db.query(updateInvoiceSql, [invoiceInfo ? JSON.stringify(invoiceInfo) : null, eWayInfo ? JSON.stringify(eWayInfo) : null, GcNumber, CompanyId], (invErr) => {
+                            if (invErr) {
+                                console.error(`[${new Date().toISOString()}] [${requestId}] Error updating invoice/e-way attachments:`, invErr);
+                            } else {
+                                console.log(`[${new Date().toISOString()}] [${requestId}] Successfully updated invoice/e-way attachments`);
+                            }
+
                             console.log(`[${new Date().toISOString()}] [${requestId}] Response: 200 - GC updated successfully`);
                             return res.status(200).json({
                                 success: true,
@@ -700,34 +1060,42 @@ router.put('/updateGC/:GcNumber', gcUpload.array('attachments', 10), (req, res) 
                                     GcNumber,
                                     CompanyId,
                                     updated: true,
-                                    attachments: attachmentFiles,
-                                    attachmentCount: attachmentFiles.length
+                                    attachments: [],
+                                    attachmentCount: 0,
+                                    invoiceAttachment: invoiceInfo,
+                                    eWayAttachment: eWayInfo
                                 },
                                 requestId
                             });
                         });
-                    });
-                } else {
-                    console.log(`[${new Date().toISOString()}] [${requestId}] Response: 200 - GC updated successfully`);
-                    return res.status(200).json({
-                        success: true,
-                        message: 'GC updated successfully',
-                        data: {
-                            GcNumber,
-                            CompanyId,
-                            updated: true,
-                            attachments: [],
-                            attachmentCount: 0
-                        },
-                        requestId
-                    });
+                    } else {
+                        console.log(`[${new Date().toISOString()}] [${requestId}] Response: 200 - GC updated successfully`);
+                        return res.status(200).json({
+                            success: true,
+                            message: 'GC updated successfully',
+                            data: {
+                                GcNumber,
+                                CompanyId,
+                                updated: true,
+                                attachments: [],
+                                attachmentCount: 0,
+                                invoiceAttachment: null,
+                                eWayAttachment: null
+                            },
+                            requestId
+                        });
+                    }
                 }
             });
         }
     );
 });
 
-router.post('/add', gcUpload.array('attachments', 10), (req, res) => {
+router.post('/add', gcUpload.fields([
+    { name: 'attachments', maxCount: 10 },
+    { name: 'invoice', maxCount: 1 },
+    { name: 'e_way', maxCount: 1 }
+]), (req, res) => {
     const requestId = `GC_ADD_${Date.now()}`;
     const requestStartTime = new Date();
     
@@ -840,7 +1208,7 @@ router.post('/add', gcUpload.array('attachments', 10), (req, res) => {
             GoodContain, GoodContain2, GoodContain3, GoodContain4, Rate, Total, Rate2, Total2, Rate3, Total3, Rate4, Total4, 
             PoNumber, TripId, DeliveryFromSpecial, DeliveryAddress, ServiceTax, ReceiptBillNo, ReceiptBillNoAmount, 
             ReceiptBillNoDate, TotalRate, TotalWeight, HireAmount, AdvanceAmount, BalanceAmount, FreightCharge, 
-            Day1, Day1Place, Day2, Day3, Day4, Day5, Day6, Day7, Day8, CompanyId, branch_id
+            Day1, Day1Place, Day2, Day3, Day4, Day5, Day6, Day7, Day8, CompanyId, branch_id, booking_officer_name
         } = gcData;
 
         // Input validation
@@ -978,6 +1346,7 @@ router.post('/add', gcUpload.array('attachments', 10), (req, res) => {
                 Day1Place,
                 CompanyId,
                 branch_id,
+                booking_officer_name,
                 send_to_tally: 'no'
             };
 
@@ -1028,15 +1397,28 @@ router.post('/add', gcUpload.array('attachments', 10), (req, res) => {
                 
                 // Process uploaded files if any
                 let attachmentFiles = [];
-                if (req.files && req.files.length > 0) {
-                    attachmentFiles = req.files.map(file => ({
-                        filename: file.filename,
-                        originalName: file.originalname,
-                        mimeType: file.mimetype,
-                        size: file.size,
-                        uploadDate: new Date().toISOString(),
-                        uploadedBy: userId
-                    }));
+                const attachmentFileArray = req.files && Array.isArray(req.files) ? req.files : (req.files && req.files.attachments) ? req.files.attachments : [];
+                if (attachmentFileArray && attachmentFileArray.length > 0) {
+                    attachmentFiles = attachmentFileArray.map((file, index) => {
+                        // Determine attachment type from body if provided (per-file type array or single type)
+                        let attachmentType = null;
+                        const bodyTypes = req.body.attachmentTypes || req.body.attachmentType;
+                        if (Array.isArray(bodyTypes)) {
+                            attachmentType = bodyTypes[index] || null;
+                        } else if (typeof bodyTypes === 'string') {
+                            attachmentType = bodyTypes;
+                        }
+
+                        return {
+                            filename: file.filename,
+                            originalName: file.originalname,
+                            mimeType: file.mimetype,
+                            size: file.size,
+                            uploadDate: new Date().toISOString(),
+                            uploadedBy: userId,
+                            type: attachmentType
+                        };
+                    });
 
                     // Update the GC record with attachment information
                     const updateSql = 'UPDATE gc_creation SET attachment_files = ?, attachment_count = ? WHERE Id = ? AND CompanyId = ?';
@@ -1044,6 +1426,39 @@ router.post('/add', gcUpload.array('attachments', 10), (req, res) => {
                         if (updateErr) {
                             console.error(`[${new Date().toISOString()}] [${requestId}] Error updating GC with attachments:`, updateErr);
                             // Don't fail the request, just log the error
+                        }
+                    });
+                }
+
+                // Handle invoice and e-way attachments separately
+                const invoiceFile = req.files && req.files.invoice && req.files.invoice[0] ? req.files.invoice[0] : null;
+                const eWayFile = req.files && req.files.e_way && req.files.e_way[0] ? req.files.e_way[0] : null;
+
+                const invoiceInfo = invoiceFile ? {
+                    filename: invoiceFile.filename,
+                    originalName: invoiceFile.originalname,
+                    mimeType: invoiceFile.mimetype,
+                    size: invoiceFile.size,
+                    path: `uploads/invoice/${invoiceFile.filename}`,
+                    uploadDate: new Date().toISOString(),
+                    uploadedBy: userId
+                } : null;
+
+                const eWayInfo = eWayFile ? {
+                    filename: eWayFile.filename,
+                    originalName: eWayFile.originalname,
+                    mimeType: eWayFile.mimetype,
+                    size: eWayFile.size,
+                    path: `uploads/e-way/${eWayFile.filename}`,
+                    uploadDate: new Date().toISOString(),
+                    uploadedBy: userId
+                } : null;
+
+                if (invoiceInfo || eWayInfo) {
+                    const updateInvoiceSql = 'UPDATE gc_creation SET invoice_attachment = ?, e_way_attachment = ? WHERE Id = ? AND CompanyId = ?';
+                    db.query(updateInvoiceSql, [invoiceInfo ? JSON.stringify(invoiceInfo) : null, eWayInfo ? JSON.stringify(eWayInfo) : null, result.insertId, companyId], (invErr) => {
+                        if (invErr) {
+                            console.error(`[${new Date().toISOString()}] [${requestId}] Error updating invoice/e-way attachments:`, invErr);
                         }
                     });
                 }

@@ -21,6 +21,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   String? _successMessage;
+  bool _showOldPassword = false;
+  bool _showNewPassword = false;
+  bool _showConfirmPassword = false;
 
   Future<void> _changePassword() async {
     if (!_formKey.currentState!.validate()) return;
@@ -114,11 +117,23 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         children: [
                           TextFormField(
                             controller: _oldPasswordController,
-                            obscureText: true,
-                            decoration: const InputDecoration(
+                            obscureText: !_showOldPassword,
+                            decoration: InputDecoration(
                               labelText: 'Current Password',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.lock_outline),
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _showOldPassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _showOldPassword = !_showOldPassword;
+                                  });
+                                },
+                              ),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -130,11 +145,23 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           const SizedBox(height: 16),
                           TextFormField(
                             controller: _newPasswordController,
-                            obscureText: true,
-                            decoration: const InputDecoration(
+                            obscureText: !_showNewPassword,
+                            decoration: InputDecoration(
                               labelText: 'New Password',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.lock_reset),
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.lock_reset),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _showNewPassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _showNewPassword = !_showNewPassword;
+                                  });
+                                },
+                              ),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -149,11 +176,24 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           const SizedBox(height: 16),
                           TextFormField(
                             controller: _confirmPasswordController,
-                            obscureText: true,
-                            decoration: const InputDecoration(
+                            obscureText: !_showConfirmPassword,
+                            decoration: InputDecoration(
                               labelText: 'Confirm New Password',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.lock_reset),
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.lock_reset),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _showConfirmPassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _showConfirmPassword =
+                                        !_showConfirmPassword;
+                                  });
+                                },
+                              ),
                             ),
                             validator: (value) {
                               if (value != _newPasswordController.text) {

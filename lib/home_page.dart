@@ -70,15 +70,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final totalGCs = _gcList.length.toDouble();
     final totalHireAmount = _gcList.fold(
       0.0,
-          (sum, gc) => sum + _parseDouble(gc['HireAmount']),
+      (sum, gc) => sum + _parseDouble(gc['HireAmount']),
     );
     final totalAdvanceAmount = _gcList.fold(
       0.0,
-          (sum, gc) => sum + _parseDouble(gc['AdvanceAmount']),
+      (sum, gc) => sum + _parseDouble(gc['AdvanceAmount']),
     );
     final totalFreightCharge = _gcList.fold(
       0.0,
-          (sum, gc) => sum + _parseDouble(gc['FreightCharge']),
+      (sum, gc) => sum + _parseDouble(gc['FreightCharge']),
     );
 
     // Debug logging for displayed count
@@ -99,18 +99,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       );
       _totalAdvanceAnim = Tween<double>(begin: 0, end: totalAdvanceAmount)
           .animate(
-        CurvedAnimation(
-          parent: _animationController,
-          curve: Curves.easeOutCubic,
-        ),
-      );
+            CurvedAnimation(
+              parent: _animationController,
+              curve: Curves.easeOutCubic,
+            ),
+          );
       _totalFreightAnim = Tween<double>(begin: 0, end: totalFreightCharge)
           .animate(
-        CurvedAnimation(
-          parent: _animationController,
-          curve: Curves.easeOutCubic,
-        ),
-      );
+            CurvedAnimation(
+              parent: _animationController,
+              curve: Curves.easeOutCubic,
+            ),
+          );
     });
     _animationController.forward(from: 0);
   }
@@ -137,15 +137,25 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
         // Debug logging to identify count discrepancy
         debugPrint('🏠 [HomePage] API Response received: ${data.length} GCs');
-        debugPrint('🏠 [HomePage] Raw response body length: ${response.body.length}');
-        debugPrint('🏠 [HomePage] First few GCs: ${data.take(3).map((gc) => gc['GcNumber'] ?? 'Unknown').toList()}');
+        debugPrint(
+          '🏠 [HomePage] Raw response body length: ${response.body.length}',
+        );
+        debugPrint(
+          '🏠 [HomePage] First few GCs: ${data.take(3).map((gc) => gc['GcNumber'] ?? 'Unknown').toList()}',
+        );
 
         // Check for null or invalid records
-        final validData = data.where((item) => item != null && item is Map).toList();
-        debugPrint('🏠 [HomePage] Valid GCs after filtering: ${validData.length}');
+        final validData = data
+            .where((item) => item != null && item is Map)
+            .toList();
+        debugPrint(
+          '🏠 [HomePage] Valid GCs after filtering: ${validData.length}',
+        );
 
         if (validData.length != data.length) {
-          debugPrint('🏠 [HomePage] Found ${data.length - validData.length} null/invalid records');
+          debugPrint(
+            '🏠 [HomePage] Found ${data.length - validData.length} null/invalid records',
+          );
         }
 
         setState(() {
@@ -192,7 +202,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return '₹${amount.toStringAsFixed(0)}';
   }
 
-  Future<void>  _checkGCAccessAndNavigate({bool toForm = false}) async {
+  Future<void> _checkGCAccessAndNavigate({bool toForm = false}) async {
     final idController = Get.find<IdController>();
     final userId = idController.userId.value;
 
@@ -500,24 +510,24 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         children: cards
             .map(
               (card) => Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: card,
-            ),
-          ),
-        )
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: card,
+                ),
+              ),
+            )
             .toList(),
       );
     }
   }
 
   Widget _buildSummaryCard(
-      String title,
-      Animation<double> animation,
-      IconData icon,
-      Color color, {
-        bool isCount = false,
-      }) {
+    String title,
+    Animation<double> animation,
+    IconData icon,
+    Color color, {
+    bool isCount = false,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -541,11 +551,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 18,
-              ),
+              child: Icon(icon, color: color, size: 18),
             ),
             const SizedBox(height: 16),
             AnimatedBuilder(
@@ -581,10 +587,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildQuickActionsSection(
-      BuildContext context,
-      bool isSmallScreen,
-      bool isAdmin,
-      ) {
+    BuildContext context,
+    bool isSmallScreen,
+    bool isAdmin,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -623,10 +629,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildActionGrid(
-      BuildContext context,
-      bool isSmallScreen,
-      bool isAdmin,
-      ) {
+    BuildContext context,
+    bool isSmallScreen,
+    bool isAdmin,
+  ) {
     final primaryActions = [
       _ActionData(
         icon: Icons.note_add_outlined,
@@ -666,50 +672,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         ),
     ];
 
-    final managementActions = isAdmin
-        ? [
-      _ActionData(
-        icon: Icons.assignment_outlined,
-        title: 'GC Assignment',
-        subtitle: 'Assign GC ranges',
-        color: const Color(0xFF8E24AA),
-        onTap: () => Get.toNamed(AppRoutes.gcAssignment),
-      ),
-      _ActionData(
-        icon: Icons.local_shipping_outlined,
-        title: 'Truck Management',
-        subtitle: 'Fleet operations',
-        color: const Color(0xFF5D4037),
-        onTap: () => Get.toNamed(AppRoutes.truckList),
-      ),
-      _ActionData(
-        icon: Icons.speed_outlined,
-        title: 'KM Management',
-        subtitle: 'Distance tracking',
-        color: const Color(0xFF00BFA5),
-        onTap: () => Get.toNamed(AppRoutes.kmList),
-      ),
-      _ActionData(
-        icon: Icons.location_on_outlined,
-        title: 'Locations',
-        subtitle: 'Manage locations',
-        color: const Color(0xFF9C27B0),
-        onTap: () => Get.toNamed(AppRoutes.locationList),
-      ),
-      _ActionData(
-        icon: Icons.people_outline,
-        title: 'Customers',
-        subtitle: 'Customer management',
-        color: const Color(0xFFFF9800),
-        onTap: () => Get.toNamed(AppRoutes.customerList),
-      ),
-      _ActionData(
-        icon: Icons.inventory_outlined,
-        title: 'Suppliers',
-        subtitle: 'Supplier management',
-        color: const Color(0xFF795548),
-        onTap: () => Get.toNamed(AppRoutes.supplierList),
-      ),
+    // Common management actions accessible to both admin and normal users
+    final commonManagementActions = [
       _ActionData(
         icon: Icons.person_outline,
         title: 'Drivers',
@@ -731,62 +695,109 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         color: const Color(0xFF0288D1),
         onTap: () => Get.toNamed(AppRoutes.consigneeList),
       ),
-      _ActionData(
-        icon: Icons.business_outlined,
-        title: 'Branch Management',
-        subtitle: 'Manage branches',
-        color: const Color(0xFF9C27B0),
-        onTap: () => Get.toNamed(AppRoutes.branchList),
-      ),
-      _ActionData(
-        icon: Icons.assignment_ind_outlined,
-        title: 'Broker Management',
-        subtitle: 'Broker operations',
-        color: const Color(0xFF9C27B0),
-        onTap: () => Get.toNamed(AppRoutes.brokerList),
-      ),
-      _ActionData(
-        icon: Icons.people_alt_outlined,
-        title: 'User Management',
-        subtitle: 'User administration',
-        color: const Color(0xFF8BC34A),
-        onTap: () => Get.toNamed(AppRoutes.userManagement),
-      ),
-      _ActionData(
-        icon: Icons.scale_outlined,
-        title: 'Weight Management',
-        subtitle: 'Weight & rates',
-        color: const Color(0xFF607D8B),
-        onTap: () => Get.toNamed(AppRoutes.weightRateList),
-      ),
-      _ActionData(
-        icon: Icons.receipt_long_outlined,
-        title: 'GST Management',
-        subtitle: 'Tax management',
-        color: const Color(0xFF37474F),
-        onTap: () => Get.toNamed(AppRoutes.gstList),
-      ),
-      _ActionData(
-        icon: Icons.settings_outlined,
-        title: 'Settings',
-        subtitle: 'App configuration',
-        color: const Color(0xFF757575),
-        onTap: () => Get.toNamed(AppRoutes.settings),
-      ),
-    ]
-        : [
-      _ActionData(
-        icon: Icons.settings_outlined,
-        title: 'Settings',
-        subtitle: 'App configuration',
-        color: const Color(0xFF757575),
-        onTap: () => Get.toNamed(AppRoutes.settings),
-      ),
     ];
+
+    // Additional management actions only for admin users
+    final managementActions = isAdmin
+        ? [
+            _ActionData(
+              icon: Icons.assignment_outlined,
+              title: 'GC Assignment',
+              subtitle: 'Assign GC ranges',
+              color: const Color(0xFF8E24AA),
+              onTap: () => Get.toNamed(AppRoutes.gcAssignment),
+            ),
+            _ActionData(
+              icon: Icons.local_shipping_outlined,
+              title: 'Truck Management',
+              subtitle: 'Fleet operations',
+              color: const Color(0xFF5D4037),
+              onTap: () => Get.toNamed(AppRoutes.truckList),
+            ),
+            _ActionData(
+              icon: Icons.speed_outlined,
+              title: 'KM Management',
+              subtitle: 'Distance tracking',
+              color: const Color(0xFF00BFA5),
+              onTap: () => Get.toNamed(AppRoutes.kmList),
+            ),
+            _ActionData(
+              icon: Icons.location_on_outlined,
+              title: 'Locations',
+              subtitle: 'Manage locations',
+              color: const Color(0xFF9C27B0),
+              onTap: () => Get.toNamed(AppRoutes.locationList),
+            ),
+            _ActionData(
+              icon: Icons.people_outline,
+              title: 'Customers',
+              subtitle: 'Customer management',
+              color: const Color(0xFFFF9800),
+              onTap: () => Get.toNamed(AppRoutes.customerList),
+            ),
+            _ActionData(
+              icon: Icons.inventory_outlined,
+              title: 'Suppliers',
+              subtitle: 'Supplier management',
+              color: const Color(0xFF795548),
+              onTap: () => Get.toNamed(AppRoutes.supplierList),
+            ),
+            _ActionData(
+              icon: Icons.business_outlined,
+              title: 'Branch Management',
+              subtitle: 'Manage branches',
+              color: const Color(0xFF9C27B0),
+              onTap: () => Get.toNamed(AppRoutes.branchList),
+            ),
+            _ActionData(
+              icon: Icons.assignment_ind_outlined,
+              title: 'Broker Management',
+              subtitle: 'Broker operations',
+              color: const Color(0xFF9C27B0),
+              onTap: () => Get.toNamed(AppRoutes.brokerList),
+            ),
+            _ActionData(
+              icon: Icons.people_alt_outlined,
+              title: 'User Management',
+              subtitle: 'User administration',
+              color: const Color(0xFF8BC34A),
+              onTap: () => Get.toNamed(AppRoutes.userManagement),
+            ),
+            _ActionData(
+              icon: Icons.scale_outlined,
+              title: 'Weight Management',
+              subtitle: 'Weight & rates',
+              color: const Color(0xFF607D8B),
+              onTap: () => Get.toNamed(AppRoutes.weightRateList),
+            ),
+            _ActionData(
+              icon: Icons.receipt_long_outlined,
+              title: 'GST Management',
+              subtitle: 'Tax management',
+              color: const Color(0xFF37474F),
+              onTap: () => Get.toNamed(AppRoutes.gstList),
+            ),
+            _ActionData(
+              icon: Icons.settings_outlined,
+              title: 'Settings',
+              subtitle: 'App configuration',
+              color: const Color(0xFF757575),
+              onTap: () => Get.toNamed(AppRoutes.settings),
+            ),
+          ]
+        : [
+            _ActionData(
+              icon: Icons.settings_outlined,
+              title: 'Settings',
+              subtitle: 'App configuration',
+              color: const Color(0xFF757575),
+              onTap: () => Get.toNamed(AppRoutes.settings),
+            ),
+          ];
 
     // Show limited actions initially
     final actionsToShow = _showAllActions
-        ? [...primaryActions, ...managementActions]
+        ? [...primaryActions, ...commonManagementActions, ...managementActions]
         : primaryActions;
 
     return Column(
@@ -963,7 +974,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 16),
             ...notifications.map(
-                  (notification) => _buildNotificationItem(notification),
+              (notification) => _buildNotificationItem(notification),
             ),
           ],
         ),
@@ -1082,11 +1093,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildStatItem(
-      String title,
-      String value,
-      IconData icon,
-      Color color,
-      ) {
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(

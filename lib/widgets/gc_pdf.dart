@@ -1099,7 +1099,24 @@ class GCPdfGenerator {
                                   pw.Expanded(
                                     child: pw.Center(
                                       child: pw.Text(
-                                        controller.actualWeightCtrl.text,
+                                        (() {
+                                          final raw = controller
+                                              .actualWeightCtrl
+                                              .text
+                                              .trim();
+                                          if (raw.isEmpty) return '';
+
+                                          final cleaned = raw.replaceAll(
+                                            RegExp(r'[^0-9\.]'),
+                                            '',
+                                          );
+                                          final parsed = double.tryParse(
+                                            cleaned,
+                                          );
+                                          if (parsed == null) return raw;
+
+                                          return parsed.toStringAsFixed(3);
+                                        })(),
                                         style: pw.TextStyle(
                                           font: font,
                                           fontSize: 9,

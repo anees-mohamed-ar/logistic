@@ -20,6 +20,7 @@ class DriverManagementPage extends StatefulWidget {
 class _DriverManagementPageState extends State<DriverManagementPage> {
   final String baseUrl = '${ApiConfig.baseUrl}/driver';
   final _formKey = GlobalKey<FormState>();
+  final _formSectionKey = GlobalKey();
   final _nameController = TextEditingController();
   final _dlNumberController = TextEditingController();
   final _addressController = TextEditingController();
@@ -253,13 +254,16 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
       _mobileController.text = driver['mobileNumber'] ?? '';
       _panController.text = driver['panNumber'] ?? '';
     });
-
-    // Scroll to form
-    Scrollable.ensureVisible(
-      context,
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeInOut,
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final formContext = _formSectionKey.currentContext;
+      if (formContext != null) {
+        Scrollable.ensureVisible(
+          formContext,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
   }
 
   void _resetForm() {
@@ -337,6 +341,7 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
           children: [
             // Add Driver Form
             Card(
+              key: _formSectionKey,
               elevation: 2,
               child: Padding(
                 padding: const EdgeInsets.all(16.0),

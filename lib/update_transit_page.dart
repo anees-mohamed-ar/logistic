@@ -26,22 +26,27 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
   final List<DateTime?> transitDates = List.filled(8, null);
   final List<TextEditingController> placeControllers = List.generate(
     8,
-        (_) => TextEditingController(),
+    (_) => TextEditingController(),
   );
 
   final TextEditingController searchCtrl = TextEditingController();
   final TextEditingController reportRemarksController = TextEditingController();
+  DateTime? reportDate;
+  TimeOfDay? reportTime;
   DateTime? unloadedDate;
   TimeOfDay? unloadedTime;
-  final TextEditingController unloadedRemarksController = TextEditingController();
+  final TextEditingController unloadedRemarksController =
+      TextEditingController();
   DateTime? receiptDate;
   TimeOfDay? receiptTime;
-  final TextEditingController receiptRemarksController = TextEditingController();
+  final TextEditingController receiptRemarksController =
+      TextEditingController();
 
   bool isSaving = false;
   bool isLoadingGc = false;
   int lastEditableTransitIndex = 7;
   bool isReportRemarksEditable = true;
+  bool isReportTimeEditable = true;
   bool isUnloadedDateEditable = true;
   bool isUnloadedTimeEditable = true;
   bool isUnloadedRemarksEditable = true;
@@ -98,13 +103,39 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
           gcDetails = null;
         });
       } else {
-        _showErrorSnackbar('Failed to fetch GC numbers: ${response.statusCode}');
+        _showErrorSnackbar(
+          'Failed to fetch GC numbers: ${response.statusCode}',
+        );
       }
     } catch (e) {
       _showErrorSnackbar('Error fetching GC numbers: $e');
     } finally {
       setState(() {
         isLoadingGc = false;
+      });
+    }
+  }
+
+  Future<void> pickReportDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: reportDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: primaryColor),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        reportDate = picked;
       });
     }
   }
@@ -133,9 +164,9 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       };
 
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/gc/search').replace(
-          queryParameters: queryParameters,
-        ),
+        Uri.parse(
+          '${ApiConfig.baseUrl}/gc/search',
+        ).replace(queryParameters: queryParameters),
       );
 
       if (response.statusCode == 200) {
@@ -143,7 +174,8 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
 
         if (responseData is List && responseData.isNotEmpty) {
           final gcData = responseData.firstWhere(
-                (item) => item is Map<String, dynamic> &&
+            (item) =>
+                item is Map<String, dynamic> &&
                 item['GcNumber']?.toString() == gcNumber,
             orElse: () => responseData[0],
           );
@@ -157,7 +189,9 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
           }
         }
 
-        if (responseData is List && responseData.isNotEmpty && responseData[0]['Id'] != null) {
+        if (responseData is List &&
+            responseData.isNotEmpty &&
+            responseData[0]['Id'] != null) {
           final gcId = responseData[0]['Id'];
           final detailResponse = await http.get(
             Uri.parse('${ApiConfig.baseUrl}/gc/search/$gcId').replace(
@@ -172,7 +206,8 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
             final detailData = jsonDecode(detailResponse.body);
             if (detailData is List && detailData.isNotEmpty) {
               final specificGcData = detailData.firstWhere(
-                    (item) => item is Map<String, dynamic> &&
+                (item) =>
+                    item is Map<String, dynamic> &&
                     item['GcNumber']?.toString() == gcNumber,
                 orElse: () => detailData[0],
               );
@@ -205,6 +240,8 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
     }
     transitDates.fillRange(0, 8, null);
     reportRemarksController.clear();
+    reportDate = null;
+    reportTime = null;
     unloadedRemarksController.clear();
     receiptRemarksController.clear();
     unloadedDate = null;
@@ -226,20 +263,22 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
 
         if (gcDetails!.containsKey(dayKey) && gcDetails![dayKey] != null) {
           try {
-            transitDates[i-1] = DateTime.tryParse(gcDetails![dayKey].toString());
+            transitDates[i - 1] = DateTime.tryParse(
+              gcDetails![dayKey].toString(),
+            );
           } catch (e) {
             print('Error parsing date for $dayKey: ${gcDetails![dayKey]}');
           }
         }
 
         if (gcDetails!.containsKey(placeKey)) {
-          placeControllers[i-1].text = gcDetails![placeKey]?.toString() ?? '';
+          placeControllers[i - 1].text = gcDetails![placeKey]?.toString() ?? '';
 
-          if (placeControllers[i-1].text.trim().isNotEmpty &&
+          if (placeControllers[i - 1].text.trim().isNotEmpty &&
               gcDetails!.containsKey('TruckTo') &&
-              placeControllers[i-1].text.trim().toLowerCase() ==
+              placeControllers[i - 1].text.trim().toLowerCase() ==
                   gcDetails!['TruckTo']?.toString().trim().toLowerCase()) {
-            lastEditableTransitIndex = i-1;
+            lastEditableTransitIndex = i - 1;
           }
         }
       }
@@ -252,6 +291,11 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       }
 
       // Parse other dates and fields
+      if (gcDetails!.containsKey('ReportDate') &&
+          gcDetails!['ReportDate'] != null) {
+        reportDate = DateTime.tryParse(gcDetails!['ReportDate'].toString());
+      }
+
       if (gcDetails!.containsKey('UnloadedDate') &&
           gcDetails!['UnloadedDate'] != null) {
         unloadedDate = DateTime.tryParse(gcDetails!['UnloadedDate'].toString());
@@ -259,17 +303,23 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
 
       if (gcDetails!.containsKey('NewReceiptDate') &&
           gcDetails!['NewReceiptDate'] != null) {
-        receiptDate = DateTime.tryParse(gcDetails!['NewReceiptDate'].toString());
+        receiptDate = DateTime.tryParse(
+          gcDetails!['NewReceiptDate'].toString(),
+        );
       }
 
-      reportRemarksController.text = gcDetails!['ReportRemarks']?.toString() ?? '';
-      unloadedRemarksController.text = gcDetails!['UnloadedRemark']?.toString() ?? '';
-      receiptRemarksController.text = gcDetails!['ReceiptRemarks']?.toString() ?? '';
+      reportRemarksController.text =
+          gcDetails!['ReportRemarks']?.toString() ?? '';
+      unloadedRemarksController.text =
+          gcDetails!['UnloadedRemark']?.toString() ?? '';
+      receiptRemarksController.text =
+          gcDetails!['ReceiptRemarks']?.toString() ?? '';
 
       final now = DateTime.now();
-      isUnloadedDateEditable = unloadedDate == null || unloadedDate!.isAfter(now);
+      isReportTimeEditable = true;
+      isUnloadedDateEditable =
+          unloadedDate == null || unloadedDate!.isAfter(now);
       isReceiptDateEditable = receiptDate == null || receiptDate!.isAfter(now);
-
     } catch (e) {
       print('Error processing GC details: $e');
       _showErrorSnackbar('Error processing GC details: ${e.toString()}');
@@ -331,9 +381,9 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: primaryColor,
-            ),
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: primaryColor),
           ),
           child: child!,
         );
@@ -359,9 +409,9 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: primaryColor,
-            ),
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: primaryColor),
           ),
           child: child!,
         );
@@ -382,9 +432,9 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: primaryColor,
-            ),
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: primaryColor),
           ),
           child: child!,
         );
@@ -407,9 +457,9 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: primaryColor,
-            ),
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: primaryColor),
           ),
           child: child!,
         );
@@ -430,9 +480,9 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: primaryColor,
-            ),
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: primaryColor),
           ),
           child: child!,
         );
@@ -1326,9 +1376,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
         'ReportRemarks': reportRemarksController.text.isNotEmpty
             ? reportRemarksController.text
             : null,
-        'ReportDate': reportRemarksController.text.isNotEmpty
-            ? formatDate(DateTime.now())
-            : null,
+        'ReportDate': reportDate != null ? formatDate(reportDate) : null,
         'UnloadedDate': unloadedDate != null ? formatDate(unloadedDate) : null,
         'NewReceiptDate': receiptDate != null ? formatDate(receiptDate) : null,
         'UnloadedRemark': unloadedRemarksController.text.isNotEmpty
@@ -1339,28 +1387,43 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
 
       payload.removeWhere((key, value) => value == null);
 
-      final url = '${ApiConfig.baseUrl}/gc/update/${gcDetails!['Id']}/${gcDetails!['GcNumber']}';
-      print('Sending PUT request to: $url');
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
 
-      final response = await http.put(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode(payload),
-      ).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          throw TimeoutException('Request timed out after 30 seconds');
-        },
-      );
+      final uri =
+          Uri.parse(
+            '${ApiConfig.baseUrl}/gc/update/${gcDetails!['Id']}/${gcDetails!['GcNumber']}',
+          ).replace(
+            queryParameters: {
+              'companyId': companyId,
+              if (branchId.isNotEmpty) 'branchId': branchId,
+            },
+          );
+      print('Sending PUT request to: $uri');
+
+      final response = await http
+          .put(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode(payload),
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw TimeoutException('Request timed out after 30 seconds');
+            },
+          );
 
       if (response.statusCode == 200) {
         await fetchGcDetails(selectedGcNumber!);
         _showSuccessSnackbar('Transit details updated successfully');
       } else {
-        throw Exception('Failed to update: ${response.statusCode} - ${response.body}');
+        throw Exception(
+          'Failed to update: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
       print('Error updating transit details: $e');
@@ -1444,7 +1507,10 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                           prefixIcon: Icon(Icons.search, color: primaryColor),
                           hintText: 'Search GC Numbers...',
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
                         ),
                         onChanged: (q) {
                           setState(() {
@@ -1461,50 +1527,74 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                   Expanded(
                     child: filtered.isEmpty
                         ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.search_off, size: 48, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text(
-                            'No GC numbers found',
-                            style: TextStyle(color: Colors.grey, fontSize: 16),
-                          ),
-                        ],
-                      ),
-                    )
-                        : ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final val = filtered[index];
-                        final selected = val == current;
-                        return Container(
-                          decoration: BoxDecoration(
-                            color: selected ? primaryColor.withOpacity(0.1) : null,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            title: Text(
-                              val,
-                              style: TextStyle(
-                                color: selected ? primaryColor : Colors.black87,
-                                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                              ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.search_off,
+                                  size: 48,
+                                  color: Colors.grey,
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  'No GC numbers found',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
                             ),
-                            trailing: selected
-                                ? const Icon(Icons.check_circle, color: primaryColor)
-                                : const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-                            onTap: () {
-                              searchCtrl.clear();
-                              Navigator.of(ctx).pop(val);
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            itemCount: filtered.length,
+                            separatorBuilder: (_, __) =>
+                                const Divider(height: 1),
+                            itemBuilder: (context, index) {
+                              final val = filtered[index];
+                              final selected = val == current;
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? primaryColor.withOpacity(0.1)
+                                      : null,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                  title: Text(
+                                    val,
+                                    style: TextStyle(
+                                      color: selected
+                                          ? primaryColor
+                                          : Colors.black87,
+                                      fontWeight: selected
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                  trailing: selected
+                                      ? const Icon(
+                                          Icons.check_circle,
+                                          color: primaryColor,
+                                        )
+                                      : const Icon(
+                                          Icons.arrow_forward_ios,
+                                          size: 16,
+                                          color: Colors.grey,
+                                        ),
+                                  onTap: () {
+                                    searchCtrl.clear();
+                                    Navigator.of(ctx).pop(val);
+                                  },
+                                ),
+                              );
                             },
                           ),
-                        );
-                      },
-                    ),
                   ),
                 ],
               ),
@@ -1548,7 +1638,9 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
               onPressed: downloadPDF,
               style: IconButton.styleFrom(
                 backgroundColor: Colors.white.withOpacity(0.2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),
@@ -1576,7 +1668,10 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                           children: [
                             CircularProgressIndicator(color: primaryColor),
                             SizedBox(height: 16),
-                            Text('Loading GC details...', style: TextStyle(color: Colors.grey)),
+                            Text(
+                              'Loading GC details...',
+                              style: TextStyle(color: Colors.grey),
+                            ),
                           ],
                         ),
                       ),
@@ -1598,10 +1693,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                 title: 'Transit Journey',
                 icon: Icons.route,
                 child: Column(
-                  children: [
-                    const SizedBox(height: 16),
-                    _buildTransitDays(),
-                  ],
+                  children: [const SizedBox(height: 16), _buildTransitDays()],
                 ),
               ),
 
@@ -1614,6 +1706,39 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                 child: Column(
                   children: [
                     const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildDateSelector(
+                            date: reportDate,
+                            onTap: () => pickReportDate(context),
+                            enabled: true,
+                          ),
+                        ),
+                        // const SizedBox(width: 12),
+                        // Expanded(
+                        //   child: _buildTimeSelector(
+                        //     time: reportTime,
+                        //     onTap: isReportTimeEditable
+                        //         ? () async {
+                        //             final picked = await showTimePicker(
+                        //               context: context,
+                        //               initialTime:
+                        //                   reportTime ?? TimeOfDay.now(),
+                        //             );
+                        //             if (picked != null) {
+                        //               setState(() {
+                        //                 reportTime = picked;
+                        //               });
+                        //             }
+                        //           }
+                        //         : null,
+                        //     enabled: isReportTimeEditable,
+                        //   ),
+                        // ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                     _buildRemarksField(
                       controller: reportRemarksController,
                       hintText: 'Enter report remarks...',
@@ -1622,7 +1747,6 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 20),
 
               // Unloaded Details Card
@@ -1706,22 +1830,24 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
 
   Widget _buildGcSelector() {
     return InkWell(
-      onTap: gcNumbers.isEmpty ? null : () async {
-        final selected = await _showSearchPicker(
-          context: context,
-          title: 'GC Number',
-          items: gcNumbers,
-          current: selectedGcNumber ?? '',
-        );
-        if (selected != null) {
-          setState(() {
-            selectedGcNumber = selected;
-            isGcDetailsExpanded = true;
-            gcDetails = null;
-          });
-          fetchGcDetails(selected);
-        }
-      },
+      onTap: gcNumbers.isEmpty
+          ? null
+          : () async {
+              final selected = await _showSearchPicker(
+                context: context,
+                title: 'GC Number',
+                items: gcNumbers,
+                current: selectedGcNumber ?? '',
+              );
+              if (selected != null) {
+                setState(() {
+                  selectedGcNumber = selected;
+                  isGcDetailsExpanded = true;
+                  gcDetails = null;
+                });
+                fetchGcDetails(selected);
+              }
+            },
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -1751,10 +1877,14 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    (selectedGcNumber?.isEmpty ?? true) ? 'Tap to select GC Number' : selectedGcNumber!,
+                    (selectedGcNumber?.isEmpty ?? true)
+                        ? 'Tap to select GC Number'
+                        : selectedGcNumber!,
                     style: TextStyle(
                       fontSize: 16,
-                      color: (selectedGcNumber?.isEmpty ?? true) ? Colors.grey[500] : primaryColor,
+                      color: (selectedGcNumber?.isEmpty ?? true)
+                          ? Colors.grey[500]
+                          : primaryColor,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1803,10 +1933,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
           ),
           subtitle: Text(
             'GC Number: ${gcDetails!['GcNumber'] ?? 'N/A'}',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
           ),
           children: [
             Container(
@@ -1817,11 +1944,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.grey.withOpacity(0.2)),
               ),
-              child: Column(
-                children: [
-                  _buildDetailGrid(),
-                ],
-              ),
+              child: Column(children: [_buildDetailGrid()]),
             ),
           ],
         ),
@@ -1850,7 +1973,9 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
     ];
 
     return Column(
-      children: details.map((detail) => _buildDetailRow(detail['label']!, detail['value'])).toList(),
+      children: details
+          .map((detail) => _buildDetailRow(detail['label']!, detail['value']))
+          .toList(),
     );
   }
 
@@ -1875,10 +2000,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
           Expanded(
             child: Text(
               value?.toString() ?? 'N/A',
-              style: const TextStyle(
-                fontSize: 13,
-                color: Colors.black87,
-              ),
+              style: const TextStyle(fontSize: 13, color: Colors.black87),
             ),
           ),
         ],
@@ -1889,7 +2011,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
   Widget _buildTransitDays() {
     // Disable editing if receipt date is present
     final isReceiptPresent = receiptDate != null;
-    
+
     return Column(
       children: List.generate(8, (i) {
         final isEditable = i <= lastEditableTransitIndex && !isReceiptPresent;
@@ -1900,7 +2022,9 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
             color: isEditable ? cardColor : Colors.grey.shade50,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isEditable ? primaryColor.withOpacity(0.3) : Colors.grey.shade300,
+              color: isEditable
+                  ? primaryColor.withOpacity(0.3)
+                  : Colors.grey.shade300,
             ),
           ),
           child: Column(
@@ -1947,9 +2071,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                     enabled: isEditable,
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildPlaceField(i, isEditable),
-                  ),
+                  Expanded(child: _buildPlaceField(i, isEditable)),
                 ],
               ),
             ],
@@ -1966,8 +2088,8 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
   }) {
     return Container(
       constraints: const BoxConstraints(
-        minWidth: 120,  // Minimum width to fit the date
-        maxWidth: 140,  // Maximum width to prevent taking too much space
+        minWidth: 120, // Minimum width to fit the date
+        maxWidth: 140, // Maximum width to prevent taking too much space
       ),
       child: GestureDetector(
         onTap: onTap,
@@ -1978,7 +2100,9 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
             color: enabled ? backgroundColor : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: enabled ? primaryColor.withOpacity(0.3) : Colors.grey.shade300,
+              color: enabled
+                  ? primaryColor.withOpacity(0.3)
+                  : Colors.grey.shade300,
             ),
           ),
           child: Row(
@@ -2028,20 +2152,33 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
         decoration: InputDecoration(
           labelText: 'Place',
           labelStyle: TextStyle(
-            color: enabled ? primaryColor.withOpacity(0.7) : Colors.grey.shade500,
+            color: enabled
+                ? primaryColor.withOpacity(0.7)
+                : Colors.grey.shade500,
             fontSize: 12,
           ),
           isDense: true, // Reduces the height of the input field
-          contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 8,
+            horizontal: 12,
+          ),
           prefixIcon: Padding(
-            padding: const EdgeInsets.only(right: 4.0, left: 8.0), // Reduced padding around icon
+            padding: const EdgeInsets.only(
+              right: 4.0,
+              left: 8.0,
+            ), // Reduced padding around icon
             child: Icon(
               Icons.place,
-              color: enabled ? primaryColor.withOpacity(0.7) : Colors.grey.shade500,
+              color: enabled
+                  ? primaryColor.withOpacity(0.7)
+                  : Colors.grey.shade500,
               size: 18,
             ),
           ),
-          prefixIconConstraints: const BoxConstraints(minWidth: 20, maxHeight: 20), // Tighter constraints for icon
+          prefixIconConstraints: const BoxConstraints(
+            minWidth: 20,
+            maxHeight: 20,
+          ), // Tighter constraints for icon
           border: InputBorder.none,
           filled: true,
           fillColor: enabled ? backgroundColor : Colors.grey.shade100,
@@ -2104,18 +2241,22 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
             Expanded(
               child: _buildDateSelector(
                 date: unloadedDate,
-                onTap: isUnloadedDateEditable ? () => pickUnloadedDate(context) : null,
+                onTap: isUnloadedDateEditable
+                    ? () => pickUnloadedDate(context)
+                    : null,
                 enabled: isUnloadedDateEditable,
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildTimeSelector(
-                time: unloadedTime,
-                onTap: isUnloadedTimeEditable ? () => pickUnloadedTime(context) : null,
-                enabled: isUnloadedTimeEditable,
-              ),
-            ),
+            // const SizedBox(width: 12),
+            // Expanded(
+            //   child: _buildTimeSelector(
+            //     time: unloadedTime,
+            //     onTap: isUnloadedTimeEditable
+            //         ? () => pickUnloadedTime(context)
+            //         : null,
+            //     enabled: isUnloadedTimeEditable,
+            //   ),
+            // ),
           ],
         ),
         const SizedBox(height: 16),
@@ -2136,18 +2277,22 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
             Expanded(
               child: _buildDateSelector(
                 date: receiptDate,
-                onTap: isReceiptDateEditable ? () => pickReceiptDate(context) : null,
+                onTap: isReceiptDateEditable
+                    ? () => pickReceiptDate(context)
+                    : null,
                 enabled: isReceiptDateEditable,
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildTimeSelector(
-                time: receiptTime,
-                onTap: isReceiptTimeEditable ? () => pickReceiptTime(context) : null,
-                enabled: isReceiptTimeEditable,
-              ),
-            ),
+            // const SizedBox(width: 12),
+            // Expanded(
+            //   child: _buildTimeSelector(
+            //     time: receiptTime,
+            //     onTap: isReceiptTimeEditable
+            //         ? () => pickReceiptTime(context)
+            //         : null,
+            //     enabled: isReceiptTimeEditable,
+            //   ),
+            // ),
           ],
         ),
         const SizedBox(height: 16),
@@ -2173,7 +2318,9 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
           color: enabled ? backgroundColor : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: enabled ? primaryColor.withOpacity(0.3) : Colors.grey.shade300,
+            color: enabled
+                ? primaryColor.withOpacity(0.3)
+                : Colors.grey.shade300,
           ),
         ),
         child: Row(
@@ -2231,40 +2378,34 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
         ),
         child: isSaving
             ? const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                color: Colors.white,
-                strokeWidth: 2,
-              ),
-            ),
-            SizedBox(width: 12),
-            Text(
-              'Saving...',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        )
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Text(
+                    'Saving...',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              )
             : const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.save, size: 20),
-            SizedBox(width: 8),
-            Text(
-              'Save Transit Details',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.save, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Save Transit Details',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }
