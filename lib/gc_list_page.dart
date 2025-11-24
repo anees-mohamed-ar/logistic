@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 import 'package:get/get.dart';
 import 'package:logistic/gc_form_screen.dart';
 import 'package:logistic/controller/id_controller.dart';
@@ -18,6 +19,7 @@ class GCListPage extends StatefulWidget {
 
 class _GCListPageState extends State<GCListPage> {
   final IdController _idController = Get.find<IdController>();
+  bool _isCheckingGcAccess = false; // Prevents overlapping GC access checks
   List<Map<String, dynamic>> gcList = [];
   List<Map<String, dynamic>> filteredGcList = [];
   bool isLoading = true;
@@ -585,6 +587,12 @@ class _GCListPageState extends State<GCListPage> {
     final idController = Get.find<IdController>();
     final userId = idController.userId.value;
 
+    // If a check is already running, ignore additional taps
+    if (_isCheckingGcAccess) {
+      return;
+    }
+    _isCheckingGcAccess = true;
+
     if (userId.isEmpty) {
       Fluttertoast.showToast(
         msg: 'User ID not found. Please login again.',
@@ -593,41 +601,120 @@ class _GCListPageState extends State<GCListPage> {
         backgroundColor: Colors.red,
         textColor: Colors.white,
       );
+      _isCheckingGcAccess = false;
       return;
     }
 
     final gcFormController = Get.put(GCFormController());
 
     Get.dialog(
-      const Center(child: CircularProgressIndicator()),
+      Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 200),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF4A90E2), Color(0xFF1E2A44)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.local_shipping,
+                  color: Colors.white,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Checking GC Access',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1E2A44),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Verifying your access to create a new GC...',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  minHeight: 6,
+                  backgroundColor: Colors.grey[200],
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).primaryColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
       barrierDismissible: false,
     );
 
     try {
-      final hasAccess = await gcFormController.checkGCAccess(userId);
+      // Add a small delay to show the progress indicator
+      await Future.delayed(const Duration(seconds: 2));
+
+      // Add timeout to prevent infinite loading
+      final hasAccess = await Future.any([
+        gcFormController.checkGCAccess(userId),
+        Future.delayed(
+          const Duration(seconds: 30),
+          () => throw TimeoutException('GC access check timed out'),
+        ),
+      ]);
 
       if (Get.isDialogOpen ?? false) Get.back();
 
       if (hasAccess) {
         Get.to(() => const GCFormScreen());
       } else {
-        Get.snackbar(
-          'Access Denied',
-          gcFormController.accessMessage.value,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 5),
-          snackPosition: SnackPosition.BOTTOM,
-          margin: const EdgeInsets.all(16),
-          borderRadius: 8,
+        Get.defaultDialog(
+          title: 'Access Denied',
+          middleText: gcFormController.accessMessage.value,
+          textConfirm: 'OK',
+          confirmTextColor: Colors.white,
+          buttonColor: Colors.red,
+          onConfirm: () {
+            Get.back();
+          },
         );
       }
     } catch (e) {
       if (Get.isDialogOpen ?? false) Get.back();
 
+      final errorMessage = e is TimeoutException
+          ? 'GC access check timed out. Please try again.'
+          : 'Failed to check GC access: $e';
+
       Get.snackbar(
         'Error',
-        'Failed to check GC access: $e',
+        errorMessage,
         backgroundColor: Colors.red,
         colorText: Colors.white,
         duration: const Duration(seconds: 5),
@@ -635,6 +722,9 @@ class _GCListPageState extends State<GCListPage> {
         margin: const EdgeInsets.all(16),
         borderRadius: 8,
       );
+    } finally {
+      // Ensure the re-entrancy flag is always cleared
+      _isCheckingGcAccess = false;
     }
   }
 

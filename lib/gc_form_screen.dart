@@ -131,9 +131,17 @@ class _GCFormScreenState extends State<GCFormScreen> {
     final theme = Theme.of(context);
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
 
-    // Ensure the tab index stays within the available range (0-3)
-    if (controller.currentTab.value > 3) {
-      controller.currentTab.value = 3;
+    // Determine if we are creating a temporary GC (not filling an existing one)
+    final isTempCreation =
+        controller.isTemporaryMode.value &&
+        !controller.isFillTemporaryMode.value;
+
+    // Max tab index: 0-2 for temp creation (no Attachments tab), 0-3 otherwise
+    final int maxTabIndex = isTempCreation ? 2 : 3;
+
+    // Ensure the tab index stays within the available range
+    if (controller.currentTab.value > maxTabIndex) {
+      controller.currentTab.value = maxTabIndex;
     } else if (controller.currentTab.value < 0) {
       controller.currentTab.value = 0;
     }
@@ -323,7 +331,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: List.generate(
-                          4,
+                          maxTabIndex + 1,
                           (index) => GestureDetector(
                             onTap: () {
                               controller.changeTab(index);
@@ -350,7 +358,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                                       Icons.local_shipping,
                                       Icons.group,
                                       Icons.inventory,
-                                      Icons.attach_file,
+                                      if (!isTempCreation) Icons.attach_file,
                                     ][index],
                                     size: 16,
                                     color: controller.currentTab.value == index
@@ -363,7 +371,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                                       'Shipment',
                                       'Parties',
                                       'Goods',
-                                      'Attachments',
+                                      if (!isTempCreation) 'Attachments',
                                     ][index],
                                     style: theme.textTheme.labelLarge?.copyWith(
                                       color:
@@ -390,16 +398,49 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     child: Obx(
                       () => AnimatedSwitcher(
                         duration: 300.ms,
-                        child: [
-                          _buildShipmentTab(context, controller, isSmallScreen),
-                          _buildPartiesTab(context, controller, isSmallScreen),
-                          _buildGoodsTab(context, controller, isSmallScreen),
-                          _buildAttachmentsTab(
-                            context,
-                            controller,
-                            isSmallScreen,
-                          ),
-                        ][controller.currentTab.value.clamp(0, 3).toInt()],
+                        child:
+                            (isTempCreation
+                            ? [
+                                _buildShipmentTab(
+                                  context,
+                                  controller,
+                                  isSmallScreen,
+                                ),
+                                _buildPartiesTab(
+                                  context,
+                                  controller,
+                                  isSmallScreen,
+                                ),
+                                _buildGoodsTab(
+                                  context,
+                                  controller,
+                                  isSmallScreen,
+                                ),
+                              ]
+                            : [
+                                _buildShipmentTab(
+                                  context,
+                                  controller,
+                                  isSmallScreen,
+                                ),
+                                _buildPartiesTab(
+                                  context,
+                                  controller,
+                                  isSmallScreen,
+                                ),
+                                _buildGoodsTab(
+                                  context,
+                                  controller,
+                                  isSmallScreen,
+                                ),
+                                _buildAttachmentsTab(
+                                  context,
+                                  controller,
+                                  isSmallScreen,
+                                ),
+                              ])[controller.currentTab.value
+                                .clamp(0, maxTabIndex)
+                                .toInt()],
                       ),
                     ),
                   ),
@@ -456,7 +497,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                               ),
                             if (controller.currentTab.value > 0)
                               const SizedBox(width: 12),
-                            if (controller.currentTab.value < 3)
+                            if (controller.currentTab.value < maxTabIndex)
                               Expanded(
                                 flex: controller.currentTab.value > 0 ? 1 : 2,
                                 child: ElevatedButton(
@@ -489,7 +530,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                                   ),
                                 ),
                               ),
-                            if (controller.currentTab.value == 3)
+                            if (controller.currentTab.value == maxTabIndex)
                               Expanded(
                                 child: ElevatedButton(
                                   onPressed: controller.isLoading.value

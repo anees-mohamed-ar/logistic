@@ -1,20 +1,72 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart' as dio;
 import 'package:logistic/models/truck.dart';
 import 'package:logistic/api_config.dart';
+import 'package:file_picker/file_picker.dart';
 
 class TruckController extends GetxController {
   final RxList<Truck> trucks = <Truck>[].obs;
   final RxList<Truck> filteredTrucks = <Truck>[].obs;
+  // Trucks actually rendered in the list (supports pagination)
+  final RxList<Truck> visibleTrucks = <Truck>[].obs;
   final RxBool isLoading = false.obs;
+  final RxBool isUploading = false.obs;
+  final RxDouble uploadProgress = 0.0.obs;
+  final RxInt uploadBytesSent = 0.obs;
+  final RxInt uploadBytesTotal = 0.obs;
+  final RxInt uploadTotalFiles = 0.obs;
   final RxString error = ''.obs;
   final RxString searchQuery = ''.obs;
+
+  // Simple client-side pagination
+  final int pageSize = 20;
+  int _currentPage = 1;
+  bool _isLoadingMore = false;
+  final RxBool hasMore = false.obs;
 
   @override
   void onInit() {
     super.onInit();
     fetchTrucks();
+  }
+
+  void _resetPagination(List<Truck> source) {
+    _currentPage = 1;
+    if (source.isEmpty) {
+      visibleTrucks.clear();
+      hasMore.value = false;
+      return;
+    }
+
+    final int end = source.length < pageSize ? source.length : pageSize;
+    visibleTrucks.value = source.sublist(0, end);
+    hasMore.value = source.length > end;
+  }
+
+  void loadMore() {
+    if (_isLoadingMore || !hasMore.value) return;
+    _isLoadingMore = true;
+
+    try {
+      final List<Truck> source = List<Truck>.from(filteredTrucks);
+      _currentPage++;
+      final int start = (pageSize * (_currentPage - 1));
+      if (start >= source.length) {
+        hasMore.value = false;
+        return;
+      }
+      final int end = (start + pageSize) > source.length
+          ? source.length
+          : (start + pageSize);
+      final nextPage = source.sublist(start, end);
+      visibleTrucks.addAll(nextPage);
+      hasMore.value = end < source.length;
+    } finally {
+      _isLoadingMore = false;
+    }
   }
 
   // Refresh trucks list
@@ -26,6 +78,7 @@ class TruckController extends GetxController {
     searchQuery.value = query;
     if (query.isEmpty) {
       filteredTrucks.value = List<Truck>.from(trucks);
+      _resetPagination(filteredTrucks);
       return;
     }
 
@@ -38,7 +91,9 @@ class TruckController extends GetxController {
               false);
     }).toList();
 
-    // If no results found locally, try server-side search
+    _resetPagination(filteredTrucks);
+
+    // If no results found locally, try server-side search over all data
     if (filteredTrucks.isEmpty) {
       await _searchTrucksOnServer(query);
     }
@@ -55,16 +110,28 @@ class TruckController extends GetxController {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        filteredTrucks.value = data
-            .map((item) => Truck.fromJson(item))
+        final List<Truck> serverResult = data
+            .map((item) => Truck.fromJson(item as Map<String, dynamic>))
             .toList();
+
+        // Only replace filtered list if server returned something
+        if (serverResult.isNotEmpty) {
+          filteredTrucks.value = serverResult;
+          _resetPagination(filteredTrucks);
+        }
       }
     } catch (e) {
       print('Error searching trucks: $e');
-      // Re-throw the error to be handled by the UI
-      rethrow;
+      // Keep existing list; just show a lightweight notification
+      Get.snackbar(
+        'Search Error',
+        'Unable to search trucks right now',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } finally {
       isLoading.value = false;
+      isUploading.value = false;
+      uploadProgress.value = 0.0;
     }
   }
 
@@ -72,6 +139,7 @@ class TruckController extends GetxController {
     try {
       print('🔄 Fetching trucks...');
       isLoading.value = true;
+      error.value = '';
 
       final url = '${ApiConfig.baseUrl}/truckmaster/search';
       final headers = {'Content-Type': 'application/json'};
@@ -98,6 +166,7 @@ class TruckController extends GetxController {
             .map((item) => Truck.fromJson(item as Map<String, dynamic>))
             .toList();
         filteredTrucks.value = List<Truck>.from(trucks);
+        _resetPagination(filteredTrucks);
         print('✅ Successfully loaded ${trucks.length} trucks');
       } else {
         final error =
@@ -114,6 +183,11 @@ class TruckController extends GetxController {
       );
     } finally {
       isLoading.value = false;
+      isUploading.value = false;
+      uploadProgress.value = 0.0;
+      uploadBytesSent.value = 0;
+      uploadBytesTotal.value = 0;
+      uploadTotalFiles.value = 0;
     }
   }
 
@@ -147,7 +221,7 @@ class TruckController extends GetxController {
     }
   }
 
-  Future<bool> addTruck(Truck truck) async {
+  Future<bool> addTruck(Truck truck, {List<PlatformFile>? attachments}) async {
     try {
       print('➕ Adding new truck with vehicle number: ${truck.vechileNumber}');
 
@@ -166,19 +240,57 @@ class TruckController extends GetxController {
       }
 
       isLoading.value = true;
+      isUploading.value = true;
+      uploadProgress.value = 0.0;
+      uploadBytesSent.value = 0;
+      uploadBytesTotal.value = 0;
+      uploadTotalFiles.value = attachments?.length ?? 0;
 
       // Create a copy of the truck data to modify
       final truckData = Map<String, dynamic>.from(truck.toJson());
       truckData.remove('id');
 
-      print('🌐 Sending POST request to: ${ApiConfig.baseUrl}/truckmaster/add');
-      print('📦 Request body: $truckData');
-
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/truckmaster/add'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(truckData),
+      print(
+        '🌐 Sending multipart POST request to: ${ApiConfig.baseUrl}/truckmaster/add',
       );
+      print('📦 Form fields: $truckData');
+
+      final dioClient = dio.Dio();
+      final formData = dio.FormData();
+
+      truckData.forEach((key, value) {
+        if (value != null) {
+          formData.fields.add(MapEntry(key, value.toString()));
+        }
+      });
+
+      if (attachments != null && attachments.isNotEmpty) {
+        for (final file in attachments) {
+          if (file.path != null && file.path!.isNotEmpty) {
+            formData.files.add(
+              MapEntry(
+                'attachments',
+                await dio.MultipartFile.fromFile(file.path!),
+              ),
+            );
+          }
+        }
+      }
+
+      final response = await dioClient.post(
+        '${ApiConfig.baseUrl}/truckmaster/add',
+        data: formData,
+        onSendProgress: (sent, total) {
+          if (total > 0) {
+            uploadProgress.value = sent / total;
+            uploadBytesSent.value = sent;
+            uploadBytesTotal.value = total;
+          }
+        },
+      );
+
+      print('✅ Response status: ${response.statusCode}');
+      print('📄 Response body: ${response.data}');
 
       if (response.statusCode == 200) {
         await fetchTrucks();
@@ -199,7 +311,11 @@ class TruckController extends GetxController {
     }
   }
 
-  Future<bool> updateTruck(Truck truck, {String? oldVehicleNumber}) async {
+  Future<bool> updateTruck(
+    Truck truck, {
+    String? oldVehicleNumber,
+    List<PlatformFile>? attachments,
+  }) async {
     try {
       print('🚛 Updating truck with vehicle number: ${truck.vechileNumber}');
       print('📦 Truck data to update: ${truck.toJson()}');
@@ -220,34 +336,60 @@ class TruckController extends GetxController {
       truckData.remove('id');
 
       // Log the final data being sent
-      print('🔍 Final data being sent: $truckData');
+      print('🔍 Final data being sent (multipart fields): $truckData');
 
       // Use oldVehicleNumber in the URL if provided (so backend can find the
       // existing record even if the vehicle number is being changed)
       final pathVehicleNumber = oldVehicleNumber ?? truck.vechileNumber;
 
       isLoading.value = true;
+      isUploading.value = true;
+      uploadProgress.value = 0.0;
+      uploadBytesSent.value = 0;
+      uploadBytesTotal.value = 0;
+      uploadTotalFiles.value = attachments?.length ?? 0;
       final url =
           '${ApiConfig.baseUrl}/truckmaster/update/${Uri.encodeComponent(pathVehicleNumber)}';
-      print('🌐 Update URL: $url');
-      final headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
+      print('🌐 Update URL (multipart): $url');
+      final dioClient = dio.Dio();
+      final formData = dio.FormData();
 
-      print('🌐 Sending PUT request to: $url');
-      print('📝 Request headers: $headers');
-      print('📦 Request body: $truckData');
+      truckData.forEach((key, value) {
+        if (value != null) {
+          formData.fields.add(MapEntry(key, value.toString()));
+        }
+      });
 
-      final response = await http.put(
-        Uri.parse(url),
-        headers: headers,
-        body: json.encode(truckData),
+      if (attachments != null && attachments.isNotEmpty) {
+        for (final file in attachments) {
+          if (file.path != null && file.path!.isNotEmpty) {
+            formData.files.add(
+              MapEntry(
+                'attachments',
+                await dio.MultipartFile.fromFile(file.path!),
+              ),
+            );
+          }
+        }
+      }
+
+      print('📝 Multipart fields: ${truckData.keys.toList()}');
+      print('🗂️ Multipart files count: ${attachments?.length ?? 0}');
+
+      final response = await dioClient.put(
+        url,
+        data: formData,
+        onSendProgress: (sent, total) {
+          if (total > 0) {
+            uploadProgress.value = sent / total;
+            uploadBytesSent.value = sent;
+            uploadBytesTotal.value = total;
+          }
+        },
       );
 
       print('✅ Response status: ${response.statusCode}');
-      print('📄 Response body: ${response.body}');
-      print('📋 Response headers: ${response.headers}');
+      print('📄 Response body: ${response.data}');
 
       if (response.statusCode == 200) {
         print('🔄 Refreshing trucks list...');
@@ -257,13 +399,16 @@ class TruckController extends GetxController {
         // Try to parse the error message from the response
         String errorMessage = 'Failed to update truck';
         try {
-          final errorData = json.decode(response.body);
-          errorMessage =
-              errorData['message'] ?? errorData['error'] ?? errorMessage;
+          final data = response.data;
+          if (data is Map<String, dynamic>) {
+            errorMessage = data['message'] ?? data['error'] ?? errorMessage;
+          } else if (data is String) {
+            errorMessage = data;
+          }
         } catch (_) {
           // If we can't parse the error, use the raw response
           errorMessage =
-              'Status: ${response.statusCode}, Body: ${response.body}';
+              'Status: ${response.statusCode}, Body: ${response.data}';
         }
 
         final error = '❌ $errorMessage';

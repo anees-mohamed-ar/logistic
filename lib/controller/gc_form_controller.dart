@@ -1250,6 +1250,13 @@ class GCFormController extends GetxController {
 
     // Clear booking officer name for temporary GC creation - will be set when filling
     gcBookingOfficerName.value = '';
+
+    // Clear attachment variables to prevent uploading stale attachments
+    attachedFiles.clear();
+    invoiceAttachment.value = null;
+    ewayAttachment.value = null;
+    otherAttachments.clear();
+    existingAttachments.clear();
   }
 
   void loadTemporaryGc(TemporaryGC tempGC) {
@@ -2589,6 +2596,11 @@ class GCFormController extends GetxController {
     attachedFiles.clear();
     existingAttachments.clear();
     attachmentsError.value = '';
+
+    // Clear typed attachment slots
+    invoiceAttachment.value = null;
+    ewayAttachment.value = null;
+    otherAttachments.clear();
 
     // Set booking officer name for new GC creation (for PDF preview)
     // This will be used in PDF even before submission

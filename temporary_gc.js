@@ -60,7 +60,13 @@ function broadcast(companyId, event, data) {
 // Configure multer for temporary GC file uploads
 const tempGcUploadStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/gc_attachments/');
+    if (file.fieldname === 'invoice') {
+      cb(null, 'uploads/invoice/');
+    } else if (file.fieldname === 'e_way') {
+      cb(null, 'uploads/e-way/');
+    } else {
+      cb(null, 'uploads/gc_attachments/');
+    }
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -1826,13 +1832,15 @@ router.get('/files/:filename', (req, res) => {
             message: 'File not found'
         });
     }
-});
-
-// Custom middleware to handle both multipart and JSON requests
+// Custom middleware to handle multipart and JSON requests (used for other endpoints)
 const handleConvertRequest = (req, res, next) => {
     if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
-        // Use multer for multipart requests
-        tempGcUpload.array('attachments', 10)(req, res, (err) => {
+        // Use multer for multipart requests (attachments + invoice + e_way)
+        tempGcUpload.fields([
+            { name: 'attachments', maxCount: 10 },
+            { name: 'invoice', maxCount: 1 },
+            { name: 'e_way', maxCount: 1 }
+        ])(req, res, (err) => {
             if (err) {
                 logTempGC('error', 'Convert Middleware', 'Multer error processing multipart data', {
                     error: err.message,
@@ -1853,11 +1861,15 @@ const handleConvertRequest = (req, res, next) => {
 };
 
 // Convert temporary GC to actual GC with file uploads
-router.post('/convert/:tempGcNumber', handleConvertRequest, async (req, res) => {
+router.post('/convert/:tempGcNumber', tempGcUpload.fields([
+    { name: 'attachments', maxCount: 10 },
+    { name: 'invoice', maxCount: 1 },
+    { name: 'e_way', maxCount: 1 }
+]), async (req, res) => {
     const startTime = Date.now();
     const { tempGcNumber } = req.params;
 
-    // Data is available in req.body regardless of content type (handled by middleware)
+    // Data is available in req.body (multer handles multipart form data)
     const rawData = req.body;
 
     logTempGC('info', 'POST /convert/:tempGcNumber', 'Convert temporary GC to actual GC request received', {
@@ -1866,7 +1878,14 @@ router.post('/convert/:tempGcNumber', handleConvertRequest, async (req, res) => 
         userId: rawData.userId,
         companyId: rawData.companyId,
         branchId: rawData.branchId,
-        hasFiles: !!(req.files && req.files.length > 0),
+        hasFiles: !!(
+            req.files && (
+                (Array.isArray(req.files) && req.files.length > 0) ||
+                (req.files.attachments && req.files.attachments.length > 0) ||
+                (req.files.invoice && req.files.invoice.length > 0) ||
+                (req.files.e_way && req.files.e_way.length > 0)
+            )
+        ),
         requestId: crypto.randomUUID()
     });
 
@@ -2315,9 +2334,15 @@ router.post('/convert/:tempGcNumber', handleConvertRequest, async (req, res) => 
                         }
                     }
 
-                    // Add new attachments from upload
-                    if (req.files && req.files.length > 0) {
-                        const newAttachments = req.files.map(file => ({
+                    // Determine generic attachments from upload
+                    const attachmentFileArray = req.files && Array.isArray(req.files)
+                        ? req.files
+                        : (req.files && req.files.attachments)
+                            ? req.files.attachments
+                            : [];
+
+                    if (attachmentFileArray && attachmentFileArray.length > 0) {
+                        const newAttachments = attachmentFileArray.map(file => ({
                             filename: file.filename,
                             originalName: file.originalname,
                             mimeType: file.mimetype,
@@ -2329,6 +2354,30 @@ router.post('/convert/:tempGcNumber', handleConvertRequest, async (req, res) => 
                     } else {
                         attachmentFiles = existingAttachments;
                     }
+
+                    // Separate invoice and e-way attachments (not stored in generic attachment_files)
+                    const invoiceFile = req.files && req.files.invoice && req.files.invoice[0] ? req.files.invoice[0] : null;
+                    const eWayFile = req.files && req.files.e_way && req.files.e_way[0] ? req.files.e_way[0] : null;
+
+                    const invoiceInfo = invoiceFile ? {
+                        filename: invoiceFile.filename,
+                        originalName: invoiceFile.originalname,
+                        mimeType: invoiceFile.mimetype,
+                        size: invoiceFile.size,
+                        path: `uploads/invoice/${invoiceFile.filename}`,
+                        uploadDate: new Date().toISOString(),
+                        uploadedBy: userId
+                    } : null;
+
+                    const eWayInfo = eWayFile ? {
+                        filename: eWayFile.filename,
+                        originalName: eWayFile.originalname,
+                        mimeType: eWayFile.mimetype,
+                        size: eWayFile.size,
+                        path: `uploads/e-way/${eWayFile.filename}`,
+                        uploadDate: new Date().toISOString(),
+                        uploadedBy: userId
+                    } : null;
 
                     // Create the actual GC record with only the fields that are provided
                     const gcInsertSql = `
@@ -2353,9 +2402,10 @@ router.post('/convert/:tempGcNumber', handleConvertRequest, async (req, res) => 
                             ChallanBillNoDate, ChallanBillAmount,
                             HireAmount, AdvanceAmount, BalanceAmount, FreightCharge,
                             CompanyId, branch_id, created_by_user_id,
-                            attachment_files, attachment_count
+                            attachment_files, attachment_count,
+                            invoice_attachment, e_way_attachment
                         ) VALUES (
-                            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                         )
                     `;
 
@@ -2380,7 +2430,9 @@ router.post('/convert/:tempGcNumber', handleConvertRequest, async (req, res) => 
                         '', '', // ChallanBillNoDate, ChallanBillAmount
                         HireAmount, AdvanceAmount, BalanceAmount, FreightCharge,
                         companyId, branchId || null, userId,
-                        JSON.stringify(attachmentFiles), attachmentFiles.length
+                        JSON.stringify(attachmentFiles), attachmentFiles.length,
+                        invoiceInfo ? JSON.stringify(invoiceInfo) : null,
+                        eWayInfo ? JSON.stringify(eWayInfo) : null
                     ];
 
                     tx.query(gcInsertSql, gcValues, (gcInsertErr, gcResult) => {
@@ -2401,118 +2453,179 @@ router.post('/convert/:tempGcNumber', handleConvertRequest, async (req, res) => 
                             });
                         }
 
-                        // Mark temporary GC as converted
-                        const updateTempGC = `
-                            UPDATE temporary_gc
-                            SET is_converted = 1,
-                                converted_gc_number = ?,
-                                converted_by_user_id = ?,
-                                converted_at = NOW()
-                            WHERE temp_gc_number = ? AND CompanyId = ?
-                        `;
+                        // Helper to proceed with updating temporary GC status after
+                        // invoice/e-way attachments (if any) are saved
+                        const proceedToUpdateTempGC = () => {
+                            const updateTempGC = `
+                                UPDATE temporary_gc
+                                SET is_converted = 1,
+                                    converted_gc_number = ?,
+                                    converted_by_user_id = ?,
+                                    converted_at = NOW()
+                                WHERE temp_gc_number = ? AND CompanyId = ?
+                            `;
 
-                        tx.query(updateTempGC, [actualGcNumber, userId, tempGcNumber, companyId], (updateErr, updateResult) => {
-                            if (updateErr) {
-                                logTempGC('error', 'POST /convert/:tempGcNumber', 'Error updating temporary GC status', {
-                                    error: updateErr.message,
-                                    tempGcNumber,
-                                    actualGcNumber,
-                                    companyId
-                                });
-                                return tx.rollback(() => {
-                                    res.status(500).json({
-                                        success: false,
-                                        message: 'Failed to update temporary GC status',
-                                        error: updateErr.message
-                                    });
-                                });
-                            }
-
-                            logTempGC('info', 'POST /convert/:tempGcNumber', 'Temporary GC converted to actual GC successfully', {
-                                tempGcNumber,
-                                actualGcNumber,
-                                companyId,
-                                attachmentCount: attachmentFiles.length,
-                                duration: Date.now() - startTime
-                            });
-
-                            // First commit the transaction
-                            tx.commit(async (err) => {
-                                if (err) {
-                                    logTempGC('error', 'POST /convert/:tempGcNumber', 'Failed to commit transaction', {
-                                        error: err.message,
+                            tx.query(updateTempGC, [actualGcNumber, userId, tempGcNumber, companyId], (updateErr, updateResult) => {
+                                if (updateErr) {
+                                    logTempGC('error', 'POST /convert/:tempGcNumber', 'Error updating temporary GC status', {
+                                        error: updateErr.message,
                                         tempGcNumber,
                                         actualGcNumber,
-                                        userId,
-                                        companyId,
-                                        duration: Date.now() - startTime
+                                        companyId
                                     });
                                     return tx.rollback(() => {
                                         res.status(500).json({
                                             success: false,
-                                            message: 'Failed to commit transaction',
-                                            error: err.message
+                                            message: 'Failed to update temporary GC status',
+                                            error: updateErr.message
                                         });
                                     });
                                 }
 
-                                logTempGC('info', 'POST /convert/:tempGcNumber', 'Database transaction committed successfully', {
+                                logTempGC('info', 'POST /convert/:tempGcNumber', 'Temporary GC converted to actual GC successfully', {
                                     tempGcNumber,
                                     actualGcNumber,
-                                    userId,
                                     companyId,
+                                    attachmentCount: attachmentFiles.length,
                                     duration: Date.now() - startTime
                                 });
 
-                                try {
-                                    // Call submit-gc endpoint to mark the GC number as used
-                                    await axios.post('http://localhost:8080/gc-management/submit-gc', {
-                                        userId: userId,
-                                        companyId: parseInt(companyId, 10),
-                                        branchId: branchId ? parseInt(branchId, 10) : null
-                                    });
-
-                                    logTempGC('info', 'POST /convert/:tempGcNumber', 'GC number marked as used', {
-                                        actualGcNumber,
-                                        userId,
-                                        companyId
-                                    });
-
-                                    // Broadcast the conversion
-                                    broadcast(String(tempGC.CompanyId), 'temp_gc_converted', {
-                                        temp_gc_number: tempGcNumber,
-                                        converted_to: actualGcNumber,
-                                        converted_by: userId,
-                                        attachment_count: attachmentFiles.length
-                                    });
-
-                                    res.json({
-                                        success: true,
-                                        message: 'Temporary GC converted to actual GC successfully',
-                                        data: {
+                                // First commit the transaction
+                                tx.commit(async (err) => {
+                                    if (err) {
+                                        logTempGC('error', 'POST /convert/:tempGcNumber', 'Failed to commit transaction', {
+                                            error: err.message,
                                             tempGcNumber,
                                             actualGcNumber,
+                                            userId,
                                             companyId,
-                                            attachments: attachmentFiles,
-                                            attachmentCount: attachmentFiles.length
-                                        }
-                                    });
+                                            duration: Date.now() - startTime
+                                        });
+                                        return tx.rollback(() => {
+                                            res.status(500).json({
+                                                success: false,
+                                                message: 'Failed to commit transaction',
+                                                error: err.message
+                                            });
+                                        });
+                                    }
 
-                                } catch (error) {
-                                    logTempGC('error', 'POST /convert/:tempGcNumber', 'Error after transaction commit', {
-                                        error: error.message,
-                                        stack: error.stack,
+                                    logTempGC('info', 'POST /convert/:tempGcNumber', 'Database transaction committed successfully', {
                                         tempGcNumber,
                                         actualGcNumber,
                                         userId,
                                         companyId,
                                         duration: Date.now() - startTime
                                     });
-                                    // The transaction is already committed, so we can't rollback
-                                    // But we should still log the error and potentially notify the user
-                                }
+
+                                    try {
+                                        // Call submit-gc endpoint to mark the GC number as used
+                                        await axios.post('http://localhost:8080/gc-management/submit-gc', {
+                                            userId: userId,
+                                            companyId: parseInt(companyId, 10),
+                                            branchId: branchId ? parseInt(branchId, 10) : null
+                                        });
+
+                                        logTempGC('info', 'POST /convert/:tempGcNumber', 'GC number marked as used', {
+                                            actualGcNumber,
+                                            userId,
+                                            companyId
+                                        });
+
+                                        // Broadcast the conversion
+                                        broadcast(String(tempGC.CompanyId), 'temp_gc_converted', {
+                                            temp_gc_number: tempGcNumber,
+                                            converted_to: actualGcNumber,
+                                            converted_by: userId,
+                                            attachment_count: attachmentFiles.length
+                                        });
+
+                                        res.json({
+                                            success: true,
+                                            message: 'Temporary GC converted to actual GC successfully',
+                                            data: {
+                                                tempGcNumber,
+                                                actualGcNumber,
+                                                companyId,
+                                                attachments: attachmentFiles,
+                                                attachmentCount: attachmentFiles.length
+                                            }
+                                        });
+
+                                    } catch (error) {
+                                        logTempGC('error', 'POST /convert/:tempGcNumber', 'Error after transaction commit', {
+                                            error: error.message,
+                                            stack: error.stack,
+                                            tempGcNumber,
+                                            actualGcNumber,
+                                            userId,
+                                            companyId,
+                                            duration: Date.now() - startTime
+                                        });
+                                        // The transaction is already committed, so we can't rollback
+                                        // But we should still log the error and potentially notify the user
+                                    }
+                                });
                             });
-                        });
+                        };
+
+                        // Handle invoice and e-way attachments separately, like gc.js
+                        let invoiceFile = null;
+                        let eWayFile = null;
+
+                        if (req.files && !Array.isArray(req.files)) {
+                            if (Array.isArray(req.files.invoice) && req.files.invoice.length > 0) {
+                                invoiceFile = req.files.invoice[0];
+                            }
+                            if (Array.isArray(req.files.e_way) && req.files.e_way.length > 0) {
+                                eWayFile = req.files.e_way[0];
+                            }
+                        }
+
+                        const invoiceInfo = invoiceFile ? {
+                            filename: invoiceFile.filename,
+                            originalName: invoiceFile.originalname,
+                            mimeType: invoiceFile.mimetype,
+                            size: invoiceFile.size,
+                            path: `uploads/invoice/${invoiceFile.filename}`,
+                            uploadDate: new Date().toISOString(),
+                            uploadedBy: userId || 'unknown'
+                        } : null;
+
+                        const eWayInfo = eWayFile ? {
+                            filename: eWayFile.filename,
+                            originalName: eWayFile.originalname,
+                            mimeType: eWayFile.mimetype,
+                            size: eWayFile.size,
+                            path: `uploads/e-way/${eWayFile.filename}`,
+                            uploadDate: new Date().toISOString(),
+                            uploadedBy: userId || 'unknown'
+                        } : null;
+
+                        if (invoiceInfo || eWayInfo) {
+                            const updateInvoiceSql = 'UPDATE gc_creation SET invoice_attachment = ?, e_way_attachment = ? WHERE GcNumber = ? AND CompanyId = ?';
+                            tx.query(updateInvoiceSql, [invoiceInfo ? JSON.stringify(invoiceInfo) : null, eWayInfo ? JSON.stringify(eWayInfo) : null, actualGcNumber, companyId], (invErr) => {
+                                if (invErr) {
+                                    logTempGC('error', 'POST /convert/:tempGcNumber', 'Error updating invoice/e-way attachments', {
+                                        error: invErr.message,
+                                        tempGcNumber,
+                                        actualGcNumber,
+                                        companyId
+                                    });
+                                    return tx.rollback(() => {
+                                        res.status(500).json({
+                                            success: false,
+                                            message: 'Failed to update invoice/e-way attachments',
+                                            error: invErr.message
+                                        });
+                                    });
+                                }
+
+                                proceedToUpdateTempGC();
+                            });
+                        } else {
+                            proceedToUpdateTempGC();
+                        }
                     });
                 });
             });
@@ -2532,6 +2645,8 @@ router.post('/convert/:tempGcNumber', handleConvertRequest, async (req, res) => 
             error: error.message
         });
     }
+});
+
 });
 
 module.exports = router;
