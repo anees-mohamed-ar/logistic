@@ -52,6 +52,11 @@ class FlavorConfig {
       final companyId = await platform.invokeMethod<int>('getCompanyId') ?? 7;
 
       // Initialize flavor based on company ID
+      debugPrint(
+        '[FlavorConfig] initFromPlatform: companyId from platform = '
+        '$companyId',
+      );
+
       if (companyId == 6) {
         FlavorConfig(
           flavor: Flavor.carrying,
@@ -59,6 +64,9 @@ class FlavorConfig {
           companyId: 6,
           primaryColor: const Color(0xFF1E2A44),
           pdfGenerator: 'gc_pdf_carrying.dart',
+        );
+        debugPrint(
+          '[FlavorConfig] initialized with flavor=carrying, companyId=${FlavorConfig._instance?.companyId}, pdfGenerator=${FlavorConfig._instance?.pdfGenerator}',
         );
       } else {
         FlavorConfig(
@@ -68,9 +76,13 @@ class FlavorConfig {
           primaryColor: const Color.fromARGB(255, 68, 42, 30),
           pdfGenerator: 'gc_pdf.dart',
         );
+        debugPrint(
+          '[FlavorConfig] initialized with flavor=cargo, companyId=${FlavorConfig._instance?.companyId}, pdfGenerator=${FlavorConfig._instance?.pdfGenerator}',
+        );
       }
     } catch (e) {
       // Default to cargo if there's an error
+      debugPrint('[FlavorConfig] initFromPlatform error: $e');
       FlavorConfig(
         flavor: Flavor.cargo,
         name: 'Sri Krishna Carrying Corporation',
@@ -78,7 +90,9 @@ class FlavorConfig {
         primaryColor: const Color(0xFF1E2A44),
         pdfGenerator: 'gc_pdf_carrying.dart',
       );
+      debugPrint(
+        '[FlavorConfig] initialized in catch with flavor=${FlavorConfig._instance?.flavor}, companyId=${FlavorConfig._instance?.companyId}, pdfGenerator=${FlavorConfig._instance?.pdfGenerator}',
+      );
     }
   }
 }
-

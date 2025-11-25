@@ -52,7 +52,9 @@ class _GCFormScreenState extends State<GCFormScreen> {
 
       if (controller.isTemporaryMode.value) {
         controller.clearForm();
-        controller.prepareTemporaryGcForm();
+
+        // For temporary GC creation, load available temp GC numbers from pool
+        await controller.fetchAvailableTemporaryGcNumbers();
 
         // Skip GC usage warning for temporary GC creation - will be checked when filling
       } else if (controller.isFillTemporaryMode.value) {
@@ -648,6 +650,43 @@ class _GCFormScreenState extends State<GCFormScreen> {
                   onRetry: () => controller.fetchBranches(),
                   compact: true,
                   searchable: true,
+                );
+              }),
+              // Temporary GC: select reusable temp GC number from backend pool
+              Obx(() {
+                if (!(controller.isTemporaryMode.value &&
+                    !controller.isFillTemporaryMode.value)) {
+                  return const SizedBox.shrink();
+                }
+
+                final items = controller.availableTempGcNumbers.toList();
+                final selected = controller.selectedTempGcFromPool.value;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildDropdownField(
+                      context: context,
+                      label: 'Temporary GC Number (Pool)',
+                      value: selected,
+                      items: items,
+                      onChanged: (value) {
+                        if (value != null && value.isNotEmpty) {
+                          controller.selectTemporaryGcNumber(value);
+                        }
+                      },
+                      isLoading:
+                          controller.isLoadingAvailableTempGcNumbers.value,
+                      error: items.isEmpty
+                          ? 'No available temporary GC numbers in pool'
+                          : null,
+                      onRetry: () =>
+                          controller.fetchAvailableTemporaryGcNumbers(),
+                      compact: true,
+                      searchable: false,
+                    ),
+                  ],
                 );
               }),
               const SizedBox(height: 16),
@@ -1354,15 +1393,15 @@ class _GCFormScreenState extends State<GCFormScreen> {
     bool isSmallScreen,
   ) {
     // Access WeightRate from the controller
-    WeightRate? selectedWeightValue = controller.selectedWeight.value;
+    // WeightRate? selectedWeightValue = controller.selectedWeight.value;
 
-    // Convert WeightRate list to a list of strings for the searchable dropdown
-    final List<String> weightOptions = controller.weightRates
-        .map((w) => w.weight)
-        .toList();
+    // // Convert WeightRate list to a list of strings for the searchable dropdown
+    // final List<String> weightOptions = controller.weightRates
+    //     .map((w) => w.weight)
+    //     .toList();
     // Get the string representation of the currently selected WeightRate
-    final String currentSelectedWeightString =
-        selectedWeightValue?.weight ?? 'Select Weight';
+    // final String currentSelectedWeightString =
+    //     selectedWeightValue?.weight ?? 'Select Weight';
 
     return SingleChildScrollView(
       key: const ValueKey(2),
@@ -1934,13 +1973,13 @@ class _GCFormScreenState extends State<GCFormScreen> {
   ) {
     return Obx(() {
       final files = controller.attachedFiles;
-      final existingFiles = controller.existingAttachments;
-      final isLoading = controller.isLoadingAttachments.value;
-      final error = controller.attachmentsError.value;
-      final isUploading = controller.isUploading.value;
-      final uploadProgress = controller.uploadProgress.value;
-      final currentUploadingFile = controller.currentUploadingFile.value;
-      final uploadStatus = controller.uploadStatus.value;
+      // final existingFiles = controller.existingAttachments;
+      // final isLoading = controller.isLoadingAttachments.value;
+      // final error = controller.attachmentsError.value;
+      // final isUploading = controller.isUploading.value;
+      // final uploadProgress = controller.uploadProgress.value;
+      // final currentUploadingFile = controller.currentUploadingFile.value;
+      // final uploadStatus = controller.uploadStatus.value;
 
       return Card(
         elevation: 1,

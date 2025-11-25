@@ -1042,6 +1042,10 @@ class GCFormController extends GetxController {
   final isFillTemporaryMode = false.obs; // When true, filling a temporary GC
   final tempGcNumber = ''.obs; // Store temp GC number when filling
   final tempGcPreview = ''.obs;
+  // Available temporary GC numbers from backend pool (SKCC-*/SKCG-*)
+  final RxList<String> availableTempGcNumbers = <String>[].obs;
+  final RxBool isLoadingAvailableTempGcNumbers = false.obs;
+  final RxString selectedTempGcFromPool = ''.obs;
   final Rx<DateTime?> lockedAt = Rx<DateTime?>(null);
 
   // Timer related variables for temporary GC lock
@@ -1242,9 +1246,16 @@ class GCFormController extends GetxController {
   }
 
   void prepareTemporaryGcForm() {
-    final number = _generateTempGcNumber();
-    gcNumberCtrl.text = number;
-    tempGcPreview.value = number;
+    final number = selectedTempGcFromPool.value;
+    if (number.isNotEmpty) {
+      gcNumberCtrl.text = number;
+      tempGcPreview.value = number;
+      tempGcNumber.value = number;
+    } else {
+      gcNumberCtrl.clear();
+      tempGcPreview.value = '';
+      tempGcNumber.value = '';
+    }
     // Set lockedAt timestamp to current time when creating new temporary GC
     lockedAt.value = DateTime.now();
 
@@ -1257,6 +1268,104 @@ class GCFormController extends GetxController {
     ewayAttachment.value = null;
     otherAttachments.clear();
     existingAttachments.clear();
+  }
+
+  // Fetch free temporary GC numbers from backend pool
+  Future<void> fetchAvailableTemporaryGcNumbers() async {
+    try {
+      isLoadingAvailableTempGcNumbers.value = true;
+
+      final companyId = _idController.companyId.value;
+      final branchId = _idController.branchId.value;
+
+      if (companyId.isEmpty) {
+        _showToast(
+          'Company ID not found. Cannot load temporary GC numbers.',
+          backgroundColor: Colors.red,
+        );
+        return;
+      }
+
+      final uri = Uri.parse('${ApiConfig.baseUrl}/temporary-gc/available')
+          .replace(
+            queryParameters: {
+              'companyId': companyId,
+              if (branchId.isNotEmpty) 'branchId': branchId,
+            },
+          );
+
+      debugPrint('[fetchAvailableTemporaryGcNumbers] GET $uri');
+
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode != 200) {
+        debugPrint(
+          '[fetchAvailableTemporaryGcNumbers] Non-200 status: ${response.statusCode}',
+        );
+        _showToast(
+          'Failed to load temporary GC numbers (HTTP ${response.statusCode})',
+          backgroundColor: Colors.red,
+        );
+        return;
+      }
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (body['success'] != true || body['data'] == null) {
+        debugPrint(
+          '[fetchAvailableTemporaryGcNumbers] success!=true or data missing: $body',
+        );
+        _showToast(
+          body['message']?.toString() ??
+              'Failed to load temporary GC numbers from server.',
+          backgroundColor: Colors.red,
+        );
+        return;
+      }
+
+      final List<dynamic> items = body['data'] as List<dynamic>;
+      final numbers = items
+          .map(
+            (e) => e is Map<String, dynamic>
+                ? e['temp_gc_number']?.toString() ?? ''
+                : '',
+          )
+          .where((value) => value.isNotEmpty)
+          .cast<String>()
+          .toList();
+
+      availableTempGcNumbers
+        ..clear()
+        ..addAll(numbers);
+
+      // If current selected number is no longer in the list, clear it
+      if (selectedTempGcFromPool.value.isNotEmpty &&
+          !availableTempGcNumbers.contains(selectedTempGcFromPool.value)) {
+        selectedTempGcFromPool.value = '';
+      }
+
+      debugPrint(
+        '[fetchAvailableTemporaryGcNumbers] Loaded ${availableTempGcNumbers.length} numbers',
+      );
+    } catch (e) {
+      debugPrint('[fetchAvailableTemporaryGcNumbers] Error: $e');
+      _showToast(
+        'Error loading temporary GC numbers: $e',
+        backgroundColor: Colors.red,
+      );
+    } finally {
+      isLoadingAvailableTempGcNumbers.value = false;
+    }
+  }
+
+  // Select a temporary GC number from the backend pool
+  void selectTemporaryGcNumber(String number) {
+    selectedTempGcFromPool.value = number;
+    gcNumberCtrl.text = number;
+    tempGcPreview.value = number;
+    tempGcNumber.value = number;
   }
 
   void loadTemporaryGc(TemporaryGC tempGC) {
@@ -2682,6 +2791,7 @@ class GCFormController extends GetxController {
           'uploadedAt': inv['uploadDate']?.toString() ?? '',
           'uploadedBy': inv['uploadedBy']?.toString() ?? '',
           'slotType': 'invoice',
+          'source': 'server',
         };
       }
 
@@ -2695,6 +2805,7 @@ class GCFormController extends GetxController {
           'uploadedAt': eway['uploadDate']?.toString() ?? '',
           'uploadedBy': eway['uploadedBy']?.toString() ?? '',
           'slotType': 'eway',
+          'source': 'server',
         };
       }
 
@@ -3163,13 +3274,15 @@ class GCFormController extends GetxController {
           debugPrint('Query params: $queryParams');
 
           final mergedFiles = <Map<String, dynamic>>[];
-          if (invoiceAttachment.value != null) {
+          if (invoiceAttachment.value != null &&
+              invoiceAttachment.value!['source'] != 'server') {
             mergedFiles.add({
               ...invoiceAttachment.value!,
               'fieldName': 'invoice',
             });
           }
-          if (ewayAttachment.value != null) {
+          if (ewayAttachment.value != null &&
+              ewayAttachment.value!['source'] != 'server') {
             mergedFiles.add({...ewayAttachment.value!, 'fieldName': 'e_way'});
           }
           mergedFiles.addAll(
@@ -3366,6 +3479,17 @@ class GCFormController extends GetxController {
             data['branchId'] = _idController.branchId.value;
           }
 
+          // Use selected temporary GC number from pool
+          final selectedTempNumber = selectedTempGcFromPool.value.isNotEmpty
+              ? selectedTempGcFromPool.value
+              : tempGcNumber.value;
+          if (selectedTempNumber.isEmpty) {
+            throw Exception(
+              'Temporary GC number is required. Please select one before creating.',
+            );
+          }
+          data['temp_gc_number'] = selectedTempNumber;
+
           final mergedFiles = <Map<String, dynamic>>[];
           if (invoiceAttachment.value != null) {
             mergedFiles.add(invoiceAttachment.value!);
@@ -3417,6 +3541,17 @@ class GCFormController extends GetxController {
           if (companyIdValue == null || companyIdValue.isEmpty) {
             throw Exception('Company ID is required for temporary GC creation');
           }
+
+          // Use selected temporary GC number from pool
+          final selectedTempNumber = selectedTempGcFromPool.value.isNotEmpty
+              ? selectedTempGcFromPool.value
+              : tempGcNumber.value;
+          if (selectedTempNumber.isEmpty) {
+            throw Exception(
+              'Temporary GC number is required. Please select one before creating.',
+            );
+          }
+          data['temp_gc_number'] = selectedTempNumber;
 
           data['userId'] = userId;
           data['companyId'] = companyIdValue;

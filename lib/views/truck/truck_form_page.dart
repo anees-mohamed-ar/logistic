@@ -653,7 +653,14 @@ class _TruckFormPageState extends State<TruckFormPage>
           attachments: _attachments,
         );
         if (success && mounted) {
-          Get.back(result: true);
+          Get.snackbar(
+            'Success',
+            'Truck updated successfully',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+          );
+          Navigator.of(context).pop(true);
         }
       } else {
         success = await _controller.addTruck(truck, attachments: _attachments);
@@ -665,7 +672,8 @@ class _TruckFormPageState extends State<TruckFormPage>
             backgroundColor: Colors.green,
             colorText: Colors.white,
           );
-          _resetForm();
+          // _resetForm();
+          Navigator.of(context).pop(true);
         }
       }
     } catch (e) {

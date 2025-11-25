@@ -937,7 +937,7 @@ class GCPdfGenerator {
                                     controller.customInvoiceCtrl.text,
                                     style: pw.TextStyle(
                                       font: font,
-                                      fontSize: 6.5,
+                                      fontSize: 8,
                                     ),
                                   ),
                                 ],
@@ -963,7 +963,7 @@ class GCPdfGenerator {
                                     controller.gcDateCtrl.text,
                                     style: pw.TextStyle(
                                       font: font,
-                                      fontSize: 6.5,
+                                      fontSize: 8,
                                     ),
                                   ),
                                 ],

@@ -11,11 +11,17 @@ class GCPdfFactory {
     BuildContext context,
     GCFormController controller,
   ) async {
+    debugPrint(
+      '[GCPdfFactory] showPdfPreview called with flavor='
+      '${FlavorConfig.instance.flavor}',
+    );
     switch (FlavorConfig.instance.flavor) {
       case Flavor.cargo:
+        debugPrint('[GCPdfFactory] Using CARGO PDF generator for PREVIEW');
         await cargo.GCPdfGenerator.showPdfPreview(context, controller);
         break;
       case Flavor.carrying:
+        debugPrint('[GCPdfFactory] Using CARRYING PDF generator for PREVIEW');
         await carrying.GCPdfGenerator.showPdfPreview(context, controller);
         break;
     }
@@ -23,21 +29,33 @@ class GCPdfFactory {
 
   /// Save PDF to device using the appropriate generator
   static Future<String> savePdfToDevice(GCFormController controller) async {
+    debugPrint(
+      '[GCPdfFactory] savePdfToDevice called with flavor='
+      '${FlavorConfig.instance.flavor}',
+    );
     switch (FlavorConfig.instance.flavor) {
       case Flavor.cargo:
+        debugPrint('[GCPdfFactory] Using CARGO PDF generator for SAVE');
         return await cargo.GCPdfGenerator.savePdfToDevice(controller);
       case Flavor.carrying:
+        debugPrint('[GCPdfFactory] Using CARRYING PDF generator for SAVE');
         return await carrying.GCPdfGenerator.savePdfToDevice(controller);
     }
   }
 
   /// Share PDF using the appropriate generator
   static Future<void> sharePdf(GCFormController controller) async {
+    debugPrint(
+      '[GCPdfFactory] sharePdf called with flavor='
+      '${FlavorConfig.instance.flavor}',
+    );
     switch (FlavorConfig.instance.flavor) {
       case Flavor.cargo:
+        debugPrint('[GCPdfFactory] Using CARGO PDF generator for SHARE');
         await cargo.GCPdfGenerator.sharePdf(controller);
         break;
       case Flavor.carrying:
+        debugPrint('[GCPdfFactory] Using CARRYING PDF generator for SHARE');
         await carrying.GCPdfGenerator.sharePdf(controller);
         break;
     }
@@ -45,11 +63,17 @@ class GCPdfFactory {
 
   /// Print PDF using the appropriate generator
   static Future<void> printPdf(GCFormController controller) async {
+    debugPrint(
+      '[GCPdfFactory] printPdf called with flavor='
+      '${FlavorConfig.instance.flavor}',
+    );
     switch (FlavorConfig.instance.flavor) {
       case Flavor.cargo:
+        debugPrint('[GCPdfFactory] Using CARGO PDF generator for PRINT');
         await cargo.GCPdfGenerator.printPdf(controller);
         break;
       case Flavor.carrying:
+        debugPrint('[GCPdfFactory] Using CARRYING PDF generator for PRINT');
         await carrying.GCPdfGenerator.printPdf(controller);
         break;
     }

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:logistic/widgets/custom_drawer.dart';
-import 'package:logistic/controller/id_controller.dart';
+// import 'package:logistic/controller/id_controller.dart';
 import 'package:logistic/routes.dart';
-import 'custom_app_bar.dart';
+// import 'custom_app_bar.dart';
 
 class MainLayout extends StatelessWidget {
   final String title;
@@ -27,7 +27,7 @@ class MainLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final idController = Get.find<IdController>();
+    // final idController = Get.find<IdController>();
     
     return Scaffold(
       appBar: showAppBar

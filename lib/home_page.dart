@@ -7,6 +7,7 @@ import 'package:logistic/widgets/main_layout.dart';
 import 'package:logistic/controller/id_controller.dart';
 import 'routes.dart';
 import 'package:logistic/widgets/gc_usage_widget.dart';
+import 'package:logistic/config/flavor_config.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:logistic/api_config.dart';
@@ -373,7 +374,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    // final theme = Theme.of(context);
     final isSmallScreen = MediaQuery.of(context).size.width < 700;
     final isAdmin = idController.userRole.value == 'admin';
 
@@ -472,6 +473,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget _buildWelcomeSection(BuildContext context, bool isSmallScreen) {
     final idController = Get.find<IdController>();
     final userName = idController.userName.value ?? 'User';
+    final flavor = FlavorConfig.instance.flavor;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -517,12 +519,42 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
           if (!isSmallScreen)
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(Icons.dashboard, color: Colors.white, size: 32),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  flavor == Flavor.cargo
+                      ? 'uploads/cargo2.png'
+                      : 'uploads/carrying.jpg',
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            )
+          else
+            Container(
+              margin: const EdgeInsets.only(left: 12),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.18),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset(
+                  flavor == Flavor.cargo
+                      ? 'uploads/cargo2.png'
+                      : 'uploads/carrying.jpg',
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
         ],
       ),

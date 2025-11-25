@@ -863,8 +863,8 @@ router.put('/updateGC/:GcNumber', gcUpload.fields([
                 // Process uploaded files if any
                 const attachmentFileArray = req.files && Array.isArray(req.files) ? req.files : (req.files && req.files.attachments) ? req.files.attachments : [];
                 if (attachmentFileArray && attachmentFileArray.length > 0) {
-                    // First, fetch existing attachments
-                    const fetchExistingSql = 'SELECT attachment_files FROM gc_creation WHERE GcNumber = ? AND CompanyId = ?';
+                    // First, fetch existing attachments and invoice/e-way metadata
+                    const fetchExistingSql = 'SELECT attachment_files, invoice_attachment, e_way_attachment FROM gc_creation WHERE GcNumber = ? AND CompanyId = ?';
                     db.query(fetchExistingSql, [GcNumber, CompanyId], (fetchErr, fetchResult) => {
                         let attachmentFiles = [];
                         if (fetchErr) {
@@ -900,6 +900,18 @@ router.put('/updateGC/:GcNumber', gcUpload.fields([
                                     console.error(`[${new Date().toISOString()}] [${requestId}] Error parsing existing attachments:`, parseErr);
                                 }
                             }
+                            let existingInvoiceJson = null;
+                            let existingEWayJson = null;
+                            if (fetchResult.length > 0 && fetchResult[0].invoice_attachment) {
+                                existingInvoiceJson = fetchResult[0].invoice_attachment;
+                            }
+                            if (fetchResult.length > 0 && fetchResult[0].e_way_attachment) {
+                                existingEWayJson = fetchResult[0].e_way_attachment;
+                            }
+
+                            console.log('>>> [updateGC] WITH attachments for GC', GcNumber, 'Company', CompanyId);
+                            console.log('Existing invoice_attachment (raw):', existingInvoiceJson);
+                            console.log('Existing e_way_attachment (raw):', existingEWayJson);
 
                             // Create new attachment objects with optional type
                             const newAttachments = attachmentFileArray.map((file, index) => {
@@ -975,13 +987,41 @@ router.put('/updateGC/:GcNumber', gcUpload.fields([
                                 uploadedBy: req.query.userId || 'unknown'
                             } : null;
 
+                            console.log('New invoiceInfo:', invoiceInfo);
+                            console.log('New eWayInfo:', eWayInfo);
+
                             if (invoiceInfo || eWayInfo) {
                                 const updateInvoiceSql = 'UPDATE gc_creation SET invoice_attachment = ?, e_way_attachment = ? WHERE GcNumber = ? AND CompanyId = ?';
-                                db.query(updateInvoiceSql, [invoiceInfo ? JSON.stringify(invoiceInfo) : null, eWayInfo ? JSON.stringify(eWayInfo) : null, GcNumber, CompanyId], (invErr) => {
+
+                                const finalInvoiceJson = invoiceInfo
+                                    ? JSON.stringify(invoiceInfo)
+                                    : (existingInvoiceJson || null);
+                                const finalEWayJson = eWayInfo
+                                    ? JSON.stringify(eWayInfo)
+                                    : (existingEWayJson || null);
+
+                                db.query(updateInvoiceSql, [finalInvoiceJson, finalEWayJson, GcNumber, CompanyId], (invErr) => {
                                     if (invErr) {
                                         console.error(`[${new Date().toISOString()}] [${requestId}] Error updating invoice/e-way attachments:`, invErr);
                                     } else {
                                         console.log(`[${new Date().toISOString()}] [${requestId}] Successfully updated invoice/e-way attachments`);
+                                    }
+
+                                    let responseInvoice = null;
+                                    let responseEWay = null;
+                                    try {
+                                        if (finalInvoiceJson) {
+                                            responseInvoice = JSON.parse(finalInvoiceJson);
+                                        }
+                                    } catch (e) {
+                                        console.error('Error parsing finalInvoiceJson for response:', e);
+                                    }
+                                    try {
+                                        if (finalEWayJson) {
+                                            responseEWay = JSON.parse(finalEWayJson);
+                                        }
+                                    } catch (e) {
+                                        console.error('Error parsing finalEWayJson for response:', e);
                                     }
 
                                     console.log(`[${new Date().toISOString()}] [${requestId}] Response: 200 - GC updated successfully`);
@@ -994,8 +1034,8 @@ router.put('/updateGC/:GcNumber', gcUpload.fields([
                                             updated: true,
                                             attachments: attachmentFiles,
                                             attachmentCount: attachmentFiles.length,
-                                            invoiceAttachment: invoiceInfo,
-                                            eWayAttachment: eWayInfo
+                                            invoiceAttachment: responseInvoice,
+                                            eWayAttachment: responseEWay
                                         },
                                         requestId
                                     });
@@ -1044,32 +1084,75 @@ router.put('/updateGC/:GcNumber', gcUpload.fields([
                     } : null;
 
                     if (invoiceInfo || eWayInfo) {
-                        const updateInvoiceSql = 'UPDATE gc_creation SET invoice_attachment = ?, e_way_attachment = ? WHERE GcNumber = ? AND CompanyId = ?';
-                        db.query(updateInvoiceSql, [invoiceInfo ? JSON.stringify(invoiceInfo) : null, eWayInfo ? JSON.stringify(eWayInfo) : null, GcNumber, CompanyId], (invErr) => {
-                            if (invErr) {
-                                console.error(`[${new Date().toISOString()}] [${requestId}] Error updating invoice/e-way attachments:`, invErr);
-                            } else {
-                                console.log(`[${new Date().toISOString()}] [${requestId}] Successfully updated invoice/e-way attachments`);
+                        // Fetch existing invoice/e-way so we can preserve untouched slot
+                        const fetchSql = 'SELECT invoice_attachment, e_way_attachment FROM gc_creation WHERE GcNumber = ? AND CompanyId = ? LIMIT 1';
+                        db.query(fetchSql, [GcNumber, CompanyId], (fetchErr, rows2) => {
+                            let existingInvoiceJson = null;
+                            let existingEWayJson = null;
+                            if (fetchErr) {
+                                console.error(`[${new Date().toISOString()}] [${requestId}] Error fetching existing invoice/e-way:`, fetchErr);
+                            } else if (rows2 && rows2.length > 0) {
+                                existingInvoiceJson = rows2[0].invoice_attachment || null;
+                                existingEWayJson = rows2[0].e_way_attachment || null;
                             }
 
-                            console.log(`[${new Date().toISOString()}] [${requestId}] Response: 200 - GC updated successfully`);
-                            return res.status(200).json({
-                                success: true,
-                                message: 'GC updated successfully',
-                                data: {
-                                    GcNumber,
-                                    CompanyId,
-                                    updated: true,
-                                    attachments: [],
-                                    attachmentCount: 0,
-                                    invoiceAttachment: invoiceInfo,
-                                    eWayAttachment: eWayInfo
-                                },
-                                requestId
+                            console.log('>>> [updateGC] NO attachments for GC', GcNumber, 'Company', CompanyId);
+                            console.log('Existing invoice_attachment (raw 2):', existingInvoiceJson);
+                            console.log('Existing e_way_attachment (raw 2):', existingEWayJson);
+                            console.log('New invoiceInfo (no-att):', invoiceInfo);
+                            console.log('New eWayInfo (no-att):', eWayInfo);
+
+                            const finalInvoiceJson = invoiceInfo
+                                ? JSON.stringify(invoiceInfo)
+                                : (existingInvoiceJson || null);
+                            const finalEWayJson = eWayInfo
+                                ? JSON.stringify(eWayInfo)
+                                : (existingEWayJson || null);
+
+                            const updateInvoiceSql = 'UPDATE gc_creation SET invoice_attachment = ?, e_way_attachment = ? WHERE GcNumber = ? AND CompanyId = ?';
+                            db.query(updateInvoiceSql, [finalInvoiceJson, finalEWayJson, GcNumber, CompanyId], (invErr) => {
+                                if (invErr) {
+                                    console.error(`[${new Date().toISOString()}] [${requestId}] Error updating invoice/e-way attachments:`, invErr);
+                                } else {
+                                    console.log(`[${new Date().toISOString()}] [${requestId}] Successfully updated invoice/e-way attachments`);
+                                }
+
+                                let responseInvoice = null;
+                                let responseEWay = null;
+                                try {
+                                    if (finalInvoiceJson) {
+                                        responseInvoice = JSON.parse(finalInvoiceJson);
+                                    }
+                                } catch (e) {
+                                    console.error('Error parsing finalInvoiceJson for response (no-attachments path):', e);
+                                }
+                                try {
+                                    if (finalEWayJson) {
+                                        responseEWay = JSON.parse(finalEWayJson);
+                                    }
+                                } catch (e) {
+                                    console.error('Error parsing finalEWayJson for response (no-attachments path):', e);
+                                }
+
+                                console.log(`[${new Date().toISOString()}] [${requestId}] Response: 200 - GC updated successfully`);
+                                return res.status(200).json({
+                                    success: true,
+                                    message: 'GC updated successfully',
+                                    data: {
+                                        GcNumber,
+                                        CompanyId,
+                                        updated: true,
+                                        attachments: [],
+                                        attachmentCount: 0,
+                                        invoiceAttachment: responseInvoice,
+                                        eWayAttachment: responseEWay
+                                    },
+                                    requestId
+                                });
                             });
                         });
                     } else {
-                        console.log(`[${new Date().toISOString()}] [${requestId}] Response: 200 - GC updated successfully`);
+                        console.log(`[${new Date().toISOString()}] [${requestId}] Response: 200 - GC updated successfully (no attachments and no invoice/e-way)`);
                         return res.status(200).json({
                             success: true,
                             message: 'GC updated successfully',
