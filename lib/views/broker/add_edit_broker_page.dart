@@ -25,13 +25,13 @@ class _AddEditBrokerPageState extends State<AddEditBrokerPage> {
   final _formKey = GlobalKey<FormState>();
   final _controller = Get.find<BrokerController>();
   final _idController = Get.find<IdController>();
-  
+
   // State management
   final _states = <StateModel>[].obs;
   final _statesLoading = false.obs;
   final _statesError = ''.obs;
   StateModel? _selectedState;
-  
+
   // Controllers for form fields
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
@@ -43,7 +43,7 @@ class _AddEditBrokerPageState extends State<AddEditBrokerPage> {
   final _phoneController = TextEditingController();
   final _mobileController = TextEditingController();
   final _panController = TextEditingController();
-  
+
   DateTime? _selectedDob;
   bool _isLoading = false;
 
@@ -61,7 +61,9 @@ class _AddEditBrokerPageState extends State<AddEditBrokerPage> {
     _addressController.text = broker.brokerAddress;
     _districtController.text = broker.district;
     _countryController.text = broker.country;
-    _selectedDob = broker.dateofBirth != null ? DateTime.parse(broker.dateofBirth!) : null;
+    _selectedDob = broker.dateofBirth != null
+        ? DateTime.parse(broker.dateofBirth!)
+        : null;
     _commissionController.text = broker.commissionPercentage.toString();
     _emailController.text = broker.email;
     _bloodGroupController.text = broker.bloodGroup;
@@ -95,7 +97,8 @@ class _AddEditBrokerPageState extends State<AddEditBrokerPage> {
       state: _selectedState?.name ?? '',
       country: _countryController.text.trim(),
       dateofBirth: _selectedDob?.toIso8601String(),
-      commissionPercentage: double.tryParse(_commissionController.text.trim()) ?? 0.0,
+      commissionPercentage:
+          double.tryParse(_commissionController.text.trim()) ?? 0.0,
       email: _emailController.text.trim(),
       bloodGroup: _bloodGroupController.text.trim(),
       phoneNumber: _phoneController.text.trim(),
@@ -105,7 +108,7 @@ class _AddEditBrokerPageState extends State<AddEditBrokerPage> {
     );
 
     setState(() => _isLoading = true);
-    
+
     final success = widget.broker == null
         ? await _controller.addBroker(broker)
         : await _controller.updateBroker(broker);
@@ -116,7 +119,9 @@ class _AddEditBrokerPageState extends State<AddEditBrokerPage> {
       Get.back();
       Get.snackbar(
         'Success',
-        widget.broker == null ? 'Broker added successfully' : 'Broker updated successfully',
+        widget.broker == null
+            ? 'Broker added successfully'
+            : 'Broker updated successfully',
         snackPosition: SnackPosition.BOTTOM,
       );
     }
@@ -138,14 +143,16 @@ class _AddEditBrokerPageState extends State<AddEditBrokerPage> {
                     _buildTextField(
                       controller: _nameController,
                       label: 'Broker Name *',
-                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                      validator: (value) =>
+                          value?.isEmpty ?? true ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
                       controller: _addressController,
                       label: 'Address *',
                       maxLines: 3,
-                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                      validator: (value) =>
+                          value?.isEmpty ?? true ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -154,20 +161,20 @@ class _AddEditBrokerPageState extends State<AddEditBrokerPage> {
                           child: _buildTextField(
                             controller: _districtController,
                             label: 'District *',
-                            validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                            validator: (value) =>
+                                value?.isEmpty ?? true ? 'Required' : null,
                           ),
                         ),
                         const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildStateDropdown(),
-                        ),
+                        Expanded(child: _buildStateDropdown()),
                       ],
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
                       controller: _countryController,
                       label: 'Country *',
-                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                      validator: (value) =>
+                          value?.isEmpty ?? true ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
                     _buildDateField(
@@ -184,7 +191,8 @@ class _AddEditBrokerPageState extends State<AddEditBrokerPage> {
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         if (value?.isEmpty ?? true) return 'Required';
-                        if (double.tryParse(value!) == null) return 'Enter a valid number';
+                        if (double.tryParse(value!) == null)
+                          return 'Enter a valid number';
                         return null;
                       },
                     ),
@@ -212,28 +220,31 @@ class _AddEditBrokerPageState extends State<AddEditBrokerPage> {
                       controller: _phoneController,
                       label: 'Phone Number *',
                       keyboardType: TextInputType.phone,
-                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                      validator: (value) =>
+                          value?.isEmpty ?? true ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
                       controller: _mobileController,
                       label: 'Mobile Number *',
                       keyboardType: TextInputType.phone,
-                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                      validator: (value) =>
+                          value?.isEmpty ?? true ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
                       controller: _panController,
                       label: 'PAN Number *',
-                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                      validator: (value) =>
+                          value?.isEmpty ?? true ? 'Required' : null,
                     ),
                     const SizedBox(height: 32),
                     ElevatedButton(
                       onPressed: _saveBroker,
                       style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1E2A44),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
@@ -260,10 +271,11 @@ class _AddEditBrokerPageState extends State<AddEditBrokerPage> {
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       ),
       maxLines: maxLines,
       keyboardType: keyboardType,
@@ -304,7 +316,7 @@ class _AddEditBrokerPageState extends State<AddEditBrokerPage> {
     try {
       _statesLoading.value = true;
       _statesError.value = '';
-      
+
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/state/search'),
         headers: {'Content-Type': 'application/json'},
@@ -312,14 +324,23 @@ class _AddEditBrokerPageState extends State<AddEditBrokerPage> {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        _states.value = data.map((state) => StateModel.fromJson(state)).toList();
-        
+        _states.value = data
+            .map((state) => StateModel.fromJson(state))
+            .toList();
+
         // Set selected state if editing
         if (widget.broker != null && widget.broker!.state.isNotEmpty) {
           setState(() {
             _selectedState = _states.firstWhere(
-              (state) => state.name.toLowerCase() == widget.broker!.state.toLowerCase(),
-              orElse: () => StateModel(id: 0, name: widget.broker!.state, code: '', tin: '')
+              (state) =>
+                  state.name.toLowerCase() ==
+                  widget.broker!.state.toLowerCase(),
+              orElse: () => StateModel(
+                id: 0,
+                name: widget.broker!.state,
+                code: '',
+                tin: '',
+              ),
             );
           });
         }
@@ -332,33 +353,38 @@ class _AddEditBrokerPageState extends State<AddEditBrokerPage> {
       _statesLoading.value = false;
     }
   }
-  
+
   Widget _buildStateDropdown() {
     return Obx(() {
       if (_statesLoading.value) {
         return const CircularProgressIndicator();
       }
-      
+
       if (_statesError.value.isNotEmpty) {
         return Text(
           _statesError.value,
           style: const TextStyle(color: Colors.red),
         );
       }
-      
+
       return SearchableDropdown<StateModel>(
         label: 'State *',
         value: _selectedState,
-        items: _states.map((state) => DropdownMenuItem<StateModel>(
-          value: state,
-          child: Text(state.name),
-        )).toList(),
+        items: _states
+            .map(
+              (state) => DropdownMenuItem<StateModel>(
+                value: state,
+                child: Text(state.name),
+              ),
+            )
+            .toList(),
         onChanged: (StateModel? state) {
           setState(() {
             _selectedState = state;
           });
         },
-        validator: (value) => _selectedState == null ? 'Please select a state' : null,
+        validator: (value) =>
+            _selectedState == null ? 'Please select a state' : null,
       );
     });
   }

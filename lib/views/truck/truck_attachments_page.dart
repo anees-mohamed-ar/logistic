@@ -324,7 +324,7 @@ class _TruckAttachmentsPageState extends State<TruckAttachmentsPage> {
             ),
           ],
         ),
-        backgroundColor: const Color(0xFF1E2A44),
+        backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -342,11 +342,11 @@ class _TruckAttachmentsPageState extends State<TruckAttachmentsPage> {
 
   Widget _buildBody() {
     if (isLoading) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: Color(0xFF1E2A44)),
+          children: const [
+            CircularProgressIndicator(),
             SizedBox(height: 16),
             Text(
               'Loading attachments...',

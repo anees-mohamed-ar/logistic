@@ -73,7 +73,7 @@ class FlavorConfig {
           flavor: Flavor.cargo,
           name: 'Sri Krishna Cargo Corporation',
           companyId: 7,
-          primaryColor: const Color.fromARGB(255, 68, 42, 30),
+          primaryColor: const Color(0xFF441E1E),
           pdfGenerator: 'gc_pdf.dart',
         );
         debugPrint(

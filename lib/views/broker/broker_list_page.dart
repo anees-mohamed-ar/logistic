@@ -15,7 +15,7 @@ class BrokerListPage extends StatefulWidget {
 class _BrokerListPageState extends State<BrokerListPage> {
   final BrokerController controller = Get.put(BrokerController());
   final searchController = TextEditingController();
-  
+
   @override
   void initState() {
     super.initState();
@@ -51,11 +51,14 @@ class _BrokerListPageState extends State<BrokerListPage> {
                   onPressed: controller.fetchBrokers,
                   icon: const Icon(Icons.refresh),
                   label: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 12.0,
+                    ),
                     child: Text('Retry'),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E2A44),
+                    backgroundColor: Theme.of(context).primaryColor,
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -79,7 +82,11 @@ class _BrokerListPageState extends State<BrokerListPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.search_off, size: 64, color: Colors.grey),
+                        const Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
                         const SizedBox(height: 16),
                         const Text(
                           'No matching brokers found',
@@ -108,7 +115,7 @@ class _BrokerListPageState extends State<BrokerListPage> {
                   icon: const Icon(Icons.refresh, size: 18),
                   label: const Text('Refresh'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E2A44),
+                    backgroundColor: Theme.of(context).primaryColor,
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -137,7 +144,7 @@ class _BrokerListPageState extends State<BrokerListPage> {
                   itemCount: controller.filteredBrokers.length,
                   itemBuilder: (context, index) {
                     final broker = controller.filteredBrokers[index];
-                    return _buildBrokerCard(broker);
+                    return _buildBrokerCard(context, broker);
                   },
                 ),
               ),
@@ -147,7 +154,7 @@ class _BrokerListPageState extends State<BrokerListPage> {
       }),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Get.to(() => const AddEditBrokerPage()),
-        backgroundColor: const Color(0xFF1E2A44),
+        backgroundColor: Theme.of(context).primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -179,13 +186,13 @@ class _BrokerListPageState extends State<BrokerListPage> {
     );
   }
 
-  Widget _buildBrokerCard(Broker broker) {
+  Widget _buildBrokerCard(BuildContext context, Broker broker) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Colors.blue.shade100,
-          child: const Icon(Icons.person, color: Colors.blue),
+          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+          child: Icon(Icons.person, color: Theme.of(context).primaryColor),
         ),
         title: Text(
           broker.brokerName,
@@ -195,15 +202,21 @@ class _BrokerListPageState extends State<BrokerListPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('${broker.phoneNumber}'),
-            Text('${broker.commissionPercentage}% commission', 
-                style: const TextStyle(fontSize: 12)),
+            Text(
+              '${broker.commissionPercentage}% commission',
+              style: const TextStyle(fontSize: 12),
+            ),
           ],
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+              icon: Icon(
+                Icons.edit,
+                color: Theme.of(context).primaryColor,
+                size: 20,
+              ),
               onPressed: () => _navigateToEditPage(broker),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
@@ -231,10 +244,7 @@ class _BrokerListPageState extends State<BrokerListPage> {
       title: 'Delete Broker',
       content: const Text('Are you sure you want to delete this broker?'),
       actions: [
-        TextButton(
-          onPressed: () => Get.back(),
-          child: const Text('Cancel'),
-        ),
+        TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
         TextButton(
           onPressed: () async {
             Get.back();

@@ -63,9 +63,7 @@ class _AddEditBranchPageState extends State<AddEditBranchPage> {
     final isEditing = widget.branch != null;
 
     return Scaffold(
-      appBar: CustomAppBar(
-        title: isEditing ? 'Edit Branch' : 'Add Branch',
-      ),
+      appBar: CustomAppBar(title: isEditing ? 'Edit Branch' : 'Add Branch'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -75,10 +73,10 @@ class _AddEditBranchPageState extends State<AddEditBranchPage> {
             children: [
               Text(
                 isEditing ? 'Edit Branch Details' : 'Enter Branch Details',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E2A44),
+                  color: Theme.of(context).primaryColor,
                 ),
               ),
               const SizedBox(height: 24),
@@ -139,10 +137,10 @@ class _AddEditBranchPageState extends State<AddEditBranchPage> {
                     const SizedBox(height: 4),
                     Text(
                       CompanyConfig.companyName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
-                        color: Color(0xFF1E2A44),
+                        color: Theme.of(context).primaryColor,
                       ),
                     ),
                   ],
@@ -185,7 +183,9 @@ class _AddEditBranchPageState extends State<AddEditBranchPage> {
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value != null && value.isNotEmpty) {
-                    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                    final emailRegex = RegExp(
+                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                    );
                     if (!emailRegex.hasMatch(value)) {
                       return 'Please enter a valid email address';
                     }
@@ -203,10 +203,10 @@ class _AddEditBranchPageState extends State<AddEditBranchPage> {
                   prefixIcon: Icon(Icons.toggle_on),
                 ),
                 items: ['Active', 'Inactive']
-                    .map((status) => DropdownMenuItem(
-                          value: status,
-                          child: Text(status),
-                        ))
+                    .map(
+                      (status) =>
+                          DropdownMenuItem(value: status, child: Text(status)),
+                    )
                     .toList(),
                 onChanged: (value) {
                   if (value != null) {
@@ -225,23 +225,25 @@ class _AddEditBranchPageState extends State<AddEditBranchPage> {
               const SizedBox(height: 32),
 
               // Save Button
-              Obx(() => SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: controller.isLoading.value ? null : _saveBranch,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E2A44),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+              Obx(
+                () => SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: controller.isLoading.value ? null : _saveBranch,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: controller.isLoading.value
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : Text(isEditing ? 'Update Branch' : 'Save Branch'),
                     ),
-                  )),
+                    child: controller.isLoading.value
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : Text(isEditing ? 'Update Branch' : 'Save Branch'),
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
             ],
           ),
@@ -261,9 +263,15 @@ class _AddEditBranchPageState extends State<AddEditBranchPage> {
       branchCode: _branchCodeController.text.trim(),
       companyId: CompanyConfig.companyId, // Use CompanyConfig
       companyName: CompanyConfig.companyName, // Use CompanyConfig
-      address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
-      phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-      email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+      address: _addressController.text.trim().isEmpty
+          ? null
+          : _addressController.text.trim(),
+      phone: _phoneController.text.trim().isEmpty
+          ? null
+          : _phoneController.text.trim(),
+      email: _emailController.text.trim().isEmpty
+          ? null
+          : _emailController.text.trim(),
       status: _status,
     );
 
@@ -278,7 +286,9 @@ class _AddEditBranchPageState extends State<AddEditBranchPage> {
       Get.back();
       Get.snackbar(
         'Success',
-        widget.branch != null ? 'Branch updated successfully' : 'Branch added successfully',
+        widget.branch != null
+            ? 'Branch updated successfully'
+            : 'Branch added successfully',
         backgroundColor: Colors.green,
         colorText: Colors.white,
       );

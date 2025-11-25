@@ -43,11 +43,14 @@ class GstListPage extends StatelessWidget {
                   onPressed: controller.refreshGstList,
                   icon: const Icon(Icons.refresh),
                   label: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 12.0,
+                    ),
                     child: Text('Retry'),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E2A44),
+                    backgroundColor: Theme.of(context).primaryColor,
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -100,7 +103,7 @@ class GstListPage extends StatelessWidget {
                   icon: const Icon(Icons.refresh, size: 18),
                   label: const Text('Refresh'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E2A44),
+                    backgroundColor: Theme.of(context).primaryColor,
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -129,7 +132,7 @@ class GstListPage extends StatelessWidget {
                   itemCount: controller.filteredGstList.length,
                   itemBuilder: (context, index) {
                     final gst = controller.filteredGstList[index];
-                    return _buildGstCard(gst);
+                    return _buildGstCard(context, gst);
                   },
                 ),
               ),
@@ -139,7 +142,7 @@ class GstListPage extends StatelessWidget {
       }),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Get.to(() => GstFormPage()),
-        backgroundColor: const Color(0xFF1E2A44),
+        backgroundColor: Theme.of(context).primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -171,7 +174,7 @@ class GstListPage extends StatelessWidget {
     );
   }
 
-  Widget _buildGstCard(GstModel gst) {
+  Widget _buildGstCard(BuildContext context, GstModel gst) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: ListTile(
@@ -192,18 +195,19 @@ class GstListPage extends StatelessWidget {
               style: const TextStyle(fontSize: 13),
             ),
             const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
               children: [
-                _buildTaxChip('CGST', '${gst.cgst}%'),
-                _buildTaxChip('SGST', '${gst.sgst}%'),
-                _buildTaxChip('IGST', '${gst.igst}%'),
+                _buildTaxChip(context, 'CGST', '${gst.cgst}%'),
+                _buildTaxChip(context, 'SGST', '${gst.sgst}%'),
+                _buildTaxChip(context, 'IGST', '${gst.igst}%'),
               ],
             ),
           ],
         ),
         trailing: IconButton(
-          icon: const Icon(Icons.edit, color: Colors.blue),
+          icon: Icon(Icons.edit, color: Theme.of(context).primaryColor),
           onPressed: () => Get.to(() => GstFormPage(gst: gst)),
         ),
         onTap: () => Get.to(() => GstFormPage(gst: gst)),
@@ -211,18 +215,18 @@ class GstListPage extends StatelessWidget {
     );
   }
 
-  Widget _buildTaxChip(String label, String value) {
+  Widget _buildTaxChip(BuildContext context, String label, String value) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: Theme.of(context).primaryColor.withOpacity(0.06),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         '$label: $value',
         style: TextStyle(
           fontSize: 12,
-          color: Colors.blue.shade800,
+          color: Theme.of(context).primaryColor,
           fontWeight: FontWeight.w500,
         ),
       ),

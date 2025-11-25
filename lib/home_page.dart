@@ -243,8 +243,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 height: 64,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF4A90E2), Color(0xFF1E2A44)],
+                  gradient: LinearGradient(
+                    colors: [
+                      Theme.of(context).primaryColor,
+                      Theme.of(context).primaryColor.withOpacity(0.85),
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -374,7 +377,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    // final theme = Theme.of(context);
     final isSmallScreen = MediaQuery.of(context).size.width < 700;
     final isAdmin = idController.userRole.value == 'admin';
 
@@ -593,7 +595,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'Total GCs',
         _totalGCsAnim,
         Icons.assignment_outlined,
-        const Color(0xFF4A90E2),
+        Theme.of(context).primaryColor,
         isCount: true,
       ),
       _buildSummaryCard(
@@ -739,7 +741,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
               label: Text(_showAllActions ? 'Show Less' : 'View All'),
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF4A90E2),
+                foregroundColor: Theme.of(context).primaryColor,
               ),
             ),
           ],

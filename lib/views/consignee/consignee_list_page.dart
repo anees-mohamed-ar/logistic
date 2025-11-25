@@ -68,7 +68,7 @@ class ConsigneeListPage extends StatelessWidget {
                       child: Text('Retry'),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1E2A44),
+                      backgroundColor: Theme.of(context).primaryColor,
                       foregroundColor: Colors.white,
                     ),
                   ),
@@ -108,7 +108,7 @@ class ConsigneeListPage extends StatelessWidget {
       }),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Get.to(() => AddEditConsigneePage()),
-        backgroundColor: const Color(0xFF1E2A44),
+        backgroundColor: Theme.of(context).primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
@@ -147,12 +147,12 @@ class ConsigneeListPage extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Colors.blue.shade100,
+          backgroundColor: Theme.of(Get.context!).primaryColor.withOpacity(0.1),
           child: Text(
             consignee.consigneeName.isNotEmpty
                 ? consignee.consigneeName[0].toUpperCase()
                 : 'C',
-            style: const TextStyle(color: Colors.blue),
+            style: TextStyle(color: Theme.of(Get.context!).primaryColor),
           ),
         ),
         title: Text(

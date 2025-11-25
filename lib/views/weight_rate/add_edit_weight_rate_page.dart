@@ -9,15 +9,19 @@ class AddEditWeightRatePage extends StatefulWidget {
   final WeightToRate? weightRate;
 
   AddEditWeightRatePage({Key? key, this.weightRate}) : super(key: key) {
-    print('AddEditWeightRatePage: Constructor called with weightRate: $weightRate');
+    print(
+      'AddEditWeightRatePage: Constructor called with weightRate: $weightRate',
+    );
   }
-  
+
   static Widget create(Object? arguments) {
     print('AddEditWeightRatePage.create called with arguments: $arguments');
     if (arguments is WeightToRate) {
       return AddEditWeightRatePage(weightRate: arguments);
     } else if (arguments is Map<String, dynamic>) {
-      return AddEditWeightRatePage(weightRate: WeightToRate.fromJson(arguments));
+      return AddEditWeightRatePage(
+        weightRate: WeightToRate.fromJson(arguments),
+      );
     } else {
       return AddEditWeightRatePage();
     }
@@ -30,7 +34,7 @@ class AddEditWeightRatePage extends StatefulWidget {
 class _AddEditWeightRatePageState extends State<AddEditWeightRatePage> {
   final _formKey = GlobalKey<FormState>();
   final _controller = Get.find<WeightToRateController>();
-  
+
   final _weightController = TextEditingController();
   final _below250Controller = TextEditingController();
   final _above250Controller = TextEditingController();
@@ -54,7 +58,7 @@ class _AddEditWeightRatePageState extends State<AddEditWeightRatePage> {
     _above250Controller.dispose();
     super.dispose();
   }
-  
+
   // Parse a string to double, handling empty strings and invalid formats
   double? _parseDouble(String value) {
     if (value.isEmpty) return null;
@@ -67,11 +71,11 @@ class _AddEditWeightRatePageState extends State<AddEditWeightRatePage> {
     try {
       final below250 = _parseDouble(_below250Controller.text);
       final above250 = _parseDouble(_above250Controller.text);
-      
+
       if (below250 == null || above250 == null) {
         throw 'Please enter valid numbers for rates';
       }
-      
+
       if (below250 <= 0 || above250 <= 0) {
         throw 'Rates must be greater than 0';
       }
@@ -128,9 +132,9 @@ class _AddEditWeightRatePageState extends State<AddEditWeightRatePage> {
                   return null;
                 },
               ),
-              
+
               const SizedBox(height: 20),
-              
+
               // Below 250km Rate
               TextFormField(
                 controller: _below250Controller,
@@ -141,7 +145,9 @@ class _AddEditWeightRatePageState extends State<AddEditWeightRatePage> {
                   prefixText: '₹ ',
                   prefixIcon: Icon(Icons.money_off_csred),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 textInputAction: TextInputAction.next,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -157,9 +163,9 @@ class _AddEditWeightRatePageState extends State<AddEditWeightRatePage> {
                   return null;
                 },
               ),
-              
+
               const SizedBox(height: 20),
-              
+
               // Above 250km Rate
               TextFormField(
                 controller: _above250Controller,
@@ -170,7 +176,9 @@ class _AddEditWeightRatePageState extends State<AddEditWeightRatePage> {
                   prefixText: '₹ ',
                   prefixIcon: Icon(Icons.monetization_on),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 textInputAction: TextInputAction.done,
                 onFieldSubmitted: (_) => _saveWeightRate(),
                 validator: (value) {
@@ -187,9 +195,9 @@ class _AddEditWeightRatePageState extends State<AddEditWeightRatePage> {
                   return null;
                 },
               ),
-              
+
               const SizedBox(height: 32),
-              
+
               // Save/Update Button
               Obx(() {
                 return _controller.isLoading.value
@@ -197,9 +205,9 @@ class _AddEditWeightRatePageState extends State<AddEditWeightRatePage> {
                     : ElevatedButton(
                         onPressed: _saveWeightRate,
                         style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1E2A44),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: const TextStyle(fontSize: 16),
+                          backgroundColor: Theme.of(context).primaryColor,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          textStyle: const TextStyle(fontSize: 16),
                         ),
                         child: Text(
                           isEditing ? 'UPDATE RATE' : 'SAVE RATE',
@@ -207,9 +215,9 @@ class _AddEditWeightRatePageState extends State<AddEditWeightRatePage> {
                         ),
                       );
               }),
-              
+
               // Cancel Button
-              if (!_controller.isLoading.value) ...[  
+              if (!_controller.isLoading.value) ...[
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: () => Get.back(),

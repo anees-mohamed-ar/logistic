@@ -28,11 +28,11 @@ class MainLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // final idController = Get.find<IdController>();
-    
+
     return Scaffold(
       appBar: showAppBar
           ? AppBar(
-              backgroundColor: const Color(0xFF1E2A44),
+              backgroundColor: Theme.of(context).primaryColor,
               foregroundColor: Colors.white,
               title: Text(title),
               automaticallyImplyLeading: false,

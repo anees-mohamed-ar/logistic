@@ -21,13 +21,13 @@ class SupplierFormPage extends StatefulWidget {
 class _SupplierFormPageState extends State<SupplierFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _controller = Get.find<SupplierController>();
-  
+
   // State management
   final _states = <StateModel>[].obs;
   final _statesLoading = false.obs;
   final _statesError = ''.obs;
   StateModel? _selectedState;
-  
+
   // Form controllers
   late TextEditingController _nameController;
   late TextEditingController _addressController;
@@ -60,62 +60,94 @@ class _SupplierFormPageState extends State<SupplierFormPage> {
     final supplier = widget.supplier;
     _nameController = TextEditingController(text: supplier?.supplierName ?? '');
     _addressController = TextEditingController(text: supplier?.address ?? '');
-    
+
     // Initialize other controllers
     _locationController = TextEditingController(text: supplier?.location ?? '');
     _districtController = TextEditingController(text: supplier?.district ?? '');
     _contactController = TextEditingController(text: supplier?.contact ?? '');
     _phoneController = TextEditingController(text: supplier?.phoneNumber ?? '');
-    _mobileController = TextEditingController(text: supplier?.mobileNumber ?? '');
+    _mobileController = TextEditingController(
+      text: supplier?.mobileNumber ?? '',
+    );
     _gstController = TextEditingController(text: supplier?.gst ?? '');
     _panController = TextEditingController(text: supplier?.panNumber ?? '');
     _msmeController = TextEditingController(text: supplier?.msmeNumber ?? '');
     _emailController = TextEditingController(text: supplier?.email ?? '');
     _cinController = TextEditingController(text: supplier?.cinNumber ?? '');
     _compTypeController = TextEditingController(text: supplier?.compType ?? '');
-    _industrialTypeController = TextEditingController(text: supplier?.industrialType ?? '');
+    _industrialTypeController = TextEditingController(
+      text: supplier?.industrialType ?? '',
+    );
     _faxController = TextEditingController(text: supplier?.fax ?? '');
-    _companyIdController = TextEditingController(text: supplier?.companyId ?? '');
-    _accountNameController = TextEditingController(text: supplier?.accountHolderName ?? '');
-    _accountNumberController = TextEditingController(text: supplier?.accountNumber ?? '');
+    _companyIdController = TextEditingController(
+      text: supplier?.companyId ?? '',
+    );
+    _accountNameController = TextEditingController(
+      text: supplier?.accountHolderName ?? '',
+    );
+    _accountNumberController = TextEditingController(
+      text: supplier?.accountNumber ?? '',
+    );
     _ifscController = TextEditingController(text: supplier?.ifscCode ?? '');
     _micrController = TextEditingController(text: supplier?.micrCode ?? '');
     _bankNameController = TextEditingController(text: supplier?.bankName ?? '');
-    _branchCodeController = TextEditingController(text: supplier?.branchCode ?? '');
-    _branchNameController = TextEditingController(text: supplier?.branchName ?? '');
-    _supplierNoController = TextEditingController(text: supplier?.supplierNo ?? '');
-    
+    _branchCodeController = TextEditingController(
+      text: supplier?.branchCode ?? '',
+    );
+    _branchNameController = TextEditingController(
+      text: supplier?.branchName ?? '',
+    );
+    _supplierNoController = TextEditingController(
+      text: supplier?.supplierNo ?? '',
+    );
+
     // Load states after initializing controllers
     _loadStates();
     _locationController = TextEditingController(text: supplier?.location ?? '');
     _districtController = TextEditingController(text: supplier?.district ?? '');
     _contactController = TextEditingController(text: supplier?.contact ?? '');
     _phoneController = TextEditingController(text: supplier?.phoneNumber ?? '');
-    _mobileController = TextEditingController(text: supplier?.mobileNumber ?? '');
+    _mobileController = TextEditingController(
+      text: supplier?.mobileNumber ?? '',
+    );
     _gstController = TextEditingController(text: supplier?.gst ?? '');
     _panController = TextEditingController(text: supplier?.panNumber ?? '');
     _msmeController = TextEditingController(text: supplier?.msmeNumber ?? '');
     _emailController = TextEditingController(text: supplier?.email ?? '');
     _cinController = TextEditingController(text: supplier?.cinNumber ?? '');
     _compTypeController = TextEditingController(text: supplier?.compType ?? '');
-    _industrialTypeController = TextEditingController(text: supplier?.industrialType ?? '');
+    _industrialTypeController = TextEditingController(
+      text: supplier?.industrialType ?? '',
+    );
     _faxController = TextEditingController(text: supplier?.fax ?? '');
-    _companyIdController = TextEditingController(text: supplier?.companyId ?? '');
-    _accountNameController = TextEditingController(text: supplier?.accountHolderName ?? '');
-    _accountNumberController = TextEditingController(text: supplier?.accountNumber ?? '');
+    _companyIdController = TextEditingController(
+      text: supplier?.companyId ?? '',
+    );
+    _accountNameController = TextEditingController(
+      text: supplier?.accountHolderName ?? '',
+    );
+    _accountNumberController = TextEditingController(
+      text: supplier?.accountNumber ?? '',
+    );
     _ifscController = TextEditingController(text: supplier?.ifscCode ?? '');
     _micrController = TextEditingController(text: supplier?.micrCode ?? '');
     _bankNameController = TextEditingController(text: supplier?.bankName ?? '');
-    _branchCodeController = TextEditingController(text: supplier?.branchCode ?? '');
-    _branchNameController = TextEditingController(text: supplier?.branchName ?? '');
-    _supplierNoController = TextEditingController(text: supplier?.supplierNo ?? '');
+    _branchCodeController = TextEditingController(
+      text: supplier?.branchCode ?? '',
+    );
+    _branchNameController = TextEditingController(
+      text: supplier?.branchName ?? '',
+    );
+    _supplierNoController = TextEditingController(
+      text: supplier?.supplierNo ?? '',
+    );
   }
 
   Future<void> _loadStates() async {
     try {
       _statesLoading.value = true;
       _statesError.value = '';
-      
+
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/state/search'),
         headers: {'Content-Type': 'application/json'},
@@ -123,14 +155,23 @@ class _SupplierFormPageState extends State<SupplierFormPage> {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        _states.value = data.map((state) => StateModel.fromJson(state)).toList();
-        
+        _states.value = data
+            .map((state) => StateModel.fromJson(state))
+            .toList();
+
         // Set selected state if editing
         if (widget.supplier != null && widget.supplier!.state.isNotEmpty) {
           setState(() {
             _selectedState = _states.firstWhere(
-              (state) => state.name.toLowerCase() == widget.supplier!.state.toLowerCase(),
-              orElse: () => StateModel(id: 0, name: widget.supplier!.state, code: '', tin: '')
+              (state) =>
+                  state.name.toLowerCase() ==
+                  widget.supplier!.state.toLowerCase(),
+              orElse: () => StateModel(
+                id: 0,
+                name: widget.supplier!.state,
+                code: '',
+                tin: '',
+              ),
             );
           });
         }
@@ -143,13 +184,13 @@ class _SupplierFormPageState extends State<SupplierFormPage> {
       _statesLoading.value = false;
     }
   }
-  
+
   Widget _buildStateDropdown() {
     return Obx(() {
       if (_statesLoading.value) {
         return const CircularProgressIndicator();
       }
-      
+
       if (_statesError.value.isNotEmpty) {
         return Text('Error: ${_statesError.value}');
       }
@@ -157,10 +198,14 @@ class _SupplierFormPageState extends State<SupplierFormPage> {
       return SearchableDropdown<StateModel>(
         label: 'State *',
         value: _selectedState,
-        items: _states.map((state) => DropdownMenuItem<StateModel>(
-          value: state,
-          child: Text(state.name),
-        )).toList(),
+        items: _states
+            .map(
+              (state) => DropdownMenuItem<StateModel>(
+                value: state,
+                child: Text(state.name),
+              ),
+            )
+            .toList(),
         onChanged: (StateModel? newValue) {
           if (newValue != null) {
             setState(() {
@@ -238,7 +283,7 @@ class _SupplierFormPageState extends State<SupplierFormPage> {
         Get.snackbar('Error', 'Please select a state');
         return;
       }
-      
+
       final supplier = Supplier(
         id: widget.supplier?.id,
         supplierName: _nameController.text.trim(),
@@ -274,8 +319,10 @@ class _SupplierFormPageState extends State<SupplierFormPage> {
 
       if (success && mounted) {
         Get.back();
-        Get.snackbar('Success',
-            'Supplier ${widget.supplier == null ? 'added' : 'updated'} successfully');
+        Get.snackbar(
+          'Success',
+          'Supplier ${widget.supplier == null ? 'added' : 'updated'} successfully',
+        );
       }
     }
   }
@@ -289,45 +336,94 @@ class _SupplierFormPageState extends State<SupplierFormPage> {
         child: ListView(
           padding: const EdgeInsets.all(16.0),
           children: [
-            _buildSectionHeader('Basic Information'),
-            _buildTextFormField('Supplier Name', _nameController, isRequired: true),
+            _buildSectionHeader(context, 'Basic Information'),
+            _buildTextFormField(
+              'Supplier Name',
+              _nameController,
+              isRequired: true,
+            ),
             _buildTextFormField('Address', _addressController, maxLines: 2),
             _buildStateDropdown(),
             const SizedBox(height: 16),
             _buildTextFormField('Location', _locationController),
             _buildTextFormField('District', _districtController),
-            _buildTextFormField('Contact Person', _contactController, isRequired: true),
-            _buildTextFormField('Phone', _phoneController, keyboardType: TextInputType.phone),
-            _buildTextFormField('Mobile', _mobileController, keyboardType: TextInputType.phone, isRequired: true),
-            _buildTextFormField('Email', _emailController, keyboardType: TextInputType.emailAddress),
-            
-            _buildSectionHeader('Business Information'),
+            _buildTextFormField(
+              'Contact Person',
+              _contactController,
+              isRequired: true,
+            ),
+            _buildTextFormField(
+              'Phone',
+              _phoneController,
+              keyboardType: TextInputType.phone,
+            ),
+            _buildTextFormField(
+              'Mobile',
+              _mobileController,
+              keyboardType: TextInputType.phone,
+              isRequired: true,
+            ),
+            _buildTextFormField(
+              'Email',
+              _emailController,
+              keyboardType: TextInputType.emailAddress,
+            ),
+
+            _buildSectionHeader(context, 'Business Information'),
             _buildTextFormField('GST Number', _gstController, isRequired: true),
             _buildTextFormField('PAN Number', _panController, isRequired: true),
             _buildTextFormField('MSME Number', _msmeController),
             _buildTextFormField('CIN Number', _cinController),
             _buildTextFormField('Company Type', _compTypeController),
             _buildTextFormField('Industrial Type', _industrialTypeController),
-            _buildTextFormField('Fax', _faxController, keyboardType: TextInputType.phone),
+            _buildTextFormField(
+              'Fax',
+              _faxController,
+              keyboardType: TextInputType.phone,
+            ),
             _buildTextFormField('Company ID', _companyIdController),
-            _buildTextFormField('Supplier Number', _supplierNoController, isRequired: true),
-            
-            _buildSectionHeader('Bank Details'),
-            _buildTextFormField('Account Holder Name', _accountNameController, isRequired: true),
-            _buildTextFormField('Account Number', _accountNumberController, keyboardType: TextInputType.number, isRequired: true),
-            _buildTextFormField('Bank Name', _bankNameController, isRequired: true),
-            _buildTextFormField('Branch Name', _branchNameController, isRequired: true),
+            _buildTextFormField(
+              'Supplier Number',
+              _supplierNoController,
+              isRequired: true,
+            ),
+
+            _buildSectionHeader(context, 'Bank Details'),
+            _buildTextFormField(
+              'Account Holder Name',
+              _accountNameController,
+              isRequired: true,
+            ),
+            _buildTextFormField(
+              'Account Number',
+              _accountNumberController,
+              keyboardType: TextInputType.number,
+              isRequired: true,
+            ),
+            _buildTextFormField(
+              'Bank Name',
+              _bankNameController,
+              isRequired: true,
+            ),
+            _buildTextFormField(
+              'Branch Name',
+              _branchNameController,
+              isRequired: true,
+            ),
             _buildTextFormField('Branch Code', _branchCodeController),
             _buildTextFormField('IFSC Code', _ifscController, isRequired: true),
             _buildTextFormField('MICR Code', _micrController),
-            
+
             const SizedBox(height: 20),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                  backgroundColor: const Color(0xFF1E2A44)),
+                backgroundColor: Theme.of(context).primaryColor,
+              ),
               onPressed: _submitForm,
-              child: Text(widget.supplier == null ? 'Add Supplier' : 'Update Supplier'),
+              child: Text(
+                widget.supplier == null ? 'Add Supplier' : 'Update Supplier',
+              ),
             ),
             if (widget.supplier != null) ...{
               const SizedBox(height: 10),
@@ -343,12 +439,16 @@ class _SupplierFormPageState extends State<SupplierFormPage> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 4.0),
       child: Text(
         title,
-        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).primaryColor,
+        ),
       ),
     );
   }
@@ -367,7 +467,10 @@ class _SupplierFormPageState extends State<SupplierFormPage> {
         decoration: InputDecoration(
           labelText: label + (isRequired ? ' *' : ''),
           border: const OutlineInputBorder(),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 12,
+          ),
         ),
         keyboardType: keyboardType,
         maxLines: maxLines,
@@ -389,11 +492,15 @@ class _SupplierFormPageState extends State<SupplierFormPage> {
   void _confirmDelete() {
     Get.defaultDialog(
       title: 'Delete Supplier',
-      content: const Text('Are you sure you want to delete this supplier? This action cannot be undone.'),
+      content: const Text(
+        'Are you sure you want to delete this supplier? This action cannot be undone.',
+      ),
       confirm: ElevatedButton(
         onPressed: () async {
           Get.back(); // Close the dialog
-          final success = await _controller.deleteSupplier(widget.supplier!.id!);
+          final success = await _controller.deleteSupplier(
+            widget.supplier!.id!,
+          );
           if (success && mounted) {
             Get.back(); // Go back to previous screen
             Get.snackbar('Success', 'Supplier deleted successfully');

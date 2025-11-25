@@ -264,7 +264,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
               ],
             );
           }),
-          backgroundColor: const Color(0xFF1E2A44),
+          backgroundColor: theme.primaryColor,
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
@@ -3025,7 +3025,10 @@ class _GCFormScreenState extends State<GCFormScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFF4A90E2), width: 1.5),
+        borderSide: BorderSide(
+          color: Theme.of(context).primaryColor,
+          width: 1.5,
+        ),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),

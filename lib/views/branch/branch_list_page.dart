@@ -51,11 +51,14 @@ class _BranchListPageState extends State<BranchListPage> {
                   onPressed: controller.fetchBranches,
                   icon: const Icon(Icons.refresh),
                   label: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 12.0,
+                    ),
                     child: Text('Retry'),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E2A44),
+                    backgroundColor: Theme.of(context).primaryColor,
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -79,7 +82,11 @@ class _BranchListPageState extends State<BranchListPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.search_off, size: 64, color: Colors.grey),
+                        const Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
                         const SizedBox(height: 16),
                         const Text(
                           'No matching branches found',
@@ -96,7 +103,11 @@ class _BranchListPageState extends State<BranchListPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.business_outlined, size: 64, color: Colors.grey),
+                const Icon(
+                  Icons.business_outlined,
+                  size: 64,
+                  color: Colors.grey,
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'No branches found',
@@ -108,7 +119,7 @@ class _BranchListPageState extends State<BranchListPage> {
                   icon: const Icon(Icons.refresh, size: 18),
                   label: const Text('Refresh'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E2A44),
+                    backgroundColor: Theme.of(context).primaryColor,
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -137,7 +148,7 @@ class _BranchListPageState extends State<BranchListPage> {
                   itemCount: controller.filteredBranches.length,
                   itemBuilder: (context, index) {
                     final branch = controller.filteredBranches[index];
-                    return _buildBranchCard(branch);
+                    return _buildBranchCard(context, branch);
                   },
                 ),
               ),
@@ -147,7 +158,7 @@ class _BranchListPageState extends State<BranchListPage> {
       }),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Get.to(() => const AddEditBranchPage()),
-        backgroundColor: const Color(0xFF1E2A44),
+        backgroundColor: Theme.of(context).primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -179,13 +190,13 @@ class _BranchListPageState extends State<BranchListPage> {
     );
   }
 
-  Widget _buildBranchCard(Branch branch) {
+  Widget _buildBranchCard(BuildContext context, Branch branch) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Colors.blue.shade100,
-          child: const Icon(Icons.business, color: Colors.blue),
+          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+          child: Icon(Icons.business, color: Theme.of(context).primaryColor),
         ),
         title: Text(
           branch.branchName,
@@ -196,22 +207,30 @@ class _BranchListPageState extends State<BranchListPage> {
           children: [
             Text('Code: ${branch.branchCode}'),
             if (branch.phone != null) Text('Phone: ${branch.phone}'),
-            Text('Company: ${branch.companyName}',
-                style: const TextStyle(fontSize: 12)),
-            Text('Status: ${branch.status}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: branch.status.toLowerCase() == 'active'
-                      ? Colors.green
-                      : Colors.red,
-                )),
+            Text(
+              'Company: ${branch.companyName}',
+              style: const TextStyle(fontSize: 12),
+            ),
+            Text(
+              'Status: ${branch.status}',
+              style: TextStyle(
+                fontSize: 12,
+                color: branch.status.toLowerCase() == 'active'
+                    ? Colors.green
+                    : Colors.red,
+              ),
+            ),
           ],
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+              icon: Icon(
+                Icons.edit,
+                color: Theme.of(context).primaryColor,
+                size: 20,
+              ),
               onPressed: () => _navigateToEditPage(branch),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
@@ -239,10 +258,7 @@ class _BranchListPageState extends State<BranchListPage> {
       title: 'Delete Branch',
       content: const Text('Are you sure you want to delete this branch?'),
       actions: [
-        TextButton(
-          onPressed: () => Get.back(),
-          child: const Text('Cancel'),
-        ),
+        TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
         TextButton(
           onPressed: () async {
             Get.back();

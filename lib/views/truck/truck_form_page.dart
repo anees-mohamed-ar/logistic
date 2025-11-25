@@ -1086,7 +1086,7 @@ class _TruckFormPageState extends State<TruckFormPage>
                   icon: const Icon(Icons.attach_file),
                   label: const Text('Choose Files'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E2A44),
+                    backgroundColor: Theme.of(context).primaryColor,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 24,
                       vertical: 12,

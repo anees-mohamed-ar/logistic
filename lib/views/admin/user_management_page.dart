@@ -26,13 +26,13 @@ class _UserManagementPageState extends State<UserManagementPage> {
   final _bloodGroupController = TextEditingController();
   final _bookingOfficerNameController = TextEditingController();
   String _selectedRole = CompanyConfig.defaultUserRole;
-  
+
   // Use CompanyConfig for company values
   final IdController _idController = Get.find<IdController>();
-  
+
   List<Branch> branches = [];
   Branch? _selectedBranch;
-  
+
   List<dynamic> users = [];
   bool isLoading = true;
   bool isAddingUser = false;
@@ -43,16 +43,19 @@ class _UserManagementPageState extends State<UserManagementPage> {
   void initState() {
     super.initState();
     _fetchUsers();
-    _fetchBranchesForCompany(CompanyConfig.companyId); // Fetch branches for hardcoded company
+    _fetchBranchesForCompany(
+      CompanyConfig.companyId,
+    ); // Fetch branches for hardcoded company
   }
 
   Future<void> _fetchUsers() async {
     setState(() => isLoading = true);
     try {
-      final response = await http.get(Uri.parse('$baseUrl/user/search')
-          .replace(queryParameters: {
-        'companyId': _idController.companyId.value,
-      }));
+      final response = await http.get(
+        Uri.parse('$baseUrl/user/search').replace(
+          queryParameters: {'companyId': _idController.companyId.value},
+        ),
+      );
       if (response.statusCode == 200) {
         setState(() {
           users = json.decode(response.body);
@@ -69,7 +72,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
   Future<void> _fetchBranchesForCompany(int companyId) async {
     try {
-      final response = await http.get(Uri.parse('${ApiConfig.baseUrl}/branch/company/$companyId'));
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/branch/company/$companyId'),
+      );
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as List;
         setState(() {
@@ -92,69 +97,67 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
     // Always use hardcoded company
     setState(() => isAddingUser = true);
-    
+
     try {
       // Prepare the request body
       final Map<String, dynamic> requestBody = {};
-      
+
       // Add fields to request body
       final name = _nameController.text.trim();
       if (name.isNotEmpty) requestBody['userName'] = name;
-      
+
       final email = _emailController.text.trim();
       if (email.isNotEmpty) requestBody['userEmail'] = email;
-      
+
       // Only include password if it's not empty (for edit mode)
       final password = _passwordController.text;
       if (password.isNotEmpty || !isEditing) {
         requestBody['password'] = password;
       }
-      
+
       // Add hardcoded company info
       requestBody['companyName'] = CompanyConfig.companyName;
       requestBody['companyId'] = CompanyConfig.companyId.toString();
-      
+
       // Add branch info if available
       if (_selectedBranch != null) {
         requestBody['branch_id'] = _selectedBranch!.branchId.toString();
       }
-      
+
       // Add optional fields if they have values
       final phoneNumber = _phoneController.text.trim();
       if (phoneNumber.isNotEmpty) requestBody['phoneNumber'] = phoneNumber;
-      
+
       final bloodGroup = _bloodGroupController.text.trim();
       if (bloodGroup.isNotEmpty) requestBody['bloodGroup'] = bloodGroup;
-      
+
       // Add booking officer name if provided
       final bookingOfficerName = _bookingOfficerNameController.text.trim();
-      if (bookingOfficerName.isNotEmpty) requestBody['booking_officer_name'] = bookingOfficerName;
-      
+      if (bookingOfficerName.isNotEmpty)
+        requestBody['booking_officer_name'] = bookingOfficerName;
+
       // Always include role as it's required
       requestBody['user_role'] = _selectedRole;
-      
+
       // Set up headers
       final headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       };
-      
+
       // Determine the URL and method
       final url = isEditing && editingUserId != null
-          ? Uri.parse('$baseUrl/user/update/$editingUserId')
-              .replace(queryParameters: {'companyId': _idController.companyId.value})
+          ? Uri.parse('$baseUrl/user/update/$editingUserId').replace(
+              queryParameters: {'companyId': _idController.companyId.value},
+            )
           : Uri.parse('$baseUrl/user/add');
-          
+
       print('Sending request to: ${url.toString()}');
       print('Request body: $requestBody');
 
       // Send the request
       final response = isEditing && editingUserId != null
-          ? await http.put(
-              url,
-              headers: headers,
-              body: jsonEncode(requestBody),
-            )
+          ? await http.put(url, headers: headers, body: jsonEncode(requestBody))
           : await http.post(
               url,
               headers: headers,
@@ -165,14 +168,20 @@ class _UserManagementPageState extends State<UserManagementPage> {
       print('Response body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        Get.snackbar('Success', isEditing ? 'User updated successfully' : 'User added successfully');
+        Get.snackbar(
+          'Success',
+          isEditing ? 'User updated successfully' : 'User added successfully',
+        );
         _resetForm();
         _fetchUsers();
       } else {
-        String errorMessage = isEditing ? 'Failed to update user' : 'Failed to add user';
+        String errorMessage = isEditing
+            ? 'Failed to update user'
+            : 'Failed to add user';
         try {
           final errorData = json.decode(response.body);
-          errorMessage = errorData['error'] ?? errorData['message'] ?? errorMessage;
+          errorMessage =
+              errorData['error'] ?? errorData['message'] ?? errorMessage;
         } catch (e) {
           // If response is not JSON, use the raw response
           if (response.body.isNotEmpty) {
@@ -216,30 +225,38 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     children: [
                       Text(
                         isEditing ? 'Edit User' : 'Add New User',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _nameController,
-                        decoration: const InputDecoration(labelText: 'Full Name'),
-                        validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Full Name',
+                        ),
+                        validator: (value) =>
+                            value?.isEmpty ?? true ? 'Required' : null,
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _emailController,
                         decoration: const InputDecoration(labelText: 'Email'),
                         keyboardType: TextInputType.emailAddress,
-                        validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                        validator: (value) =>
+                            value?.isEmpty ?? true ? 'Required' : null,
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _passwordController,
                         decoration: InputDecoration(
-                          labelText: 'Password${isEditing ? ' (Leave empty to keep current)' : ''}',
+                          labelText:
+                              'Password${isEditing ? ' (Leave empty to keep current)' : ''}',
                         ),
                         obscureText: true,
                         validator: (value) => isEditing
-                            ? null  // Not required when editing
+                            ? null // Not required when editing
                             : (value?.isEmpty ?? true ? 'Required' : null),
                       ),
                       const SizedBox(height: 8),
@@ -266,10 +283,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
                             const SizedBox(height: 4),
                             Text(
                               CompanyConfig.companyName,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
-                                color: Color(0xFF1E2A44),
+                                color: Theme.of(context).primaryColor,
                               ),
                             ),
                           ],
@@ -287,7 +304,16 @@ class _UserManagementPageState extends State<UserManagementPage> {
                             if (value != null) {
                               final branch = branches.firstWhere(
                                 (b) => b.branchName == value,
-                                orElse: () => _selectedBranch ?? Branch(branchId: 0, branchName: '', branchCode: '', companyId: 0, companyName: '', status: 'active'),
+                                orElse: () =>
+                                    _selectedBranch ??
+                                    Branch(
+                                      branchId: 0,
+                                      branchName: '',
+                                      branchCode: '',
+                                      companyId: 0,
+                                      companyName: '',
+                                      status: 'active',
+                                    ),
                               );
                               setState(() {
                                 _selectedBranch = branch;
@@ -299,28 +325,36 @@ class _UserManagementPageState extends State<UserManagementPage> {
                       ],
                       TextFormField(
                         controller: _phoneController,
-                        decoration: const InputDecoration(labelText: 'Phone Number (Optional)'),
+                        decoration: const InputDecoration(
+                          labelText: 'Phone Number (Optional)',
+                        ),
                         keyboardType: TextInputType.phone,
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _bloodGroupController,
-                        decoration: const InputDecoration(labelText: 'Blood Group (Optional)'),
+                        decoration: const InputDecoration(
+                          labelText: 'Blood Group (Optional)',
+                        ),
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _bookingOfficerNameController,
-                        decoration: const InputDecoration(labelText: 'Booking Officer Name (Optional)'),
+                        decoration: const InputDecoration(
+                          labelText: 'Booking Officer Name (Optional)',
+                        ),
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
                         value: _selectedRole,
                         decoration: const InputDecoration(labelText: 'Role'),
                         items: ['user', 'admin']
-                            .map((role) => DropdownMenuItem(
-                                  value: role,
-                                  child: Text(role.toUpperCase()),
-                                ))
+                            .map(
+                              (role) => DropdownMenuItem(
+                                value: role,
+                                child: Text(role.toUpperCase()),
+                              ),
+                            )
                             .toList(),
                         onChanged: (value) {
                           setState(() {
@@ -335,9 +369,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed: isAddingUser ? null : _addUser,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Theme.of(context).primaryColor,
+                              ),
                               child: isAddingUser
                                   ? const CircularProgressIndicator()
-                                  : Text(isEditing ? 'Update User' : 'Add User'),
+                                  : Text(
+                                      isEditing ? 'Update User' : 'Add User',
+                                    ),
                             ),
                           ),
                           if (isEditing) ...[
@@ -373,135 +412,179 @@ class _UserManagementPageState extends State<UserManagementPage> {
             isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : users.isEmpty
-                    ? const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Text('No users found'),
-                        ),
-                      )
-                    : Card(
-                        elevation: 1,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: users.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1, thickness: 1),
-                          itemBuilder: (context, index) {
-                            final user = users[index];
-                            final isAdmin = (user['user_role'] ?? '').toString().toLowerCase() == 'admin';
-                            
-                            return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              leading: CircleAvatar(
-                                backgroundColor: isAdmin ? Colors.blue[100] : Colors.grey[200],
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text('No users found'),
+                    ),
+                  )
+                : Card(
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: users.length,
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1, thickness: 1),
+                      itemBuilder: (context, index) {
+                        final user = users[index];
+                        final isAdmin =
+                            (user['user_role'] ?? '')
+                                .toString()
+                                .toLowerCase() ==
+                            'admin';
+
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          leading: CircleAvatar(
+                            backgroundColor: isAdmin
+                                ? Theme.of(
+                                    context,
+                                  ).primaryColor.withOpacity(0.12)
+                                : Colors.grey[200],
+                            child: Text(
+                              (user['userName']?[0] ?? '?').toUpperCase(),
+                              style: TextStyle(
+                                color: isAdmin
+                                    ? Theme.of(context).primaryColor
+                                    : Colors.grey[800],
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            user['userName'] ?? 'No Name',
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text(
+                                user['userEmail'] ?? 'No Email',
+                                style: Theme.of(context).textTheme.bodySmall,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (user['phoneNumber']?.isNotEmpty == true) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  user['phoneNumber'],
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isAdmin
+                                      ? Theme.of(
+                                          context,
+                                        ).primaryColor.withOpacity(0.08)
+                                      : Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 child: Text(
-                                  (user['userName']?[0] ?? '?').toUpperCase(),
+                                  isAdmin ? 'Admin' : 'User',
                                   style: TextStyle(
-                                    color: isAdmin ? Colors.blue[800] : Colors.grey[800],
-                                    fontWeight: FontWeight.bold,
+                                    color: isAdmin
+                                        ? Theme.of(context).primaryColor
+                                        : Colors.grey[800],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
-                              title: Text(
-                                user['userName'] ?? 'No Name',
-                                style: const TextStyle(fontWeight: FontWeight.w500),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    user['userEmail'] ?? 'No Email',
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  if (user['phoneNumber']?.isNotEmpty == true) ...[
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      user['phoneNumber'],
-                                      style: Theme.of(context).textTheme.bodySmall,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: isAdmin ? Colors.blue[50] : Colors.grey[100],
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      isAdmin ? 'Admin' : 'User',
-                                      style: TextStyle(
-                                        color: isAdmin ? Colors.blue[800] : Colors.grey[800],
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                              PopupMenuButton(
+                                icon: const Icon(Icons.more_vert, size: 20),
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.edit,
+                                          size: 20,
+                                          color: Colors.grey,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text('Edit'),
+                                      ],
                                     ),
                                   ),
-                                  PopupMenuButton(
-                                    icon: const Icon(Icons.more_vert, size: 20),
-                                    itemBuilder: (context) => [
-                                      const PopupMenuItem(
-                                        value: 'edit',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.edit, size: 20, color: Colors.grey),
-                                            SizedBox(width: 8),
-                                            Text('Edit'),
-                                          ],
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.delete,
+                                          size: 20,
+                                          color: Colors.red,
                                         ),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: 'delete',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.delete, size: 20, color: Colors.red),
-                                            SizedBox(width: 8),
-                                            Text('Delete', style: TextStyle(color: Colors.red)),
-                                          ],
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Delete',
+                                          style: TextStyle(color: Colors.red),
                                         ),
-                                      ),
-                                    ],
-                                    onSelected: (value) async {
-                                      if (value == 'edit') {
-                                        _loadUserForEditing(user);
-                                        // Scroll to form
-                                        await Future.delayed(const Duration(milliseconds: 300));
-                                        Scrollable.ensureVisible(
-                                          _formKey.currentContext!,
-                                          duration: const Duration(milliseconds: 500),
-                                          curve: Curves.easeInOut,
-                                        );
-                                      } else if (value == 'delete') {
-                                        // Using 'userId' to match the API response
-                                        final userId = user['userId']?.toString();
-                                        if (userId == null || userId.isEmpty || userId == 'null') {
-                                          print('Invalid user data: ${user.toString()}');
-                                          Get.snackbar(
-                                            'Error',
-                                            'Invalid user ID',
-                                            snackPosition: SnackPosition.BOTTOM,
-                                          );
-                                          return;
-                                        }
-                                        print('Initiating delete for user ID: $userId');
-                                        await _deleteUser(userId);
-                                      }
-                                    },
+                                      ],
+                                    ),
                                   ),
                                 ],
+                                onSelected: (value) async {
+                                  if (value == 'edit') {
+                                    _loadUserForEditing(user);
+                                    // Scroll to form
+                                    await Future.delayed(
+                                      const Duration(milliseconds: 300),
+                                    );
+                                    Scrollable.ensureVisible(
+                                      _formKey.currentContext!,
+                                      duration: const Duration(
+                                        milliseconds: 500,
+                                      ),
+                                      curve: Curves.easeInOut,
+                                    );
+                                  } else if (value == 'delete') {
+                                    // Using 'userId' to match the API response
+                                    final userId = user['userId']?.toString();
+                                    if (userId == null ||
+                                        userId.isEmpty ||
+                                        userId == 'null') {
+                                      print(
+                                        'Invalid user data: ${user.toString()}',
+                                      );
+                                      Get.snackbar(
+                                        'Error',
+                                        'Invalid user ID',
+                                        snackPosition: SnackPosition.BOTTOM,
+                                      );
+                                      return;
+                                    }
+                                    print(
+                                      'Initiating delete for user ID: $userId',
+                                    );
+                                    await _deleteUser(userId);
+                                  }
+                                },
                               ),
-                            );
-                          },
-                        ),
-                      ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
           ],
         ),
       ),
@@ -519,7 +602,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   }) {
     final theme = Theme.of(context);
     final searchCtrl = TextEditingController();
-    
+
     return GestureDetector(
       onTap: () async {
         final selected = await _showSearchPicker(
@@ -534,7 +617,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
       },
       child: AbsorbPointer(
         child: TextFormField(
-          controller: TextEditingController(text: value.isEmpty ? 'Select $label' : value),
+          controller: TextEditingController(
+            text: value.isEmpty ? 'Select $label' : value,
+          ),
           readOnly: true,
           decoration: InputDecoration(
             labelText: label,
@@ -566,23 +651,23 @@ class _UserManagementPageState extends State<UserManagementPage> {
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                color: theme.colorScheme.error,
-                width: 2,
-              ),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 14,
+            ),
             errorText: errorText,
             suffixIcon: const Icon(Icons.search),
           ),
-          style: value.isEmpty 
+          style: value.isEmpty
               ? theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)
               : theme.textTheme.bodyMedium,
         ),
       ),
     );
   }
-  
+
   Widget _buildSearchableBranchField({
     required BuildContext context,
     required String label,
@@ -592,7 +677,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   }) {
     final theme = Theme.of(context);
     final searchCtrl = TextEditingController();
-    
+
     return GestureDetector(
       onTap: () async {
         final selected = await _showSearchPicker(
@@ -607,33 +692,31 @@ class _UserManagementPageState extends State<UserManagementPage> {
       },
       child: AbsorbPointer(
         child: TextFormField(
-          controller: TextEditingController(text: value.isEmpty ? 'Select $label' : value),
+          controller: TextEditingController(
+            text: value.isEmpty ? 'Select $label' : value,
+          ),
           readOnly: true,
           decoration: InputDecoration(
             labelText: label,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                color: theme.dividerColor,
-              ),
+              borderSide: BorderSide(color: theme.dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                color: theme.dividerColor,
-              ),
+              borderSide: BorderSide(color: theme.dividerColor),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                color: theme.primaryColor,
-                width: 2,
-              ),
+              borderSide: BorderSide(color: theme.primaryColor, width: 2),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 14,
+            ),
             suffixIcon: const Icon(Icons.search),
           ),
-          style: value.isEmpty 
+          style: value.isEmpty
               ? theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)
               : theme.textTheme.bodyMedium,
         ),
@@ -649,7 +732,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   }) async {
     final TextEditingController searchCtrl = TextEditingController();
     List<String> filtered = List<String>.from(items);
-    
+
     return showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -767,7 +850,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
       _phoneController.text = user['phoneNumber'] ?? '';
       _bloodGroupController.text = user['bloodGroup'] ?? '';
       _bookingOfficerNameController.text = user['booking_officer_name'] ?? '';
-      _selectedRole = user['user_role']?.toString().toLowerCase() ?? CompanyConfig.defaultUserRole;
+      _selectedRole =
+          user['user_role']?.toString().toLowerCase() ??
+          CompanyConfig.defaultUserRole;
 
       // Company is hardcoded, no need to set it
 
@@ -777,7 +862,16 @@ class _UserManagementPageState extends State<UserManagementPage> {
         if (branchId != null) {
           _selectedBranch = branches.firstWhere(
             (b) => b.branchId == branchId,
-            orElse: () => _selectedBranch ?? Branch(branchId: 0, branchName: '', branchCode: '', companyId: 0, companyName: '', status: 'active'),
+            orElse: () =>
+                _selectedBranch ??
+                Branch(
+                  branchId: 0,
+                  branchName: '',
+                  branchCode: '',
+                  companyId: 0,
+                  companyName: '',
+                  status: 'active',
+                ),
           );
         }
       }
@@ -786,7 +880,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
   Future<void> _deleteUser(String userId) async {
     print('_deleteUser called with userId: $userId');
-    
+
     if (userId.isEmpty) {
       print('Error: Empty user ID provided');
       Get.snackbar(
@@ -801,7 +895,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete User'),
-        content: Text('Are you sure you want to delete user ID: $userId? This action cannot be undone.'),
+        content: Text(
+          'Are you sure you want to delete user ID: $userId? This action cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () {
@@ -829,24 +925,22 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
     setState(() => isLoading = true);
     print('Proceeding with deletion of user: $userId');
-    
+
     try {
-      final url = Uri.parse('$baseUrl/user/delete/$userId')
-          .replace(queryParameters: {'companyId': _idController.companyId.value});
+      final url = Uri.parse(
+        '$baseUrl/user/delete/$userId',
+      ).replace(queryParameters: {'companyId': _idController.companyId.value});
       print('Sending DELETE request to: $url');
-      
+
       final headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       };
-      
+
       print('Request headers: $headers');
-      
-      final response = await http.delete(
-        url,
-        headers: headers,
-      );
-      
+
+      final response = await http.delete(url, headers: headers);
+
       print('Delete response status: ${response.statusCode}');
       print('Response headers: ${response.headers}');
       print('Response body: ${response.body}');
@@ -861,35 +955,35 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
       if (response.statusCode == 200) {
         print('User deletion successful: $responseData');
-        
+
         Get.snackbar(
-          'Success', 
-          responseData != null && responseData['message'] != null 
+          'Success',
+          responseData != null && responseData['message'] != null
               ? responseData['message'].toString()
               : 'User deleted successfully',
           duration: const Duration(seconds: 3),
         );
-        
+
         // Refresh the user list
         _fetchUsers();
       } else {
-        String errorMessage = 'Failed to delete user (Status: ${response.statusCode})';
-        
+        String errorMessage =
+            'Failed to delete user (Status: ${response.statusCode})';
+
         if (responseData != null) {
-          errorMessage = responseData['error'] ?? 
-                       responseData['message'] ?? 
-                       errorMessage;
+          errorMessage =
+              responseData['error'] ?? responseData['message'] ?? errorMessage;
         } else {
           // If not JSON, try to get the raw response
-          errorMessage = response.body.isNotEmpty 
-              ? response.body 
+          errorMessage = response.body.isNotEmpty
+              ? response.body
               : errorMessage;
         }
-        
+
         print('Delete error details: $errorMessage');
-        
+
         Get.snackbar(
-          'Error', 
+          'Error',
           errorMessage,
           duration: const Duration(seconds: 5),
           snackPosition: SnackPosition.BOTTOM,
@@ -899,9 +993,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
       print('Exception during user deletion:');
       print('Error: $e');
       print('Stack trace: $stackTrace');
-      
+
       Get.snackbar(
-        'Error', 
+        'Error',
         'An error occurred: ${e.toString()}',
         duration: const Duration(seconds: 5),
         snackPosition: SnackPosition.BOTTOM,

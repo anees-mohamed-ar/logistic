@@ -54,7 +54,7 @@ class LogisticsGCApp extends StatelessWidget {
         primaryColor: CompanyConfig.primaryColor,
         colorScheme: ColorScheme.fromSwatch().copyWith(
           primary: CompanyConfig.primaryColor,
-          secondary: const Color(0xFF4A90E2),
+          secondary: CompanyConfig.primaryColor,
         ),
         scaffoldBackgroundColor: const Color(0xFFF7F9FC),
         inputDecorationTheme: InputDecorationTheme(
@@ -63,7 +63,7 @@ class LogisticsGCApp extends StatelessWidget {
           fillColor: Colors.white,
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF4A90E2), width: 2),
+            borderSide: BorderSide(color: CompanyConfig.primaryColor, width: 2),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -73,7 +73,7 @@ class LogisticsGCApp extends StatelessWidget {
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF4A90E2),
+            backgroundColor: CompanyConfig.primaryColor,
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),

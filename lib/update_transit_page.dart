@@ -9,6 +9,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'api_config.dart'; // Assuming ApiConfig file with baseUrl
 import 'package:logistic/controller/id_controller.dart';
+import 'package:logistic/config/company_config.dart';
 
 class UpdateTransitPage extends StatefulWidget {
   const UpdateTransitPage({Key? key}) : super(key: key);
@@ -56,10 +57,10 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
 
   final IdController _idController = Get.find<IdController>();
 
-  // Theme constants
-  static const Color primaryColor = Color(0xFF1E2A44);
+  // Theme constants (semantic/neutral)
+  static Color get primaryColor => CompanyConfig.primaryColor;
+  static Color get accentColor => CompanyConfig.primaryColor;
   static const Color secondaryColor = Color(0xFF2E3A59);
-  static const Color accentColor = Color(0xFF3B82F6);
   static const Color backgroundColor = Color(0xFFF8FAFC);
   static const Color cardColor = Colors.white;
   static const Color successColor = Color(0xFF10B981);
@@ -123,11 +124,12 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
       builder: (context, child) {
+        final theme = Theme.of(context);
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(
-              context,
-            ).colorScheme.copyWith(primary: primaryColor),
+          data: theme.copyWith(
+            colorScheme: theme.colorScheme.copyWith(
+              primary: theme.primaryColor,
+            ),
           ),
           child: child!,
         );
@@ -1475,7 +1477,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                         Expanded(
                           child: Text(
                             'Select $title',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: primaryColor,
@@ -1483,7 +1485,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, color: primaryColor),
+                          icon: Icon(Icons.close, color: primaryColor),
                           onPressed: () {
                             searchCtrl.clear();
                             Navigator.of(ctx).pop();
@@ -1503,7 +1505,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                       ),
                       child: TextField(
                         controller: searchCtrl,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           prefixIcon: Icon(Icons.search, color: primaryColor),
                           hintText: 'Search GC Numbers...',
                           border: InputBorder.none,
@@ -1578,7 +1580,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                                     ),
                                   ),
                                   trailing: selected
-                                      ? const Icon(
+                                      ? Icon(
                                           Icons.check_circle,
                                           color: primaryColor,
                                         )
@@ -1626,7 +1628,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
           'Update Transit',
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
-        backgroundColor: primaryColor,
+        backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -1659,11 +1661,11 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     _buildGcSelector(),
                     if (isLoadingGc) ...[
-                      const SizedBox(height: 24),
-                      const Center(
+                      SizedBox(height: 24),
+                      Center(
                         child: Column(
                           children: [
                             CircularProgressIndicator(color: primaryColor),
@@ -1680,6 +1682,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                 ),
               ),
 
+              SizedBox(height: 20),
               const SizedBox(height: 20),
 
               // GC Details Card
@@ -1813,7 +1816,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                 const SizedBox(width: 12),
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: primaryColor,
@@ -1921,9 +1924,9 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
               color: accentColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.info_outline, color: accentColor, size: 20),
+            child: Icon(Icons.info_outline, color: accentColor, size: 20),
           ),
-          title: const Text(
+          title: Text(
             'GC Details',
             style: TextStyle(
               fontSize: 18,
@@ -1989,7 +1992,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
             width: 120,
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
                 color: primaryColor,
                 fontSize: 13,
@@ -2355,7 +2358,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
         gradient: LinearGradient(
           colors: isSaving
               ? [Colors.grey.shade400, Colors.grey.shade500]
-              : [primaryColor, secondaryColor],
+              : [primaryColor, primaryColor.withOpacity(0.85)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [

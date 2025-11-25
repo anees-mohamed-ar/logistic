@@ -38,7 +38,9 @@ class _GCReportPageState extends State<GCReportPage>
   // Pagination
   int _rowsPerPage = 10;
   int _currentPage = 0;
-  final TextEditingController _pageController = TextEditingController(text: '1');
+  final TextEditingController _pageController = TextEditingController(
+    text: '1',
+  );
 
   // Table view mode
   bool _isCardView = false;
@@ -46,10 +48,14 @@ class _GCReportPageState extends State<GCReportPage>
   int get totalGCs => filteredGcList.length;
   double get totalHireAmount =>
       filteredGcList.fold(0, (sum, gc) => sum + _parseDouble(gc['HireAmount']));
-  double get totalAdvanceAmount =>
-      filteredGcList.fold(0, (sum, gc) => sum + _parseDouble(gc['AdvanceAmount']));
-  double get totalFreightCharge =>
-      filteredGcList.fold(0, (sum, gc) => sum + _parseDouble(gc['FreightCharge']));
+  double get totalAdvanceAmount => filteredGcList.fold(
+    0,
+    (sum, gc) => sum + _parseDouble(gc['AdvanceAmount']),
+  );
+  double get totalFreightCharge => filteredGcList.fold(
+    0,
+    (sum, gc) => sum + _parseDouble(gc['FreightCharge']),
+  );
 
   @override
   void initState() {
@@ -73,18 +79,22 @@ class _GCReportPageState extends State<GCReportPage>
   }
 
   void _setupAnimations() {
-    _totalGCsAnim = Tween<double>(begin: 0, end: 0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
-    _totalHireAnim = Tween<double>(begin: 0, end: 0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
-    _totalAdvanceAnim = Tween<double>(begin: 0, end: 0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
-    _totalFreightAnim = Tween<double>(begin: 0, end: 0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
+    _totalGCsAnim = Tween<double>(
+      begin: 0,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _totalHireAnim = Tween<double>(
+      begin: 0,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _totalAdvanceAnim = Tween<double>(
+      begin: 0,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _totalFreightAnim = Tween<double>(
+      begin: 0,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
   }
 
   void _onSearchChanged() {
@@ -101,8 +111,10 @@ class _GCReportPageState extends State<GCReportPage>
       filteredGcList = List.from(gcList);
     } else {
       filteredGcList = gcList.where((gc) {
-        return gc.values.any((value) =>
-        value?.toString().toLowerCase().contains(_searchQuery) ?? false);
+        return gc.values.any(
+          (value) =>
+              value?.toString().toLowerCase().contains(_searchQuery) ?? false,
+        );
       }).toList();
     }
     _updateAnimations();
@@ -180,9 +192,9 @@ class _GCReportPageState extends State<GCReportPage>
 
   Future<void> _downloadExcel() async {
     if (filteredGcList.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No data to export')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No data to export')));
       return;
     }
 
@@ -313,7 +325,8 @@ class _GCReportPageState extends State<GCReportPage>
       }
 
       // Create full file path
-      final fileName = 'GC_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+      final fileName =
+          'GC_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx';
       final filePath = '${downloadDir.path}/$fileName';
 
       debugPrint('Generating Excel file to: $filePath');
@@ -379,7 +392,9 @@ class _GCReportPageState extends State<GCReportPage>
 
       // Add headers
       for (int i = 0; i < headers.length; i++) {
-        final cell = sheet.cell(excel.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+        final cell = sheet.cell(
+          excel.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
+        );
         cell.value = excel.TextCellValue(headers[i]);
         // Make header bold
         cell.cellStyle = excel.CellStyle(
@@ -399,7 +414,12 @@ class _GCReportPageState extends State<GCReportPage>
           // Format currency fields
           if (['HireAmount', 'AdvanceAmount', 'FreightCharge'].contains(key)) {
             value = _parseDouble(value);
-            final cell = sheet.cell(excel.CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex + 1));
+            final cell = sheet.cell(
+              excel.CellIndex.indexByColumnRow(
+                columnIndex: colIndex,
+                rowIndex: rowIndex + 1,
+              ),
+            );
             cell.value = excel.DoubleCellValue(value);
             cell.cellStyle = excel.CellStyle(
               fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
@@ -409,7 +429,12 @@ class _GCReportPageState extends State<GCReportPage>
           } else {
             // Handle null values and convert to string
             final displayValue = value?.toString() ?? '';
-            final cell = sheet.cell(excel.CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex + 1));
+            final cell = sheet.cell(
+              excel.CellIndex.indexByColumnRow(
+                columnIndex: colIndex,
+                rowIndex: rowIndex + 1,
+              ),
+            );
             cell.value = excel.TextCellValue(displayValue);
             cell.cellStyle = excel.CellStyle(
               fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
@@ -474,9 +499,9 @@ class _GCReportPageState extends State<GCReportPage>
 
   Future<void> _shareExcel() async {
     if (filteredGcList.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No data to export')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No data to export')));
       return;
     }
 
@@ -524,7 +549,9 @@ class _GCReportPageState extends State<GCReportPage>
 
       // Add headers
       for (int i = 0; i < headers.length; i++) {
-        final cell = sheet.cell(excel.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+        final cell = sheet.cell(
+          excel.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
+        );
         cell.value = excel.TextCellValue(headers[i]);
         // Make header bold
         cell.cellStyle = excel.CellStyle(
@@ -544,7 +571,12 @@ class _GCReportPageState extends State<GCReportPage>
           // Format currency fields
           if (['HireAmount', 'AdvanceAmount', 'FreightCharge'].contains(key)) {
             value = _parseDouble(value);
-            final cell = sheet.cell(excel.CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex + 1));
+            final cell = sheet.cell(
+              excel.CellIndex.indexByColumnRow(
+                columnIndex: colIndex,
+                rowIndex: rowIndex + 1,
+              ),
+            );
             cell.value = excel.DoubleCellValue(value);
             cell.cellStyle = excel.CellStyle(
               fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
@@ -554,7 +586,12 @@ class _GCReportPageState extends State<GCReportPage>
           } else {
             // Handle null values and convert to string
             final displayValue = value?.toString() ?? '';
-            final cell = sheet.cell(excel.CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex + 1));
+            final cell = sheet.cell(
+              excel.CellIndex.indexByColumnRow(
+                columnIndex: colIndex,
+                rowIndex: rowIndex + 1,
+              ),
+            );
             cell.value = excel.TextCellValue(displayValue);
             cell.cellStyle = excel.CellStyle(
               fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
@@ -571,7 +608,8 @@ class _GCReportPageState extends State<GCReportPage>
 
       // Get temporary directory for sharing
       final directory = await getTemporaryDirectory();
-      final fileName = 'GC_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+      final fileName =
+          'GC_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx';
       final filePath = '${directory.path}/$fileName';
 
       // Save file
@@ -584,17 +622,17 @@ class _GCReportPageState extends State<GCReportPage>
         final xFile = XFile(filePath);
         await Share.shareXFiles([xFile], text: 'GC Report Export');
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Excel file shared: $fileName')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Excel file shared: $fileName')));
       } else {
         throw Exception('Failed to encode Excel file');
       }
     } catch (e) {
       print('Excel share error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Share failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
     }
   }
 
@@ -615,8 +653,8 @@ class _GCReportPageState extends State<GCReportPage>
           child: isLoading
               ? _buildLoadingState()
               : error != null
-                  ? _buildErrorState()
-                  : _buildMainContent(isMobile, isTablet),
+              ? _buildErrorState()
+              : _buildMainContent(isMobile, isTablet),
         ),
       ),
     );
@@ -631,7 +669,7 @@ class _GCReportPageState extends State<GCReportPage>
           fontSize: isMobile ? 18 : 20,
         ),
       ),
-      backgroundColor: const Color(0xFF1E2A44),
+      backgroundColor: Theme.of(context).primaryColor,
       foregroundColor: Colors.white,
       elevation: 0,
       actions: [
@@ -661,20 +699,19 @@ class _GCReportPageState extends State<GCReportPage>
   }
 
   Widget _buildLoadingState() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1E3A8A)),
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Loading GC Report...',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              Theme.of(context).primaryColor,
             ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Loading GC Report...',
+            style: TextStyle(fontSize: 16, color: Colors.grey),
           ),
         ],
       ),
@@ -688,11 +725,7 @@ class _GCReportPageState extends State<GCReportPage>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.red.shade300,
-            ),
+            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
             const SizedBox(height: 16),
             Text(
               'Error Loading Data',
@@ -706,10 +739,7 @@ class _GCReportPageState extends State<GCReportPage>
             Text(
               error!,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -717,9 +747,12 @@ class _GCReportPageState extends State<GCReportPage>
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1E3A8A),
+                backgroundColor: Theme.of(context).primaryColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
               ),
             ),
           ],
@@ -752,9 +785,7 @@ class _GCReportPageState extends State<GCReportPage>
 
         // Data Table/Cards
         if (filteredGcList.isEmpty)
-          const SliverToBoxAdapter(
-            child: _EmptyState(),
-          )
+          const SliverToBoxAdapter(child: _EmptyState())
         else if (_isCardView && isMobile)
           _buildCardView()
         else
@@ -764,11 +795,36 @@ class _GCReportPageState extends State<GCReportPage>
   }
 
   Widget _buildSummaryCards(bool isMobile, bool isTablet) {
+    final primary = Theme.of(context).primaryColor;
     final cards = [
-      _SummaryCardData('Total GCs', _totalGCsAnim, Icons.assignment, const Color(0xFF3B82F6), true),
-      _SummaryCardData('Total Hire', _totalHireAnim, Icons.currency_rupee, const Color(0xFF10B981), false),
-      _SummaryCardData('Total Advance', _totalAdvanceAnim, Icons.account_balance_wallet, const Color(0xFFF59E0B), false),
-      _SummaryCardData('Total Freight', _totalFreightAnim, Icons.local_shipping, const Color(0xFF8B5CF6), false),
+      _SummaryCardData(
+        'Total GCs',
+        _totalGCsAnim,
+        Icons.assignment,
+        primary,
+        true,
+      ),
+      _SummaryCardData(
+        'Total Hire',
+        _totalHireAnim,
+        Icons.currency_rupee,
+        const Color(0xFF10B981),
+        false,
+      ),
+      _SummaryCardData(
+        'Total Advance',
+        _totalAdvanceAnim,
+        Icons.account_balance_wallet,
+        const Color(0xFFF59E0B),
+        false,
+      ),
+      _SummaryCardData(
+        'Total Freight',
+        _totalFreightAnim,
+        Icons.local_shipping,
+        const Color(0xFF8B5CF6),
+        false,
+      ),
     ];
 
     if (isMobile) {
@@ -778,7 +834,8 @@ class _GCReportPageState extends State<GCReportPage>
           scrollDirection: Axis.horizontal,
           itemCount: cards.length,
           separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (context, i) => _buildAnimatedSummaryCard(cards[i], isMobile),
+          itemBuilder: (context, i) =>
+              _buildAnimatedSummaryCard(cards[i], isMobile),
         ),
       );
     } else {
@@ -792,7 +849,8 @@ class _GCReportPageState extends State<GCReportPage>
           mainAxisSpacing: 16,
         ),
         itemCount: cards.length,
-        itemBuilder: (context, i) => _buildAnimatedSummaryCard(cards[i], isMobile),
+        itemBuilder: (context, i) =>
+            _buildAnimatedSummaryCard(cards[i], isMobile),
       );
     }
   }
@@ -811,7 +869,7 @@ class _GCReportPageState extends State<GCReportPage>
             gradient: LinearGradient(
               colors: [
                 cardData.color.withOpacity(0.08),
-                cardData.color.withOpacity(0.02)
+                cardData.color.withOpacity(0.02),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -896,11 +954,11 @@ class _GCReportPageState extends State<GCReportPage>
                       prefixIcon: const Icon(Icons.search, color: Colors.grey),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                        },
-                      )
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                              },
+                            )
                           : null,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -931,10 +989,7 @@ class _GCReportPageState extends State<GCReportPage>
               const SizedBox(height: 12),
               Text(
                 '${filteredGcList.length} records found',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
               ),
             ],
           ],
@@ -945,7 +1000,9 @@ class _GCReportPageState extends State<GCReportPage>
 
   SliverList _buildCardView() {
     final int itemCount = filteredGcList.length;
-    final int totalPages = itemCount == 0 ? 1 : (itemCount / _rowsPerPage).ceil();
+    final int totalPages = itemCount == 0
+        ? 1
+        : (itemCount / _rowsPerPage).ceil();
     _currentPage = _currentPage.clamp(0, totalPages - 1);
     final int startIndex = _currentPage * _rowsPerPage;
     final int endIndex = math.min(startIndex + _rowsPerPage, itemCount);
@@ -955,21 +1012,18 @@ class _GCReportPageState extends State<GCReportPage>
     );
 
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-            (context, index) {
-          if (index == pageData.length) {
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: _buildPaginationControls(totalPages, true),
-            );
-          }
+      delegate: SliverChildBuilderDelegate((context, index) {
+        if (index == pageData.length) {
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: _buildGCCard(pageData[index]),
+            padding: const EdgeInsets.all(16),
+            child: _buildPaginationControls(totalPages, true),
           );
-        },
-        childCount: pageData.length + 1,
-      ),
+        }
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: _buildGCCard(pageData[index]),
+        );
+      }, childCount: pageData.length + 1),
     );
   }
 
@@ -988,15 +1042,18 @@ class _GCReportPageState extends State<GCReportPage>
                 Expanded(
                   child: Text(
                     'GC #${gc['GcNumber'] ?? 'N/A'}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E3A8A),
+                      color: Theme.of(context).primaryColor,
                     ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.shade50,
                     borderRadius: BorderRadius.circular(12),
@@ -1028,7 +1085,7 @@ class _GCReportPageState extends State<GCReportPage>
                   child: _buildAmountChip(
                     'Hire',
                     _formatCurrency(_parseDouble(gc['HireAmount'])),
-                    Colors.blue,
+                    Theme.of(context).primaryColor,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1075,10 +1132,7 @@ class _GCReportPageState extends State<GCReportPage>
           Expanded(
             child: Text(
               value?.toString() ?? 'N/A',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w400,
-              ),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w400),
             ),
           ),
         ],
@@ -1089,8 +1143,11 @@ class _GCReportPageState extends State<GCReportPage>
   Widget _buildAmountChip(String label, String amount, Color color) {
     // Create darker variants of the color for text
     final darkerColor = Color.alphaBlend(Colors.black.withOpacity(0.3), color);
-    final evenDarkerColor = Color.alphaBlend(Colors.black.withOpacity(0.5), color);
-    
+    final evenDarkerColor = Color.alphaBlend(
+      Colors.black.withOpacity(0.5),
+      color,
+    );
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
       decoration: BoxDecoration(
@@ -1179,7 +1236,9 @@ class _GCReportPageState extends State<GCReportPage>
 
     // Pagination calculations
     final int itemCount = filteredGcList.length;
-    final int totalPages = itemCount == 0 ? 1 : (itemCount / _rowsPerPage).ceil();
+    final int totalPages = itemCount == 0
+        ? 1
+        : (itemCount / _rowsPerPage).ceil();
     _currentPage = _currentPage.clamp(0, totalPages - 1);
     final int startIndex = _currentPage * _rowsPerPage;
     final int endIndex = math.min(startIndex + _rowsPerPage, itemCount);
@@ -1198,7 +1257,7 @@ class _GCReportPageState extends State<GCReportPage>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E3A8A).withOpacity(0.05),
+              color: Theme.of(context).primaryColor.withOpacity(0.05),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(12),
                 topRight: Radius.circular(12),
@@ -1206,21 +1265,18 @@ class _GCReportPageState extends State<GCReportPage>
             ),
             child: Row(
               children: [
-                const Text(
+                Text(
                   'GC Entries',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E3A8A),
+                    color: Theme.of(context).primaryColor,
                   ),
                 ),
                 const Spacer(),
                 Text(
                   'Showing ${startIndex + 1}–$endIndex of $itemCount entries',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                 ),
               ],
             ),
@@ -1231,26 +1287,27 @@ class _GCReportPageState extends State<GCReportPage>
             scrollDirection: Axis.horizontal,
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minWidth: MediaQuery.of(context).size.width - (isMobile ? 24 : 32),
+                minWidth:
+                    MediaQuery.of(context).size.width - (isMobile ? 24 : 32),
               ),
               child: DataTable(
                 headingRowHeight: 56,
                 dataRowHeight: 56,
-                headingRowColor: MaterialStateProperty.all(
-                  Colors.grey.shade50,
-                ),
+                headingRowColor: MaterialStateProperty.all(Colors.grey.shade50),
                 columns: columns
-                    .map((c) => DataColumn(
-                  label: Expanded(
-                    child: Text(
-                      c,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                    .map(
+                      (c) => DataColumn(
+                        label: Expanded(
+                          child: Text(
+                            c,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ))
+                    )
                     .toList(),
                 rows: pageData.asMap().entries.map((entry) {
                   final index = entry.key;
@@ -1264,7 +1321,11 @@ class _GCReportPageState extends State<GCReportPage>
                       String displayValue = item[key]?.toString() ?? '';
 
                       // Format currency fields
-                      if (['HireAmount', 'AdvanceAmount', 'FreightCharge'].contains(key)) {
+                      if ([
+                        'HireAmount',
+                        'AdvanceAmount',
+                        'FreightCharge',
+                      ].contains(key)) {
                         displayValue = _formatCurrency(_parseDouble(item[key]));
                       }
 
@@ -1276,11 +1337,21 @@ class _GCReportPageState extends State<GCReportPage>
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 12,
-                              fontWeight: ['HireAmount', 'AdvanceAmount', 'FreightCharge'].contains(key)
+                              fontWeight:
+                                  [
+                                    'HireAmount',
+                                    'AdvanceAmount',
+                                    'FreightCharge',
+                                  ].contains(key)
                                   ? FontWeight.w600
                                   : FontWeight.w400,
-                              color: ['HireAmount', 'AdvanceAmount', 'FreightCharge'].contains(key)
-                                  ? const Color(0xFF1E3A8A)
+                              color:
+                                  [
+                                    'HireAmount',
+                                    'AdvanceAmount',
+                                    'FreightCharge',
+                                  ].contains(key)
+                                  ? Theme.of(context).primaryColor
                                   : Colors.black87,
                             ),
                           ),
@@ -1330,10 +1401,9 @@ class _GCReportPageState extends State<GCReportPage>
               DropdownButton<int>(
                 value: _rowsPerPage,
                 items: const [5, 10, 20, 50]
-                    .map((v) => DropdownMenuItem<int>(
-                  value: v,
-                  child: Text('$v'),
-                ))
+                    .map(
+                      (v) => DropdownMenuItem<int>(value: v, child: Text('$v')),
+                    )
                     .toList(),
                 onChanged: (v) {
                   if (v != null) {
@@ -1359,7 +1429,9 @@ class _GCReportPageState extends State<GCReportPage>
                 children: [
                   IconButton(
                     icon: const Icon(Icons.chevron_left),
-                    onPressed: _currentPage > 0 ? () => goToPage(_currentPage - 1) : null,
+                    onPressed: _currentPage > 0
+                        ? () => goToPage(_currentPage - 1)
+                        : null,
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
@@ -1399,10 +1471,10 @@ class _GCReportPageState extends State<GCReportPage>
                   value: _rowsPerPage,
                   underline: const SizedBox(),
                   items: const [5, 10, 20, 50, 100]
-                      .map((v) => DropdownMenuItem<int>(
-                    value: v,
-                    child: Text('$v'),
-                  ))
+                      .map(
+                        (v) =>
+                            DropdownMenuItem<int>(value: v, child: Text('$v')),
+                      )
                       .toList(),
                   onChanged: (v) {
                     if (v != null) {
@@ -1428,15 +1500,21 @@ class _GCReportPageState extends State<GCReportPage>
                 onPressed: _currentPage > 0 ? () => goToPage(0) : null,
                 tooltip: 'First page',
                 style: IconButton.styleFrom(
-                  backgroundColor: _currentPage > 0 ? Colors.grey.shade100 : null,
+                  backgroundColor: _currentPage > 0
+                      ? Colors.grey.shade100
+                      : null,
                 ),
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_left),
-                onPressed: _currentPage > 0 ? () => goToPage(_currentPage - 1) : null,
+                onPressed: _currentPage > 0
+                    ? () => goToPage(_currentPage - 1)
+                    : null,
                 tooltip: 'Previous page',
                 style: IconButton.styleFrom(
-                  backgroundColor: _currentPage > 0 ? Colors.grey.shade100 : null,
+                  backgroundColor: _currentPage > 0
+                      ? Colors.grey.shade100
+                      : null,
                 ),
               ),
               const SizedBox(width: 8),
@@ -1473,7 +1551,10 @@ class _GCReportPageState extends State<GCReportPage>
               ),
               Text(
                 ' of $totalPages',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               const SizedBox(width: 8),
               IconButton(
@@ -1483,7 +1564,9 @@ class _GCReportPageState extends State<GCReportPage>
                     : null,
                 tooltip: 'Next page',
                 style: IconButton.styleFrom(
-                  backgroundColor: _currentPage < totalPages - 1 ? Colors.grey.shade100 : null,
+                  backgroundColor: _currentPage < totalPages - 1
+                      ? Colors.grey.shade100
+                      : null,
                 ),
               ),
               IconButton(
@@ -1493,7 +1576,9 @@ class _GCReportPageState extends State<GCReportPage>
                     : null,
                 tooltip: 'Last page',
                 style: IconButton.styleFrom(
-                  backgroundColor: _currentPage < totalPages - 1 ? Colors.grey.shade100 : null,
+                  backgroundColor: _currentPage < totalPages - 1
+                      ? Colors.grey.shade100
+                      : null,
                 ),
               ),
             ],
@@ -1504,7 +1589,6 @@ class _GCReportPageState extends State<GCReportPage>
   }
 }
 
-
 // Helper classes
 class _SummaryCardData {
   final String label;
@@ -1513,7 +1597,13 @@ class _SummaryCardData {
   final Color color;
   final bool isCount;
 
-  _SummaryCardData(this.label, this.animation, this.icon, this.color, this.isCount);
+  _SummaryCardData(
+    this.label,
+    this.animation,
+    this.icon,
+    this.color,
+    this.isCount,
+  );
 }
 
 class _EmptyState extends StatelessWidget {
@@ -1526,11 +1616,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.inbox_outlined,
-            size: 64,
-            color: Colors.grey.shade400,
-          ),
+          Icon(Icons.inbox_outlined, size: 64, color: Colors.grey.shade400),
           const SizedBox(height: 16),
           Text(
             'No GC Records Found',
@@ -1544,10 +1630,7 @@ class _EmptyState extends StatelessWidget {
           Text(
             'Try adjusting your search criteria or check back later.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade500,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
           ),
         ],
       ),

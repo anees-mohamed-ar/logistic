@@ -13,14 +13,12 @@ class ConsignorListPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CustomAppBar(
-        title: 'Consignors',
-      ),
+      appBar: CustomAppBar(title: 'Consignors'),
       body: Obx(() {
         if (controller.isLoading.value && controller.consignors.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }
-        
+
         if (controller.consignors.isEmpty) {
           return Center(
             child: Column(
@@ -34,11 +32,14 @@ class ConsignorListPage extends StatelessWidget {
                     onPressed: controller.fetchConsignors,
                     icon: const Icon(Icons.refresh),
                     label: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 8.0,
+                        vertical: 12.0,
+                      ),
                       child: Text('Retry'),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1E2A44),
+                      backgroundColor: Theme.of(context).primaryColor,
                       foregroundColor: Colors.white,
                     ),
                   ),
@@ -64,7 +65,10 @@ class ConsignorListPage extends StatelessWidget {
                   ),
                   filled: true,
                   fillColor: Colors.grey[200],
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 0,
+                    horizontal: 16,
+                  ),
                   suffixIcon: controller.searchController.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear),
@@ -84,19 +88,32 @@ class ConsignorListPage extends StatelessWidget {
                 onRefresh: () => controller.fetchConsignors(),
                 child: ListView.builder(
                   // itemExtent: 100, // Fixed height for each item
-                  cacheExtent: 1000, // Cache more items off-screen for smoother scrolling
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  cacheExtent:
+                      1000, // Cache more items off-screen for smoother scrolling
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   itemCount: controller.filteredConsignors.length,
                   itemBuilder: (context, index) {
                     final consignor = controller.filteredConsignors[index];
                     return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                      margin: const EdgeInsets.symmetric(
+                        vertical: 4,
+                        horizontal: 8,
+                      ),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: Colors.blue.shade100,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).primaryColor.withOpacity(0.1),
                           child: Text(
-                            consignor.consignorName.isNotEmpty ? consignor.consignorName[0].toUpperCase() : 'C',
-                            style: const TextStyle(color: Colors.blue),
+                            consignor.consignorName.isNotEmpty
+                                ? consignor.consignorName[0].toUpperCase()
+                                : 'C',
+                            style: TextStyle(
+                              color: Theme.of(context).primaryColor,
+                            ),
                           ),
                         ),
                         title: Text(
@@ -111,7 +128,11 @@ class ConsignorListPage extends StatelessWidget {
                                 padding: const EdgeInsets.only(top: 4.0),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.phone, size: 14, color: Colors.grey),
+                                    const Icon(
+                                      Icons.phone,
+                                      size: 14,
+                                      color: Colors.grey,
+                                    ),
                                     const SizedBox(width: 4),
                                     Text(
                                       consignor.mobileNumber,
@@ -125,7 +146,11 @@ class ConsignorListPage extends StatelessWidget {
                                 padding: const EdgeInsets.only(top: 4.0),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.receipt, size: 14, color: Colors.grey),
+                                    const Icon(
+                                      Icons.receipt,
+                                      size: 14,
+                                      color: Colors.grey,
+                                    ),
                                     const SizedBox(width: 4),
                                     Text(
                                       consignor.gst,
@@ -139,7 +164,11 @@ class ConsignorListPage extends StatelessWidget {
                                 padding: const EdgeInsets.only(top: 4.0),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                                    const Icon(
+                                      Icons.location_on,
+                                      size: 14,
+                                      color: Colors.grey,
+                                    ),
                                     const SizedBox(width: 4),
                                     Expanded(
                                       child: Text(
@@ -153,10 +182,11 @@ class ConsignorListPage extends StatelessWidget {
                               ),
                           ],
                         ),
-                        onTap: () => Get.to(() => AddEditConsignorPage(consignor: consignor)),
+                        onTap: () => Get.to(
+                          () => AddEditConsignorPage(consignor: consignor),
+                        ),
                       ),
                     );
-                    
                   },
                 ),
               ),
@@ -166,7 +196,7 @@ class ConsignorListPage extends StatelessWidget {
       }),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Get.to(() => AddEditConsignorPage()),
-        backgroundColor: const Color(0xFF1E2A44),
+        backgroundColor: Theme.of(context).primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,

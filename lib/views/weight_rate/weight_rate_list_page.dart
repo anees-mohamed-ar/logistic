@@ -40,19 +40,24 @@ class WeightRateListPage extends StatelessWidget {
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 ElevatedButton.icon(
-                  onPressed: () => Get.toNamed(AppRoutes.weightRateForm, arguments: null)
-                      ?.then((_) => _controller.fetchWeightRates()),
+                  onPressed: () => Get.toNamed(
+                    AppRoutes.weightRateForm,
+                    arguments: null,
+                  )?.then((_) => _controller.fetchWeightRates()),
                   icon: const Icon(Icons.add, size: 20),
                   label: const Text('Add New'),
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1E2A44),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    backgroundColor: Theme.of(context).primaryColor,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          
+
           // Info card
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -66,20 +71,25 @@ class WeightRateListPage extends StatelessWidget {
               ),
             ),
           ),
-          
+
           // Data Table
           Expanded(
             child: Obx(() {
-              if (_controller.isLoading.value && _controller.weightRates.isEmpty) {
+              if (_controller.isLoading.value &&
+                  _controller.weightRates.isEmpty) {
                 return const Center(child: CircularProgressIndicator());
               }
-              
+
               if (_controller.error.value.isNotEmpty) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                      const Icon(
+                        Icons.error_outline,
+                        color: Colors.red,
+                        size: 48,
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         'Error loading data: ${_controller.error.value}',
@@ -91,18 +101,26 @@ class WeightRateListPage extends StatelessWidget {
                         onPressed: _controller.fetchWeightRates,
                         icon: const Icon(Icons.refresh),
                         label: const Text('Retry'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).primaryColor,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
                     ],
                   ),
                 );
               }
-              
+
               if (_controller.weightRates.isEmpty) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.inbox_outlined, size: 64, color: Colors.grey),
+                      const Icon(
+                        Icons.inbox_outlined,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(height: 16),
                       const Text(
                         'No weight rates found',
@@ -110,8 +128,10 @@ class WeightRateListPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       TextButton.icon(
-                        onPressed: () => Get.toNamed(AppRoutes.weightRateForm, arguments: null)
-                            ?.then((_) => _controller.fetchWeightRates()),
+                        onPressed: () => Get.toNamed(
+                          AppRoutes.weightRateForm,
+                          arguments: null,
+                        )?.then((_) => _controller.fetchWeightRates()),
                         icon: const Icon(Icons.add),
                         label: const Text('Add New Rate'),
                       ),
@@ -119,7 +139,7 @@ class WeightRateListPage extends StatelessWidget {
                   ),
                 );
               }
-              
+
               return RefreshIndicator(
                 onRefresh: _refreshData,
                 child: ListView.builder(
@@ -148,14 +168,22 @@ class WeightRateListPage extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                              icon: Icon(
+                                Icons.edit,
+                                color: Theme.of(context).primaryColor,
+                                size: 20,
+                              ),
                               onPressed: () => Get.toNamed(
                                 AppRoutes.weightRateEdit,
                                 arguments: rate,
                               )?.then((_) => _controller.fetchWeightRates()),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                              icon: const Icon(
+                                Icons.delete,
+                                color: Colors.red,
+                                size: 20,
+                              ),
                               onPressed: () => _deleteWeightRate(rate),
                             ),
                           ],
@@ -166,9 +194,17 @@ class WeightRateListPage extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildRateItem('Rate (0-250 KM)', '₹${rate.below250.toStringAsFixed(2)}'),
+                                _buildRateItem(
+                                  context,
+                                  'Rate (0-250 KM)',
+                                  '₹${rate.below250.toStringAsFixed(2)}',
+                                ),
                                 const SizedBox(height: 12),
-                                _buildRateItem('Rate (Above 250 KM)', '₹${rate.above250.toStringAsFixed(2)}'),
+                                _buildRateItem(
+                                  context,
+                                  'Rate (Above 250 KM)',
+                                  '₹${rate.above250.toStringAsFixed(2)}',
+                                ),
                               ],
                             ),
                           ),
@@ -185,24 +221,18 @@ class WeightRateListPage extends StatelessWidget {
     );
   }
 
-  Widget _buildRateItem(String label, String value) {
+  Widget _buildRateItem(BuildContext context, String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-          ),
-        ),
+        Text(label, style: const TextStyle(fontSize: 14, color: Colors.grey)),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'RobotoMono',
             fontSize: 16,
             fontWeight: FontWeight.w500,
-            color: Colors.blueGrey,
+            color: Theme.of(context).primaryColor,
           ),
         ),
       ],
@@ -210,17 +240,20 @@ class WeightRateListPage extends StatelessWidget {
   }
 
   Future<void> _deleteWeightRate(WeightToRate weightRate) async {
-    final confirmed = await Get.defaultDialog<bool>(
-      title: 'Confirm Delete',
-      middleText: 'Are you sure you want to delete the weight rate for ${weightRate.weight}?',
-      textConfirm: 'DELETE',
-      textCancel: 'CANCEL',
-      confirmTextColor: Colors.white,
-      buttonColor: Colors.red,
-      cancelTextColor: Colors.black54,
-      onConfirm: () => Get.back(result: true),
-      onCancel: () => Get.back(result: false),
-    ) ?? false;
+    final confirmed =
+        await Get.defaultDialog<bool>(
+          title: 'Confirm Delete',
+          middleText:
+              'Are you sure you want to delete the weight rate for ${weightRate.weight}?',
+          textConfirm: 'DELETE',
+          textCancel: 'CANCEL',
+          confirmTextColor: Colors.white,
+          buttonColor: Colors.red,
+          cancelTextColor: Colors.black54,
+          onConfirm: () => Get.back(result: true),
+          onCancel: () => Get.back(result: false),
+        ) ??
+        false;
 
     if (confirmed) {
       await _controller.deleteWeightRate(weightRate.id!);

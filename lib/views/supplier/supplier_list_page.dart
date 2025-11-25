@@ -144,7 +144,7 @@ class _SupplierListPageState extends State<SupplierListPage> {
                         icon: const Icon(Icons.refresh),
                         label: const Text('Refresh'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1E2A44),
+                          backgroundColor: Theme.of(context).primaryColor,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -159,7 +159,7 @@ class _SupplierListPageState extends State<SupplierListPage> {
                   itemCount: suppliers.length,
                   itemBuilder: (context, index) {
                     final supplier = suppliers[index];
-                    return _buildSupplierCard(supplier);
+                    return _buildSupplierCard(context, supplier);
                   },
                 ),
               );
@@ -169,19 +169,19 @@ class _SupplierListPageState extends State<SupplierListPage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Get.to(() => const SupplierFormPage()),
-        backgroundColor: const Color(0xFF1E2A44),
+        backgroundColor: Theme.of(context).primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
 
-  Widget _buildSupplierCard(Supplier supplier) {
+  Widget _buildSupplierCard(BuildContext context, Supplier supplier) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Colors.purple.shade100,
-          child: const Icon(Icons.business, color: Colors.purple),
+          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+          child: Icon(Icons.business, color: Theme.of(context).primaryColor),
         ),
         title: Text(
           supplier.supplierName,
@@ -203,7 +203,11 @@ class _SupplierListPageState extends State<SupplierListPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+              icon: Icon(
+                Icons.edit,
+                color: Theme.of(context).primaryColor,
+                size: 20,
+              ),
               onPressed: () =>
                   Get.to(() => SupplierFormPage(supplier: supplier)),
               padding: EdgeInsets.zero,

@@ -396,7 +396,7 @@ class _GCListPageState extends State<GCListPage> {
                           Navigator.pop(context);
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1E2A44),
+                          backgroundColor: Theme.of(context).primaryColor,
                           foregroundColor: Colors.white,
                         ),
                         child: const Text('Apply Filters'),
@@ -441,8 +441,8 @@ class _GCListPageState extends State<GCListPage> {
           }
         });
       },
-      selectedColor: const Color(0xFF1E2A44).withOpacity(0.2),
-      checkmarkColor: const Color(0xFF1E2A44),
+      selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
+      checkmarkColor: Theme.of(context).primaryColor,
     );
   }
 
@@ -575,7 +575,7 @@ class _GCListPageState extends State<GCListPage> {
       body: _buildBody(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _checkAndNavigateToGCForm,
-        backgroundColor: const Color(0xFF1E2A44),
+        backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('Add GC'),
@@ -624,8 +624,11 @@ class _GCListPageState extends State<GCListPage> {
                 height: 64,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF4A90E2), Color(0xFF1E2A44)],
+                  gradient: LinearGradient(
+                    colors: [
+                      Theme.of(context).primaryColor,
+                      Theme.of(context).primaryColor.withOpacity(0.85),
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -644,12 +647,12 @@ class _GCListPageState extends State<GCListPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 'Checking GC Access',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF1E2A44),
+                  color: Theme.of(context).primaryColor,
                 ),
               ),
               const SizedBox(height: 8),
@@ -760,7 +763,7 @@ class _GCListPageState extends State<GCListPage> {
           ),
         ],
       ),
-      backgroundColor: const Color(0xFF1E2A44),
+      backgroundColor: Theme.of(context).primaryColor,
       foregroundColor: Colors.white,
       elevation: 0,
       actions: [
@@ -865,11 +868,11 @@ class _GCListPageState extends State<GCListPage> {
   }
 
   Widget _buildLoadingState() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(color: Color(0xFF1E2A44)),
+          CircularProgressIndicator(color: Theme.of(context).primaryColor),
           SizedBox(height: 16),
           Text(
             'Loading GC records...',
@@ -985,7 +988,7 @@ class _GCListPageState extends State<GCListPage> {
                 icon: const Icon(Icons.clear),
                 label: const Text('Clear All Filters'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1E2A44),
+                  backgroundColor: Theme.of(context).primaryColor,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -1005,7 +1008,7 @@ class _GCListPageState extends State<GCListPage> {
   Widget _buildGCList() {
     return RefreshIndicator(
       onRefresh: fetchGCList,
-      color: const Color(0xFF1E2A44),
+      color: Theme.of(context).primaryColor,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: filteredGcList.length,
@@ -1070,13 +1073,19 @@ class _GCListPageState extends State<GCListPage> {
                 Container(
                   margin: const EdgeInsets.only(right: 8),
                   child: IconButton(
-                    icon: const Icon(Icons.edit, size: 20, color: Colors.blue),
+                    icon: Icon(
+                      Icons.edit,
+                      size: 20,
+                      color: Theme.of(context).primaryColor,
+                    ),
                     onPressed: () => _editGC(gc),
                     padding: const EdgeInsets.all(6),
                     constraints: const BoxConstraints(),
                     tooltip: 'Edit GC',
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.blue.withOpacity(0.1),
+                      backgroundColor: Theme.of(
+                        context,
+                      ).primaryColor.withOpacity(0.1),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(6),
                       ),
@@ -1086,10 +1095,13 @@ class _GCListPageState extends State<GCListPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E2A44).withOpacity(0.1),
+                  color: Theme.of(context).primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.expand_more, color: Color(0xFF1E2A44)),
+                child: Icon(
+                  Icons.expand_more,
+                  color: Theme.of(context).primaryColor,
+                ),
               ),
             ],
           ),
@@ -1105,7 +1117,7 @@ class _GCListPageState extends State<GCListPage> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E2A44),
+            color: Theme.of(context).primaryColor,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
@@ -1263,7 +1275,7 @@ class _GCListPageState extends State<GCListPage> {
                 icon: const Icon(Icons.edit, size: 18),
                 label: const Text('Edit GC Record'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4A90E2),
+                  backgroundColor: Theme.of(context).primaryColor,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
@@ -1294,14 +1306,14 @@ class _GCListPageState extends State<GCListPage> {
       children: [
         Row(
           children: [
-            Icon(icon, size: 18, color: const Color(0xFF1E2A44)),
+            Icon(icon, size: 18, color: Theme.of(context).primaryColor),
             const SizedBox(width: 8),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1E2A44),
+                color: Theme.of(context).primaryColor,
               ),
             ),
           ],

@@ -754,7 +754,7 @@ class _TruckListPageState extends State<TruckListPage> {
                 icon: const Icon(Icons.refresh),
                 label: const Text('Try Again'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1E2A44),
+                  backgroundColor: Theme.of(context).primaryColor,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -867,7 +867,7 @@ class _TruckListPageState extends State<TruckListPage> {
                           _isGridView ? Icons.view_list : Icons.grid_view,
                           size: 20,
                         ),
-                        color: const Color(0xFF1E2A44),
+                        color: Theme.of(context).primaryColor,
                         padding: const EdgeInsets.all(10),
                         constraints: const BoxConstraints(),
                       ),
@@ -902,15 +902,17 @@ class _TruckListPageState extends State<TruckListPage> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1E2A44).withOpacity(0.1),
+                              color: Theme.of(
+                                context,
+                              ).primaryColor.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Filtered',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF1E2A44),
+                                color: Theme.of(context).primaryColor,
                               ),
                             ),
                           ),
@@ -929,7 +931,7 @@ class _TruckListPageState extends State<TruckListPage> {
                     onRefresh: () async {
                       await _loadAllTrucks();
                     },
-                    color: const Color(0xFF1E2A44),
+                    color: Theme.of(context).primaryColor,
                     child: _isGridView ? _buildGridView() : _buildListView(),
                   ),
           ),
@@ -942,7 +944,7 @@ class _TruckListPageState extends State<TruckListPage> {
             await _loadAllTrucks();
           }
         },
-        backgroundColor: const Color(0xFF1E2A44),
+        backgroundColor: Theme.of(context).primaryColor,
         elevation: 4,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text(
@@ -956,9 +958,12 @@ class _TruckListPageState extends State<TruckListPage> {
   Widget _buildQuickStatsBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1E2A44), Color(0xFF2D3E5F)],
+          colors: [
+            Theme.of(context).primaryColor,
+            Theme.of(context).primaryColor.withOpacity(0.85),
+          ],
         ),
       ),
       child: Row(
@@ -1035,12 +1040,16 @@ class _TruckListPageState extends State<TruckListPage> {
         overflow: TextOverflow.ellipsis,
       ),
       style: OutlinedButton.styleFrom(
-        foregroundColor: isActive ? Colors.white : const Color(0xFF1E2A44),
+        foregroundColor: isActive
+            ? Colors.white
+            : Theme.of(context).primaryColor,
         backgroundColor: isActive
-            ? const Color(0xFF1E2A44)
+            ? Theme.of(context).primaryColor
             : Colors.transparent,
         side: BorderSide(
-          color: isActive ? const Color(0xFF1E2A44) : Colors.grey.shade300,
+          color: isActive
+              ? Theme.of(context).primaryColor
+              : Colors.grey.shade300,
           width: isActive ? 2 : 1,
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -1140,8 +1149,8 @@ class _TruckListPageState extends State<TruckListPage> {
                 icon: const Icon(Icons.clear_all),
                 label: const Text('Clear All Filters'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF1E2A44),
-                  side: const BorderSide(color: Color(0xFF1E2A44)),
+                  foregroundColor: Theme.of(context).primaryColor,
+                  side: BorderSide(color: Theme.of(context).primaryColor),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 12,
@@ -1235,8 +1244,11 @@ class _TruckListPageState extends State<TruckListPage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF1E2A44), Color(0xFF2D3E5F)],
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).primaryColor,
+                          Theme.of(context).primaryColor.withOpacity(0.85),
+                        ],
                       ),
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1253,10 +1265,10 @@ class _TruckListPageState extends State<TruckListPage> {
                       children: [
                         Text(
                           truck.vechileNumber,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E2A44),
+                            color: Theme.of(context).primaryColor,
                             letterSpacing: 0.5,
                           ),
                         ),
@@ -1268,14 +1280,16 @@ class _TruckListPageState extends State<TruckListPage> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
+                              color: Theme.of(
+                                context,
+                              ).primaryColor.withOpacity(0.06),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               truck.typeofVechile!,
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.blue.shade700,
+                                color: Theme.of(context).primaryColor,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -1413,8 +1427,12 @@ class _TruckListPageState extends State<TruckListPage> {
                         style: TextStyle(fontSize: 13),
                       ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.blue.shade700,
-                        side: BorderSide(color: Colors.blue.shade200),
+                        foregroundColor: Theme.of(context).primaryColor,
+                        side: BorderSide(
+                          color: Theme.of(
+                            context,
+                          ).primaryColor.withOpacity(0.4),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -1436,7 +1454,7 @@ class _TruckListPageState extends State<TruckListPage> {
                       icon: const Icon(Icons.edit, size: 16),
                       label: const Text('Edit', style: TextStyle(fontSize: 13)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E2A44),
+                        backgroundColor: Theme.of(context).primaryColor,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         elevation: 0,
@@ -1500,8 +1518,11 @@ class _TruckListPageState extends State<TruckListPage> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF1E2A44), Color(0xFF2D3E5F)],
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).primaryColor,
+                          Theme.of(context).primaryColor.withOpacity(0.85),
+                        ],
                       ),
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -1530,10 +1551,10 @@ class _TruckListPageState extends State<TruckListPage> {
               // Vehicle Number
               Text(
                 truck.vechileNumber,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E2A44),
+                  color: Theme.of(context).primaryColor,
                   letterSpacing: 0.3,
                 ),
               ),
@@ -1546,14 +1567,14 @@ class _TruckListPageState extends State<TruckListPage> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: Theme.of(context).primaryColor.withOpacity(0.06),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     truck.typeofVechile!,
                     style: TextStyle(
                       fontSize: 10,
-                      color: Colors.blue.shade700,
+                      color: Theme.of(context).primaryColor,
                       fontWeight: FontWeight.w600,
                     ),
                     maxLines: 1,

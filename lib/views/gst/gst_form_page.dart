@@ -17,13 +17,13 @@ class GstFormPage extends StatefulWidget {
 class _GstFormPageState extends State<GstFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _gstController = Get.find<GstController>();
-  
+
   late TextEditingController _hsnController;
   late TextEditingController _dateController;
   late TextEditingController _cgstController;
   late TextEditingController _igstController;
   late TextEditingController _sgstController;
-  
+
   DateTime? _selectedDate;
   final _dateFormat = DateFormat('dd-MM-yyyy');
 
@@ -31,13 +31,21 @@ class _GstFormPageState extends State<GstFormPage> {
   void initState() {
     super.initState();
     _hsnController = TextEditingController(text: widget.gst?.hsn ?? '');
-    _cgstController = TextEditingController(text: widget.gst?.cgst.toString() ?? '');
-    _igstController = TextEditingController(text: widget.gst?.igst.toString() ?? '');
-    _sgstController = TextEditingController(text: widget.gst?.sgst.toString() ?? '');
-    
+    _cgstController = TextEditingController(
+      text: widget.gst?.cgst.toString() ?? '',
+    );
+    _igstController = TextEditingController(
+      text: widget.gst?.igst.toString() ?? '',
+    );
+    _sgstController = TextEditingController(
+      text: widget.gst?.sgst.toString() ?? '',
+    );
+
     if (widget.gst != null) {
       _selectedDate = widget.gst!.date;
-      _dateController = TextEditingController(text: _dateFormat.format(widget.gst!.date));
+      _dateController = TextEditingController(
+        text: _dateFormat.format(widget.gst!.date),
+      );
     } else {
       _dateController = TextEditingController();
       _selectedDate = DateTime.now();
@@ -187,7 +195,7 @@ class _GstFormPageState extends State<GstFormPage> {
                 onPressed: _saveGst,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  backgroundColor: const Color(0xFF1E2A44)
+                  backgroundColor: Theme.of(context).primaryColor,
                 ),
                 child: const Text('Save'),
               ),

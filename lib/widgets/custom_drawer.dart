@@ -127,7 +127,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
         width: double.infinity,
-        decoration: const BoxDecoration(color: Color(0xFF1E2A44)),
+        decoration: BoxDecoration(color: Theme.of(context).primaryColor),
         child: Column(
           children: [
             // Profile Picture
@@ -214,12 +214,11 @@ class _CustomDrawerState extends State<CustomDrawer> {
   }
 
   Widget _buildAvatarFallback(String name) {
+    final primary = Theme.of(context).primaryColor;
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [const Color(0xFF4A90E2), const Color(0xFF357ABD)],
-        ),
+        gradient: LinearGradient(colors: [primary, primary.withOpacity(0.85)]),
       ),
       child: Center(
         child: Text(
@@ -263,7 +262,9 @@ class _CustomDrawerState extends State<CustomDrawer> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: isSelected ? const Color(0xFF4A90E2).withOpacity(0.1) : null,
+        color: isSelected
+            ? Theme.of(context).primaryColor.withOpacity(0.1)
+            : null,
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -271,7 +272,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: isSelected
-                ? const Color(0xFF4A90E2)
+                ? Theme.of(context).primaryColor
                 : Colors.grey.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
@@ -287,7 +288,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
             color: isSelected
-                ? const Color(0xFF1E2A44)
+                ? Theme.of(context).primaryColor
                 : const Color(0xFF1E2A44),
           ),
         ),
@@ -491,7 +492,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: isSelected
-                ? const Color(0xFF4A90E2).withOpacity(0.12)
+                ? Theme.of(context).primaryColor.withOpacity(0.12)
                 : Colors.grey.withOpacity(0.08),
             borderRadius: BorderRadius.circular(8),
           ),
@@ -499,7 +500,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
             icon,
             size: 18,
             color: isSelected
-                ? const Color(0xFF4A90E2)
+                ? Theme.of(context).primaryColor
                 : const Color(0xFF64748B),
           ),
         ),

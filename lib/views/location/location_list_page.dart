@@ -34,20 +34,22 @@ class _LocationListPageState extends State<LocationListPage> {
 
   void _filterLocations() {
     if (controller.locations.isEmpty) return;
-    
+
     final query = searchController.text.trim().toLowerCase();
-    
+
     if (query.isEmpty) {
       filteredLocations.assignAll(controller.locations);
     } else {
-      filteredLocations.assignAll(controller.locations.where((location) {
-        return location.branchName.toLowerCase().contains(query) ||
-            (location.branchCode?.toLowerCase() ?? '').contains(query) ||
-            (location.contactPerson?.toLowerCase() ?? '').contains(query) ||
-            (location.phoneNumber?.contains(query) ?? false);
-      }).toList());
+      filteredLocations.assignAll(
+        controller.locations.where((location) {
+          return location.branchName.toLowerCase().contains(query) ||
+              (location.branchCode?.toLowerCase() ?? '').contains(query) ||
+              (location.contactPerson?.toLowerCase() ?? '').contains(query) ||
+              (location.phoneNumber?.contains(query) ?? false);
+        }).toList(),
+      );
     }
-    
+
     // Force UI update
     filteredLocations.refresh();
   }
@@ -105,7 +107,8 @@ class _LocationListPageState extends State<LocationListPage> {
               }
 
               // Always use filteredLocations which is kept in sync by _filterLocations
-              final locations = filteredLocations.isEmpty && searchController.text.isEmpty
+              final locations =
+                  filteredLocations.isEmpty && searchController.text.isEmpty
                   ? controller.locations
                   : filteredLocations;
 
@@ -114,20 +117,13 @@ class _LocationListPageState extends State<LocationListPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.search_off,
-                        size: 64,
-                        color: Colors.grey[400],
-                      ),
+                      Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
                       const SizedBox(height: 16),
                       Text(
                         searchController.text.isEmpty
                             ? 'No locations found'
                             : 'No matching locations',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                       ),
                       if (searchController.text.isNotEmpty) ...[
                         const SizedBox(height: 8),
@@ -145,7 +141,7 @@ class _LocationListPageState extends State<LocationListPage> {
                         icon: const Icon(Icons.refresh),
                         label: const Text('Refresh'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1E2A44),
+                          backgroundColor: Theme.of(context).primaryColor,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -171,7 +167,7 @@ class _LocationListPageState extends State<LocationListPage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Get.to(() => const LocationFormPage()),
-        backgroundColor: const Color(0xFF1E2A44),
+        backgroundColor: Theme.of(context).primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -182,8 +178,8 @@ class _LocationListPageState extends State<LocationListPage> {
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Colors.blue.shade100,
-          child: const Icon(Icons.location_on, color: Colors.blue),
+          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+          child: Icon(Icons.location_on, color: Theme.of(context).primaryColor),
         ),
         title: Text(
           location.branchName,
@@ -194,18 +190,20 @@ class _LocationListPageState extends State<LocationListPage> {
           children: [
             Text('${location.branchCode} • ${location.contactPerson}'),
             if (location.phoneNumber.isNotEmpty)
-              Text(
-                location.phoneNumber,
-                style: const TextStyle(fontSize: 12),
-              ),
+              Text(location.phoneNumber, style: const TextStyle(fontSize: 12)),
           ],
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-              onPressed: () => Get.to(() => LocationFormPage(location: location)),
+              icon: Icon(
+                Icons.edit,
+                color: Theme.of(context).primaryColor,
+                size: 20,
+              ),
+              onPressed: () =>
+                  Get.to(() => LocationFormPage(location: location)),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
             ),
@@ -237,12 +235,7 @@ class _LocationListPageState extends State<LocationListPage> {
             ),
           ),
           const Text(':  ', style: TextStyle(fontWeight: FontWeight.bold)),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
         ],
       ),
     );

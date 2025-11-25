@@ -8,7 +8,7 @@ import 'customer_form_page.dart';
 class CustomerListPage extends StatelessWidget {
   final CustomerController controller = Get.put(CustomerController());
   final searchController = TextEditingController();
-  
+
   CustomerListPage({Key? key}) : super(key: key) {
     searchController.addListener(() {
       controller.filterCustomers(searchController.text);
@@ -20,7 +20,8 @@ class CustomerListPage extends StatelessWidget {
     return Scaffold(
       appBar: const CustomAppBar(title: 'Customer Management'),
       body: Obx(() {
-        if (controller.isLoading.value && controller.filteredCustomers.isEmpty) {
+        if (controller.isLoading.value &&
+            controller.filteredCustomers.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }
 
@@ -41,11 +42,14 @@ class CustomerListPage extends StatelessWidget {
                   onPressed: controller.fetchCustomers,
                   icon: const Icon(Icons.refresh),
                   label: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 12.0,
+                    ),
                     child: Text('Retry'),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E2A44),
+                    backgroundColor: Theme.of(context).primaryColor,
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -98,7 +102,7 @@ class CustomerListPage extends StatelessWidget {
                   icon: const Icon(Icons.refresh, size: 18),
                   label: const Text('Refresh'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E2A44),
+                    backgroundColor: Theme.of(context).primaryColor,
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -127,7 +131,7 @@ class CustomerListPage extends StatelessWidget {
                   itemCount: controller.filteredCustomers.length,
                   itemBuilder: (context, index) {
                     final customer = controller.filteredCustomers[index];
-                    return _buildCustomerCard(customer);
+                    return _buildCustomerCard(context, customer);
                   },
                 ),
               ),
@@ -137,7 +141,7 @@ class CustomerListPage extends StatelessWidget {
       }),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Get.to(() => CustomerFormPage()),
-        backgroundColor: const Color(0xFF1E2A44),
+        backgroundColor: Theme.of(context).primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -169,17 +173,17 @@ class CustomerListPage extends StatelessWidget {
     );
   }
 
-  Widget _buildCustomerCard(Customer customer) {
+  Widget _buildCustomerCard(BuildContext context, Customer customer) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Colors.blue.shade100,
+          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
           child: Text(
-            customer.customerName.isNotEmpty 
-                ? customer.customerName[0].toUpperCase() 
+            customer.customerName.isNotEmpty
+                ? customer.customerName[0].toUpperCase()
                 : 'C',
-            style: const TextStyle(color: Colors.blue),
+            style: TextStyle(color: Theme.of(context).primaryColor),
           ),
         ),
         title: Text(
@@ -206,7 +210,8 @@ class CustomerListPage extends StatelessWidget {
                   ],
                 ),
               ),
-            if (customer.phoneNumber.isNotEmpty || customer.mobileNumber.isNotEmpty)
+            if (customer.phoneNumber.isNotEmpty ||
+                customer.mobileNumber.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4.0),
                 child: Row(
@@ -214,8 +219,8 @@ class CustomerListPage extends StatelessWidget {
                     const Icon(Icons.phone, size: 14, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
-                      customer.phoneNumber.isNotEmpty 
-                          ? customer.phoneNumber 
+                      customer.phoneNumber.isNotEmpty
+                          ? customer.phoneNumber
                           : customer.mobileNumber,
                       style: const TextStyle(fontSize: 13),
                     ),

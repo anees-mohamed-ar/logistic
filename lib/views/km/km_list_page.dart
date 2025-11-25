@@ -8,7 +8,7 @@ import 'km_form_page.dart';
 class KMListPage extends StatelessWidget {
   final KMController controller = Get.put(KMController());
   final searchController = TextEditingController();
-  
+
   KMListPage({super.key}) {
     searchController.addListener(() {
       controller.filterKmEntries(searchController.text);
@@ -41,11 +41,14 @@ class KMListPage extends StatelessWidget {
                   onPressed: controller.fetchKMList,
                   icon: const Icon(Icons.refresh),
                   label: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 12.0,
+                    ),
                     child: Text('Retry'),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E2A44),
+                    backgroundColor: Theme.of(context).primaryColor,
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -127,7 +130,7 @@ class KMListPage extends StatelessWidget {
                   itemCount: controller.filteredKmList.length,
                   itemBuilder: (context, index) {
                     final km = controller.filteredKmList[index];
-                    return _buildKmCard(km);
+                    return _buildKmCard(context, km);
                   },
                 ),
               ),
@@ -137,7 +140,7 @@ class KMListPage extends StatelessWidget {
       }),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Get.to(() => KMFormPage()),
-        backgroundColor: const Color(0xFF1E2A44),
+        backgroundColor: Theme.of(context).primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -169,7 +172,7 @@ class KMListPage extends StatelessWidget {
     );
   }
 
-  Widget _buildKmCard(KMLocation km) {
+  Widget _buildKmCard(BuildContext context, KMLocation km) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: ListTile(
@@ -186,7 +189,7 @@ class KMListPage extends StatelessWidget {
           style: const TextStyle(fontSize: 14, color: Colors.grey),
         ),
         trailing: IconButton(
-          icon: const Icon(Icons.edit, color: Colors.blue),
+          icon: Icon(Icons.edit, color: Theme.of(context).primaryColor),
           onPressed: () => Get.to(() => KMFormPage(km: km)),
         ),
         onTap: () => Get.to(() => KMFormPage(km: km)),
