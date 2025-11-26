@@ -134,7 +134,7 @@ class GCPdfGenerator {
                           'Sri Krishna Cargo Corporation',
                           style: pw.TextStyle(
                             font: boldFont,
-                            fontSize: 16,
+                            fontSize: 20,
                             color: PdfColors.red,
                           ),
                         ),
@@ -543,7 +543,7 @@ class GCPdfGenerator {
           "OWNER'S RISK",
           style: pw.TextStyle(
             font: boldFont,
-            fontSize: 11,
+            fontSize: 14,
             color: PdfColors.red,
           ),
         ),
@@ -1384,7 +1384,7 @@ class GCPdfGenerator {
                       child: pw.Row(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          // GSTIN Payer Selection column (replacing certificate)
+                          // GSTIN Payer info column (cargo PDF: always show three options, Transporter fixed as selected)
                           pw.Expanded(
                             flex: 5,
                             child: pw.Container(
@@ -1394,35 +1394,56 @@ class GCPdfGenerator {
                                   right: pw.BorderSide(width: 1),
                                 ),
                               ),
-                              child: pw.Center(
-                                child: pw.RichText(
-                                  textAlign: pw.TextAlign.center,
-                                  text: pw.TextSpan(
-                                    style: pw.TextStyle(
-                                      font: font,
-                                      fontSize: 10,
-                                    ),
-                                    children: [
-                                      ..._buildGstPayerSelection(
-                                        'Consignor',
-                                        controller.selectedGstPayer.value,
-                                        font,
+                              child: pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                mainAxisAlignment: pw.MainAxisAlignment.center,
+                                children: [
+                                  // First line: Consignor / Consignee (shown but never selected)
+                                  pw.RichText(
+                                    text: pw.TextSpan(
+                                      style: pw.TextStyle(
+                                        font: font,
+                                        fontSize: 9,
                                       ),
-                                      pw.TextSpan(
-                                        text: '   /   ',
-                                        style: pw.TextStyle(
-                                          font: font,
-                                          fontSize: 10,
+                                      children: [
+                                        ..._buildGstPayerSelection(
+                                          'Consignor',
+                                          'Transporter',
+                                          font,
                                         ),
-                                      ),
-                                      ..._buildGstPayerSelection(
-                                        'Consignee',
-                                        controller.selectedGstPayer.value,
-                                        font,
-                                      ),
-                                    ],
+                                        pw.TextSpan(
+                                          text: '   /   ',
+                                          style: pw.TextStyle(
+                                            font: font,
+                                            fontSize: 9,
+                                          ),
+                                        ),
+                                        ..._buildGstPayerSelection(
+                                          'Consignee',
+                                          'Transporter',
+                                          font,
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
+                                  pw.SizedBox(height: 3),
+                                  // Second line: Transporter (always selected)
+                                  pw.RichText(
+                                    text: pw.TextSpan(
+                                      style: pw.TextStyle(
+                                        font: font,
+                                        fontSize: 9,
+                                      ),
+                                      children: [
+                                        ..._buildGstPayerSelection(
+                                          'Transporter',
+                                          'Transporter',
+                                          font,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -1995,7 +2016,19 @@ class GCPdfGenerator {
   static Future<String> savePdfToDevice(GCFormController controller) async {
     try {
       final pdfData = await generatePDF(controller);
-      final directory = await getApplicationDocumentsDirectory();
+
+      // Prefer public Downloads on Android so user can easily find the file,
+      // otherwise fall back to the app's documents directory.
+      Directory directory;
+      if (Platform.isAndroid) {
+        final downloadsDir = Directory('/storage/emulated/0/Download');
+        if (!await downloadsDir.exists()) {
+          await downloadsDir.create(recursive: true);
+        }
+        directory = downloadsDir;
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
 
       String gcNumber = controller.gcNumberCtrl.text.trim();
       if (gcNumber.isEmpty) {

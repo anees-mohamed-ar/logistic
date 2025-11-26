@@ -16,7 +16,7 @@ class LocationFormPage extends StatefulWidget {
 class _LocationFormPageState extends State<LocationFormPage> {
   final _formKey = GlobalKey<FormState>();
   final LocationController _controller = Get.find();
-  
+
   final _branchNameController = TextEditingController();
   final _branchCodeController = TextEditingController();
   final _branchPincodeController = TextEditingController();
@@ -82,14 +82,16 @@ class _LocationFormPageState extends State<LocationFormPage> {
       );
 
       final isEditing = widget.location != null || Get.arguments != null;
-      final success = isEditing 
+      final success = isEditing
           ? await _controller.updateLocation(location)
           : await _controller.addLocation(location);
-          
+
       if (success) {
         if (!isEditing) {
           _clearForm();
-          Get.snackbar('Success', 'Location added successfully',
+          Get.snackbar(
+            'Success',
+            'Location added successfully',
             snackPosition: SnackPosition.BOTTOM,
             duration: const Duration(seconds: 2),
           );
@@ -104,7 +106,7 @@ class _LocationFormPageState extends State<LocationFormPage> {
   Widget build(BuildContext context) {
     final location = widget.location ?? Get.arguments as Location?;
     final isEditing = location != null;
-    
+
     return MainLayout(
       title: isEditing ? 'Edit Location' : 'Add Location',
       child: Padding(
@@ -185,19 +187,20 @@ class _LocationFormPageState extends State<LocationFormPage> {
                 keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 24),
-              Obx(() => _controller.isLoading.value
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                      onPressed: _submitForm,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E2A44),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+              Obx(
+                () => _controller.isLoading.value
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton(
+                        onPressed: _submitForm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).primaryColor,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: Text(
+                          isEditing ? 'Update Location' : 'Add Location',
+                          style: const TextStyle(fontSize: 16),
+                        ),
                       ),
-                      child: Text(
-                        isEditing ? 'Update Location' : 'Add Location',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
               ),
             ],
           ),

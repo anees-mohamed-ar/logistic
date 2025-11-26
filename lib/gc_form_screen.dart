@@ -279,7 +279,32 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 PopupMenuItem(
                   value: 'export_pdf',
                   child: const Text('Save PDF to Device'),
-                  onTap: () => GCPdfFactory.savePdfToDevice(controller),
+                  onTap: () {
+                    // Delay until after the popup closes, then save and show toast
+                    Future.delayed(Duration.zero, () async {
+                      final path = await GCPdfFactory.savePdfToDevice(
+                        controller,
+                      );
+
+                      if (!context.mounted) return;
+
+                      final isDownloads = path.contains('Download');
+                      final fileName = path.split('/').isNotEmpty
+                          ? path.split('/').last
+                          : path;
+                      final location = isDownloads
+                          ? 'Downloads folder'
+                          : 'app storage';
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'PDF saved successfully to $location: $fileName',
+                          ),
+                        ),
+                      );
+                    });
+                  },
                 ),
                 PopupMenuItem(
                   value: 'share_pdf',
@@ -684,7 +709,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                       onRetry: () =>
                           controller.fetchAvailableTemporaryGcNumbers(),
                       compact: true,
-                      searchable: false,
+                      searchable: true,
                     ),
                   ],
                 );
@@ -2786,7 +2811,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
         onTap: () {
           _showSearchPicker(
             context: context,
-            title: 'Select $label',
+            title: label, // Pass just the label
             items: items,
             current: value,
           ).then((selected) {

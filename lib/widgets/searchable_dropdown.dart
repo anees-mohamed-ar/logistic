@@ -39,11 +39,146 @@ class SearchableDropdown<T> extends StatelessWidget {
     return item?.toString() ?? 'null';
   }
 
+  // Helper to extract a human-readable label from a dropdown item
+  String _getItemLabel(DropdownMenuItem<T> item) {
+    final child = item.child;
+    if (child is Text) {
+      return child.data ?? '';
+    }
+    return item.value?.toString() ?? '';
+  }
+
+  Future<void> _showSearchDialog(
+    BuildContext context,
+    List<DropdownMenuItem<T>> items,
+    T? currentValue,
+  ) async {
+    String query = '';
+
+    await showModalBottomSheet<T>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        List<DropdownMenuItem<T>> filteredItems = items;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            filteredItems = items.where((item) {
+              final labelStr = _getItemLabel(item).toLowerCase();
+              return labelStr.contains(query.toLowerCase());
+            }).toList();
+
+            final screenHeight = MediaQuery.of(context).size.height;
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: SizedBox(
+                  height: screenHeight * 0.55,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.max,
+                    children: [
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade400,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Select $label',
+                                style: theme.textTheme.titleMedium,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => Navigator.of(sheetContext).pop(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: TextField(
+                          decoration: InputDecoration(
+                            prefixIcon: const Icon(Icons.search),
+                            hintText: 'Search...',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              query = value;
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: filteredItems.length,
+                          itemBuilder: (context, index) {
+                            final item = filteredItems[index];
+                            final itemLabel = _getItemLabel(item);
+                            final isSelected = item.value == currentValue;
+
+                            return ListTile(
+                              dense: true,
+                              title: Text(itemLabel),
+                              trailing: isSelected
+                                  ? Icon(
+                                      Icons.check,
+                                      color: theme.colorScheme.primary,
+                                    )
+                                  : null,
+                              onTap: () {
+                                Navigator.of(sheetContext).pop();
+                                onChanged(item.value);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isError = validator?.call(value) != null || error != null;
-    
+
     // Log debug information
     if (kDebugMode) {
       print('Building SearchableDropdown:');
@@ -52,14 +187,14 @@ class SearchableDropdown<T> extends StatelessWidget {
       print('- Items count: ${items.length}');
       print('- Is loading: $isLoading');
       print('- Error: $error');
-      
+
       // Check for duplicate values
       final valueMap = <String, int>{};
       for (var item in items) {
         final key = _getItemKey(item.value);
         valueMap[key] = (valueMap[key] ?? 0) + 1;
       }
-      
+
       final duplicates = valueMap.entries.where((e) => e.value > 1).toList();
       if (duplicates.isNotEmpty) {
         print('Warning: Found duplicate values in dropdown items');
@@ -84,10 +219,7 @@ class SearchableDropdown<T> extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             decoration: BoxDecoration(
-              border: Border.all(
-                color: theme.colorScheme.error,
-                width: 1.5,
-              ),
+              border: Border.all(color: theme.colorScheme.error, width: 1.5),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -113,7 +245,10 @@ class SearchableDropdown<T> extends StatelessWidget {
                     icon: const Icon(Icons.refresh, size: 16),
                     label: const Text('Retry'),
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
@@ -139,10 +274,7 @@ class SearchableDropdown<T> extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             decoration: BoxDecoration(
-              border: Border.all(
-                color: theme.dividerColor,
-                width: 1,
-              ),
+              border: Border.all(color: theme.dividerColor, width: 1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -169,7 +301,7 @@ class SearchableDropdown<T> extends StatelessWidget {
     // Filter out null values and ensure unique items
     final validItems = items.where((item) => item.value != null).toList();
     final uniqueItems = <String, DropdownMenuItem<T>>{};
-    
+
     for (var item in validItems) {
       final key = _getItemKey(item.value);
       if (!uniqueItems.containsKey(key)) {
@@ -178,12 +310,13 @@ class SearchableDropdown<T> extends StatelessWidget {
         print('Removing duplicate dropdown item: $key');
       }
     }
-    
+
     final uniqueItemsList = uniqueItems.values.toList();
-    
+
     // If current value is not in the list, set it to null
     T? currentValue = value;
-    if (currentValue != null && !uniqueItemsList.any((item) => item.value == currentValue)) {
+    if (currentValue != null &&
+        !uniqueItemsList.any((item) => item.value == currentValue)) {
       currentValue = null;
     }
 
@@ -200,83 +333,86 @@ class SearchableDropdown<T> extends StatelessWidget {
           ),
           const SizedBox(height: 4),
         ],
-        Container(
-          constraints: const BoxConstraints(minWidth: 200), // Ensure minimum width
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: isError 
-                ? Border.all(color: theme.colorScheme.error, width: 1.5)
-                : null,
-          ),
-          child: DropdownButtonFormField<T>(
-            value: currentValue,
-            items: uniqueItemsList,
-            onChanged: onChanged,
-            validator: validator,
-            isExpanded: true,
-            dropdownColor: theme.cardColor,
-            menuMaxHeight: 300,
-            itemHeight: kDefaultItemHeight,
-            decoration: InputDecoration(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-              filled: true,
-              fillColor: theme.cardColor,
-              hintText: 'Select $label',
-              hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.hintColor,
-              ),
-              errorText: isError ? (error ?? (validator?.call(value) as String?)) : null,
-              errorStyle: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.error,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: isError ? theme.colorScheme.error : theme.dividerColor,
-                ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: isError ? theme.colorScheme.error : theme.dividerColor,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: isError ? theme.colorScheme.error : theme.primaryColor,
-                  width: 2,
-                ),
-              ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: theme.colorScheme.error,
-                  width: 1.5,
-                ),
-              ),
-              focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: theme.colorScheme.error,
-                  width: 2,
-                ),
-              ),
-              suffixIcon: showSearchIcon 
-                  ? const Icon(Icons.search, size: 20)
-                  : const Icon(Icons.arrow_drop_down, size: 24),
+        GestureDetector(
+          onTap: showSearchIcon
+              ? () => _showSearchDialog(context, uniqueItemsList, currentValue)
+              : null,
+          child: Container(
+            constraints: const BoxConstraints(
+              minWidth: 200,
+            ), // Ensure minimum width
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: isError
+                  ? Border.all(color: theme.colorScheme.error, width: 1.5)
+                  : null,
             ),
-            icon: const SizedBox.shrink(),
-            style: theme.textTheme.bodyMedium,
-            selectedItemBuilder: (BuildContext context) {
-              return items.map<Widget>((DropdownMenuItem<T> item) {
-                return Text(
-                  item.value.toString(),
-                  style: theme.textTheme.bodyMedium,
-                  overflow: TextOverflow.ellipsis,
-                );
-              }).toList();
-            },
+            child: DropdownButtonFormField<T>(
+              value: currentValue,
+              items: uniqueItemsList,
+              onChanged: showSearchIcon ? null : onChanged,
+              validator: validator,
+              isExpanded: true,
+              dropdownColor: theme.cardColor,
+              menuMaxHeight: 300,
+              itemHeight: kDefaultItemHeight,
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 14,
+                ),
+                filled: true,
+                fillColor: theme.cardColor,
+                hintText: 'Select $label',
+                hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.hintColor,
+                ),
+                errorText: isError
+                    ? (error ?? (validator?.call(value) as String?))
+                    : null,
+                errorStyle: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: theme.colorScheme.error),
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: isError
+                        ? theme.colorScheme.error
+                        : theme.dividerColor,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: isError
+                        ? theme.colorScheme.error
+                        : theme.dividerColor,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: isError
+                        ? theme.colorScheme.error
+                        : theme.primaryColor,
+                  ),
+                ),
+                suffixIcon: showSearchIcon
+                    ? IconButton(
+                        icon: const Icon(Icons.search),
+                        onPressed: () => _showSearchDialog(
+                          context,
+                          uniqueItemsList,
+                          currentValue,
+                        ),
+                      )
+                    : null,
+              ),
+            ),
           ),
         ),
       ],

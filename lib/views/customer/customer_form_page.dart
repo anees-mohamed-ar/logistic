@@ -23,13 +23,13 @@ class CustomerFormPage extends StatefulWidget {
 class _CustomerFormPageState extends State<CustomerFormPage> {
   final _formKey = GlobalKey<FormState>();
   final CustomerController _controller = Get.find();
-  
+
   // State management
   final _states = <StateModel>[].obs;
   final _statesLoading = false.obs;
   final _statesError = ''.obs;
   StateModel? _selectedState;
-  
+
   // Controllers for form fields
   final _customerNameController = TextEditingController();
   final _addressController = TextEditingController();
@@ -91,7 +91,7 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
     try {
       _statesLoading.value = true;
       _statesError.value = '';
-      
+
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/state/search'),
         headers: {'Content-Type': 'application/json'},
@@ -99,15 +99,19 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        _states.value = data.map((state) => StateModel.fromJson(state)).toList();
-        
+        _states.value = data
+            .map((state) => StateModel.fromJson(state))
+            .toList();
+
         // Set selected state if editing
         final customer = widget.customer ?? Get.arguments as Customer?;
         if (customer != null && customer.state.isNotEmpty) {
           setState(() {
             _selectedState = _states.firstWhere(
-              (state) => state.name.toLowerCase() == customer.state.toLowerCase(),
-              orElse: () => StateModel(id: 0, name: customer.state, code: '', tin: '')
+              (state) =>
+                  state.name.toLowerCase() == customer.state.toLowerCase(),
+              orElse: () =>
+                  StateModel(id: 0, name: customer.state, code: '', tin: ''),
             );
           });
         }
@@ -126,7 +130,7 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
       if (_statesLoading.value) {
         return const CircularProgressIndicator();
       }
-      
+
       if (_statesError.value.isNotEmpty) {
         return Text('Error: ${_statesError.value}');
       }
@@ -134,10 +138,14 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
       return SearchableDropdown<StateModel>(
         label: 'State *',
         value: _selectedState,
-        items: _states.map((state) => DropdownMenuItem<StateModel>(
-          value: state,
-          child: Text(state.name),
-        )).toList(),
+        items: _states
+            .map(
+              (state) => DropdownMenuItem<StateModel>(
+                value: state,
+                child: Text(state.name),
+              ),
+            )
+            .toList(),
         onChanged: (StateModel? newValue) {
           setState(() {
             _selectedState = newValue;
@@ -145,6 +153,7 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
         },
         isRequired: true,
         validator: (value) => value == null ? 'Please select a state' : null,
+        showSearchIcon: true,
       );
     });
   }
@@ -212,7 +221,7 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
         Get.snackbar('Error', 'Please select a state');
         return;
       }
-      
+
       final customer = Customer(
         id: widget.customer?.id,
         customerName: _customerNameController.text.trim(),
@@ -242,14 +251,16 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
       );
 
       final isEditing = widget.customer != null || Get.arguments != null;
-      final success = isEditing 
+      final success = isEditing
           ? await _controller.updateCustomer(customer)
           : await _controller.addCustomer(customer);
-          
+
       if (success) {
         if (!isEditing) {
           _clearForm();
-          Get.snackbar('Success', 'Customer added successfully',
+          Get.snackbar(
+            'Success',
+            'Customer added successfully',
             snackPosition: SnackPosition.BOTTOM,
             duration: const Duration(seconds: 2),
           );
@@ -291,7 +302,7 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
   Widget build(BuildContext context) {
     final customer = widget.customer ?? Get.arguments as Customer?;
     final isEditing = customer != null;
-    
+
     return MainLayout(
       title: isEditing ? 'Edit Customer' : 'Add New Customer',
       child: Form(
@@ -345,10 +356,7 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
               ),
-              _buildFormField(
-                label: 'GST',
-                controller: _gstController,
-              ),
+              _buildFormField(label: 'GST', controller: _gstController),
               _buildFormField(
                 label: 'PAN Number',
                 controller: _panNumberController,
@@ -369,11 +377,8 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
                 label: 'Industrial Type',
                 controller: _industrialTypeController,
               ),
-              _buildFormField(
-                label: 'Fax',
-                controller: _faxController,
-              ),
-              
+              _buildFormField(label: 'Fax', controller: _faxController),
+
               const SizedBox(height: 24),
               const Text(
                 'Bank Details',
@@ -409,21 +414,22 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
                 label: 'MICR Code',
                 controller: _micrCodeController,
               ),
-              
+
               const SizedBox(height: 24),
-              Obx(() => _controller.isLoading.value
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                      onPressed: _submitForm,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E2A44),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+              Obx(
+                () => _controller.isLoading.value
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton(
+                        onPressed: _submitForm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).primaryColor,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: Text(
+                          isEditing ? 'Update Customer' : 'Add Customer',
+                          style: const TextStyle(fontSize: 16),
+                        ),
                       ),
-                      child: Text(
-                        isEditing ? 'Update Customer' : 'Add Customer',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
               ),
             ],
           ),

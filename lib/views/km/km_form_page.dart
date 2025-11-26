@@ -62,11 +62,11 @@ class _KMFormPageState extends State<KMFormPage> {
   Widget build(BuildContext context) {
     final km = widget.km ?? Get.arguments as KMLocation?;
     final isEditing = km != null;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text(isEditing ? 'Edit KM' : 'Add KM'),
-        backgroundColor: const Color(0xFF1E2A44),
+        backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
       ),
       body: Padding(
@@ -121,19 +121,20 @@ class _KMFormPageState extends State<KMFormPage> {
                 },
               ),
               const SizedBox(height: 24),
-              Obx(() => _controller.isLoading.value
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                      onPressed: _submitForm,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E2A44),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+              Obx(
+                () => _controller.isLoading.value
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton(
+                        onPressed: _submitForm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).primaryColor,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: Text(
+                          isEditing ? 'Update KM' : 'Add KM',
+                          style: const TextStyle(fontSize: 16),
+                        ),
                       ),
-                      child: Text(
-                        isEditing ?   'Update KM':'Add KM'  ,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
               ),
             ],
           ),

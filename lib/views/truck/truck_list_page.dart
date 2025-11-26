@@ -353,16 +353,17 @@ class _TruckListPageState extends State<TruckListPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Expiry Status Cards (compact)
               Row(
                 children: [
-                  const Icon(Icons.sort, color: Color(0xFF1E2A44)),
+                  Icon(Icons.sort, color: Theme.of(context).primaryColor),
                   const SizedBox(width: 12),
-                  const Text(
+                  Text(
                     'Sort Trucks By',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E2A44),
+                      color: Theme.of(context).primaryColor,
                     ),
                   ),
                 ],
@@ -406,7 +407,7 @@ class _TruckListPageState extends State<TruckListPage> {
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
                 value: _sortAscending,
-                activeColor: const Color(0xFF1E2A44),
+                activeColor: Theme.of(context).primaryColor,
                 onChanged: (value) {
                   setState(() {
                     _sortAscending = value;
@@ -428,11 +429,13 @@ class _TruckListPageState extends State<TruckListPage> {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: isSelected
-            ? const Color(0xFF1E2A44).withOpacity(0.05)
+            ? Theme.of(context).primaryColor.withOpacity(0.05)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isSelected ? const Color(0xFF1E2A44) : Colors.grey.shade200,
+          color: isSelected
+              ? Theme.of(context).primaryColor
+              : Colors.grey.shade200,
           width: isSelected ? 2 : 1,
         ),
       ),
@@ -443,7 +446,7 @@ class _TruckListPageState extends State<TruckListPage> {
               icon,
               size: 18,
               color: isSelected
-                  ? const Color(0xFF1E2A44)
+                  ? Theme.of(context).primaryColor
                   : Colors.grey.shade600,
             ),
             const SizedBox(width: 12),
@@ -452,7 +455,7 @@ class _TruckListPageState extends State<TruckListPage> {
               style: TextStyle(
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                 color: isSelected
-                    ? const Color(0xFF1E2A44)
+                    ? Theme.of(context).primaryColor
                     : Colors.grey.shade800,
               ),
             ),
@@ -460,7 +463,7 @@ class _TruckListPageState extends State<TruckListPage> {
         ),
         value: sortBy,
         groupValue: _currentSort,
-        activeColor: const Color(0xFF1E2A44),
+        activeColor: Theme.of(context).primaryColor,
         onChanged: (value) {
           setState(() {
             _currentSort = value!;
@@ -494,14 +497,17 @@ class _TruckListPageState extends State<TruckListPage> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.filter_list, color: Color(0xFF1E2A44)),
+                    Icon(
+                      Icons.filter_list,
+                      color: Theme.of(context).primaryColor,
+                    ),
                     const SizedBox(width: 12),
-                    const Text(
+                    Text(
                       'Filter Trucks',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E2A44),
+                        color: Theme.of(context).primaryColor,
                       ),
                     ),
                     const Spacer(),
@@ -529,7 +535,7 @@ class _TruckListPageState extends State<TruckListPage> {
                     TruckFilterBy.all,
                     'All Trucks',
                     Icons.local_shipping,
-                    Colors.blue,
+                    Theme.of(context).primaryColor,
                     'Show all trucks ($_totalTrucks)',
                   ),
                   _buildFilterOption(
@@ -548,6 +554,8 @@ class _TruckListPageState extends State<TruckListPage> {
                   ),
                 ]),
                 const SizedBox(height: 16),
+
+                // Owner Info Card (compact)
                 _buildFilterSection('Insurance Status', [
                   _buildFilterOption(
                     TruckFilterBy.insuranceExpired,
@@ -779,9 +787,9 @@ class _TruckListPageState extends State<TruckListPage> {
           // Quick Stats Bar
           if (_allTrucks.isNotEmpty) _buildQuickStatsBar(),
 
-          // Search and Filter Bar
+          // Search and Filter Bar (compact)
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [
@@ -793,6 +801,7 @@ class _TruckListPageState extends State<TruckListPage> {
               ],
             ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 // Search Bar
                 TextField(
@@ -801,7 +810,7 @@ class _TruckListPageState extends State<TruckListPage> {
                     hintText: 'Search by vehicle, owner, phone...',
                     hintStyle: TextStyle(
                       color: Colors.grey.shade500,
-                      fontSize: 14,
+                      fontSize: 13,
                     ),
                     prefixIcon: Icon(Icons.search, color: Colors.grey.shade600),
                     border: OutlineInputBorder(
@@ -811,8 +820,8 @@ class _TruckListPageState extends State<TruckListPage> {
                     filled: true,
                     fillColor: Colors.grey.shade100,
                     contentPadding: const EdgeInsets.symmetric(
-                      vertical: 12,
-                      horizontal: 16,
+                      vertical: 10,
+                      horizontal: 14,
                     ),
                     suffixIcon: searchController.text.isNotEmpty
                         ? IconButton(
@@ -828,7 +837,7 @@ class _TruckListPageState extends State<TruckListPage> {
                         : null,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 // Action Buttons Row
                 Row(
                   children: [
@@ -877,7 +886,7 @@ class _TruckListPageState extends State<TruckListPage> {
                 // Results count
                 if (_filteredTrucks.isNotEmpty)
                   Padding(
-                    padding: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.only(top: 8),
                     child: Row(
                       children: [
                         Icon(
@@ -957,7 +966,7 @@ class _TruckListPageState extends State<TruckListPage> {
 
   Widget _buildQuickStatsBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -1008,18 +1017,18 @@ class _TruckListPageState extends State<TruckListPage> {
     return Column(
       children: [
         Icon(icon, size: 20, color: color),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         Text(
           value,
           style: TextStyle(
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.bold,
             color: color,
           ),
         ),
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: Colors.white70),
+          style: const TextStyle(fontSize: 10, color: Colors.white70),
         ),
       ],
     );
@@ -1213,11 +1222,11 @@ class _TruckListPageState extends State<TruckListPage> {
         (taxDays >= 7 && taxDays <= 30);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 8),
       elevation: hasUrgentWarning ? 4 : 2,
       shadowColor: hasUrgentWarning ? Colors.red.withOpacity(0.3) : null,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         side: hasUrgentWarning
             ? BorderSide(color: Colors.red.shade400, width: 2)
             : hasWarning
@@ -1234,7 +1243,7 @@ class _TruckListPageState extends State<TruckListPage> {
         },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1242,7 +1251,7 @@ class _TruckListPageState extends State<TruckListPage> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
@@ -1250,12 +1259,12 @@ class _TruckListPageState extends State<TruckListPage> {
                           Theme.of(context).primaryColor.withOpacity(0.85),
                         ],
                       ),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
                       Icons.local_shipping,
                       color: Colors.white,
-                      size: 24,
+                      size: 20,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1266,7 +1275,7 @@ class _TruckListPageState extends State<TruckListPage> {
                         Text(
                           truck.vechileNumber,
                           style: TextStyle(
-                            fontSize: 17,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: Theme.of(context).primaryColor,
                             letterSpacing: 0.5,
@@ -1288,7 +1297,7 @@ class _TruckListPageState extends State<TruckListPage> {
                             child: Text(
                               truck.typeofVechile!,
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 10,
                                 color: Theme.of(context).primaryColor,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -1300,7 +1309,7 @@ class _TruckListPageState extends State<TruckListPage> {
                   ),
                   if (hasUrgentWarning)
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: Colors.red.shade50,
                         shape: BoxShape.circle,
@@ -1308,12 +1317,12 @@ class _TruckListPageState extends State<TruckListPage> {
                       child: Icon(
                         Icons.priority_high,
                         color: Colors.red.shade700,
-                        size: 18,
+                        size: 16,
                       ),
                     )
                   else if (hasWarning)
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: Colors.orange.shade50,
                         shape: BoxShape.circle,
@@ -1321,16 +1330,15 @@ class _TruckListPageState extends State<TruckListPage> {
                       child: Icon(
                         Icons.warning_amber_rounded,
                         color: Colors.orange.shade700,
-                        size: 18,
+                        size: 16,
                       ),
                     ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-              // Owner Info Card
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(10),
@@ -1341,15 +1349,15 @@ class _TruckListPageState extends State<TruckListPage> {
                       children: [
                         Icon(
                           Icons.person_outline,
-                          size: 16,
+                          size: 14,
                           color: Colors.grey.shade700,
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             truck.ownerName ?? 'No owner assigned',
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: Colors.grey.shade800,
                             ),
@@ -1371,7 +1379,7 @@ class _TruckListPageState extends State<TruckListPage> {
                           Text(
                             truck.ownerMobileNumber!,
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 12,
                               color: Colors.grey.shade700,
                             ),
                           ),
@@ -1409,7 +1417,7 @@ class _TruckListPageState extends State<TruckListPage> {
 
               const SizedBox(height: 16),
 
-              // Action Buttons
+              // Action Buttons (unchanged layout, slightly tighter spacing)
               Row(
                 children: [
                   Expanded(

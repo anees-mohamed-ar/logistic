@@ -2065,17 +2065,43 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDateSelector(
-                    date: transitDates[i],
-                    onTap: isEditable ? () => pickDate(i, context) : null,
-                    enabled: isEditable,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildPlaceField(i, isEditable)),
-                ],
+              // Responsive layout: on narrow or large-text screens, move Place below Date
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final textScale = MediaQuery.of(context).textScaleFactor;
+                  final isNarrow =
+                      constraints.maxWidth < 420 || textScale > 1.1;
+
+                  if (isNarrow) {
+                    // Stack vertically: Date on top, Place below
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildDateSelector(
+                          date: transitDates[i],
+                          onTap: isEditable ? () => pickDate(i, context) : null,
+                          enabled: isEditable,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildPlaceField(i, isEditable),
+                      ],
+                    );
+                  }
+
+                  // Default wide layout: Date and Place in a row
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDateSelector(
+                        date: transitDates[i],
+                        onTap: isEditable ? () => pickDate(i, context) : null,
+                        enabled: isEditable,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildPlaceField(i, isEditable)),
+                    ],
+                  );
+                },
               ),
             ],
           ),

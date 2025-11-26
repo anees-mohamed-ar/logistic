@@ -534,7 +534,10 @@ class _TruckFormPageState extends State<TruckFormPage>
         fillColor: Colors.grey.shade50,
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF1E2A44), width: 2),
+          borderSide: BorderSide(
+            color: Theme.of(context).primaryColor,
+            width: 2,
+          ),
         ),
       ),
       validator: validator,
@@ -1151,7 +1154,7 @@ class _TruckFormPageState extends State<TruckFormPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E2A44),
+        backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
         title: Text(widget.truck == null ? 'Add New Truck' : 'Edit Truck'),
@@ -1247,8 +1250,11 @@ class _TruckFormPageState extends State<TruckFormPage>
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF1E2A44), Color(0xFF3A4B73)],
+                          gradient: LinearGradient(
+                            colors: [
+                              Theme.of(context).primaryColor,
+                              Theme.of(context).primaryColor.withOpacity(0.85),
+                            ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -1306,8 +1312,8 @@ class _TruckFormPageState extends State<TruckFormPage>
                                 value: hasProgress ? progress : null,
                                 minHeight: 10,
                                 backgroundColor: Colors.white.withOpacity(0.15),
-                                valueColor: const AlwaysStoppedAnimation<Color>(
-                                  Color(0xFFFFC857),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Theme.of(context).primaryColor,
                                 ),
                               ),
                             ),
@@ -1384,17 +1390,17 @@ class _TruckFormPageState extends State<TruckFormPage>
                           child: LinearProgressIndicator(
                             value: (_currentTabIndex + 1) / 5,
                             backgroundColor: Colors.grey.shade200,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFF1E2A44),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Theme.of(context).primaryColor,
                             ),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Text(
                           'Step ${_currentTabIndex + 1} of 5',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF1E2A44),
+                            color: Theme.of(context).primaryColor,
                           ),
                         ),
                       ],
@@ -1439,10 +1445,10 @@ class _TruckFormPageState extends State<TruckFormPage>
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 14,
                                 ),
-                                side: const BorderSide(
-                                  color: Color(0xFF1E2A44),
+                                side: BorderSide(
+                                  color: Theme.of(context).primaryColor,
                                 ),
-                                foregroundColor: const Color(0xFF1E2A44),
+                                foregroundColor: Theme.of(context).primaryColor,
                               ),
                             ),
                           ),
@@ -1474,7 +1480,7 @@ class _TruckFormPageState extends State<TruckFormPage>
                               ),
                             ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1E2A44),
+                              backgroundColor: Theme.of(context).primaryColor,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),

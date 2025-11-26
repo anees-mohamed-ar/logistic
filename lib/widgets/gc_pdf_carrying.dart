@@ -138,7 +138,7 @@ class GCPdfGenerator {
                           'Sri Krishna Carrying Corporation',
                           style: pw.TextStyle(
                             font: boldFont,
-                            fontSize: 16,
+                            fontSize: 20,
                             color: PdfColors.red,
                           ),
                         ),
@@ -547,7 +547,7 @@ class GCPdfGenerator {
           "OWNER'S RISK",
           style: pw.TextStyle(
             font: boldFont,
-            fontSize: 11,
+            fontSize: 14,
             color: PdfColors.red,
           ),
         ),
@@ -937,7 +937,7 @@ class GCPdfGenerator {
                                     controller.customInvoiceCtrl.text,
                                     style: pw.TextStyle(
                                       font: font,
-                                      fontSize: 8,
+                                      fontSize: 7,
                                     ),
                                   ),
                                 ],
@@ -963,7 +963,7 @@ class GCPdfGenerator {
                                     controller.gcDateCtrl.text,
                                     style: pw.TextStyle(
                                       font: font,
-                                      fontSize: 8,
+                                      fontSize: 6.5,
                                     ),
                                   ),
                                 ],
@@ -1177,7 +1177,7 @@ class GCPdfGenerator {
 
                     // Row 2: Charges for and Value of
                     pw.Container(
-                      height: 33,
+                      height: 20,
                       decoration: pw.BoxDecoration(
                         border: pw.Border(
                           right: pw.BorderSide(width: 1),
@@ -1186,6 +1186,7 @@ class GCPdfGenerator {
                       ),
                       child: pw.Row(
                         children: [
+                          // Charges for: FTL (single line)
                           pw.Expanded(
                             child: pw.Container(
                               padding: const pw.EdgeInsets.symmetric(
@@ -1197,58 +1198,59 @@ class GCPdfGenerator {
                                   right: pw.BorderSide(width: 1),
                                 ),
                               ),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                mainAxisAlignment: pw.MainAxisAlignment.start,
+                              child: pw.Row(
+                                crossAxisAlignment:
+                                    pw.CrossAxisAlignment.center,
                                 children: [
                                   pw.Text(
-                                    'Charges for',
+                                    'Charges for : ',
                                     style: pw.TextStyle(
                                       font: boldFont,
                                       fontSize: 8,
                                     ),
                                   ),
-                                  pw.SizedBox(height: 2),
-                                  pw.Container(
-                                    width: double.infinity,
+                                  pw.Expanded(
                                     child: pw.Text(
                                       'FTL',
                                       style: pw.TextStyle(
                                         font: font,
                                         fontSize: 8,
                                       ),
+                                      maxLines: 1,
+                                      overflow: pw.TextOverflow.clip,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                           ),
+                          // Value of: <amount> (single line)
                           pw.Expanded(
                             child: pw.Container(
                               padding: const pw.EdgeInsets.symmetric(
                                 horizontal: 4,
                                 vertical: 3,
                               ),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                mainAxisAlignment: pw.MainAxisAlignment.start,
+                              child: pw.Row(
+                                crossAxisAlignment:
+                                    pw.CrossAxisAlignment.center,
                                 children: [
                                   pw.Text(
-                                    'Value of',
+                                    'Value of : ',
                                     style: pw.TextStyle(
                                       font: boldFont,
                                       fontSize: 8,
                                     ),
                                   ),
-                                  pw.SizedBox(height: 2),
-                                  pw.Container(
-                                    width: double.infinity,
+                                  pw.Expanded(
                                     child: pw.Text(
                                       controller.invValueCtrl.text,
                                       style: pw.TextStyle(
                                         font: font,
                                         fontSize: 8,
                                       ),
+                                      maxLines: 1,
+                                      overflow: pw.TextOverflow.clip,
                                     ),
                                   ),
                                 ],
@@ -1259,9 +1261,9 @@ class GCPdfGenerator {
                       ),
                     ),
 
-                    // Row 3: Delivery Instructions
+                    // Row 3: Delivery Instructions + GSTIN payer (compact so GSTIN row fits and footer remains visible)
                     pw.Container(
-                      height: 50,
+                      height: 65,
                       decoration: pw.BoxDecoration(
                         border: pw.Border(right: pw.BorderSide(width: 1)),
                       ),
@@ -1276,25 +1278,23 @@ class GCPdfGenerator {
                           pw.Center(
                             child: pw.Text(
                               'Delivery from & Special Instructions',
-                              style: pw.TextStyle(
-                                font: boldFont,
-                                fontSize: 7.5,
-                              ),
+                              style: pw.TextStyle(font: boldFont, fontSize: 7),
                             ),
                           ),
-                          pw.SizedBox(height: 4),
+                          pw.SizedBox(height: 2),
                           pw.Text(
                             controller.deliveryInstructionsCtrl.text,
                             style: pw.TextStyle(font: font, fontSize: 7),
-                            maxLines: 2,
+                            maxLines: 1,
                             overflow: pw.TextOverflow.clip,
                           ),
-                          pw.Spacer(),
+                          pw.SizedBox(height: 1),
                           pw.Divider(height: 1),
                           pw.SizedBox(height: 1),
+                          // Line 1: label + Consignor / Consignee
                           pw.RichText(
                             text: pw.TextSpan(
-                              style: pw.TextStyle(font: font, fontSize: 9.5),
+                              style: pw.TextStyle(font: font, fontSize: 7.5),
                               children: [
                                 pw.TextSpan(text: 'GSTIN to be paid by : '),
                                 ..._buildGstPayerSelection(
@@ -1306,11 +1306,25 @@ class GCPdfGenerator {
                                   text: ' / ',
                                   style: pw.TextStyle(
                                     font: font,
-                                    fontSize: 9.5,
+                                    fontSize: 7.5,
                                   ),
                                 ),
                                 ..._buildGstPayerSelection(
                                   'Consignee',
+                                  controller.selectedGstPayer.value,
+                                  font,
+                                ),
+                              ],
+                            ),
+                          ),
+                          pw.SizedBox(height: 1),
+                          // Line 2: Transporter only, checkbox and label together
+                          pw.RichText(
+                            text: pw.TextSpan(
+                              style: pw.TextStyle(font: font, fontSize: 7.5),
+                              children: [
+                                ..._buildGstPayerSelection(
+                                  'Transporter',
                                   controller.selectedGstPayer.value,
                                   font,
                                 ),
@@ -2003,7 +2017,19 @@ class GCPdfGenerator {
   static Future<String> savePdfToDevice(GCFormController controller) async {
     try {
       final pdfData = await generatePDF(controller);
-      final directory = await getApplicationDocumentsDirectory();
+
+      // Prefer public Downloads on Android so user can easily find the file,
+      // otherwise fall back to the app's documents directory.
+      Directory directory;
+      if (Platform.isAndroid) {
+        final downloadsDir = Directory('/storage/emulated/0/Download');
+        if (!await downloadsDir.exists()) {
+          await downloadsDir.create(recursive: true);
+        }
+        directory = downloadsDir;
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
 
       String gcNumber = controller.gcNumberCtrl.text.trim();
       if (gcNumber.isEmpty) {

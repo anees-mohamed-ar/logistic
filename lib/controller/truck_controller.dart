@@ -411,6 +411,12 @@ class TruckController extends GetxController {
               'Status: ${response.statusCode}, Body: ${response.data}';
         }
 
+        // Extra detailed log so we can see the exact backend error
+        print('❌ [Truck update] Backend returned non-200 status');
+        print('   → Status code: ${response.statusCode}');
+        print('   → Raw response data: ${response.data}');
+        print('   → Parsed error message: $errorMessage');
+
         final error = '❌ $errorMessage';
         print(error);
         Get.snackbar(
@@ -421,17 +427,33 @@ class TruckController extends GetxController {
         return false;
       }
     } catch (e, stackTrace) {
-      print('❌ Exception details: $e');
+      print('❌ [Truck update] Exception while calling update API: $e');
       print('📋 Stack trace: $stackTrace');
 
       String errorMessage = 'Failed to update truck';
-      if (e is http.ClientException) {
+
+      // If this is a Dio error, log full HTTP details
+      if (e is dio.DioError) {
+        final res = e.response;
+        print('❌ [Truck update] DioError details:');
+        print('   → Type: ${e.type}');
+        print('   → Message: ${e.message}');
+        if (res != null) {
+          print('   → Response status: ${res.statusCode}');
+          print('   → Response data: ${res.data}');
+          print('   → Response headers: ${res.headers}');
+          errorMessage = 'Status: ${res.statusCode}, Body: ${res.data}';
+        }
+      } else if (e is http.ClientException) {
         errorMessage = 'Network error: ${e.message}';
       } else if (e is FormatException) {
         errorMessage = 'Invalid data format';
+      } else if (e is SocketException) {
+        errorMessage = 'No internet connection: ${e.message}';
       }
 
       error.value = 'Error updating truck: $errorMessage';
+      print('❌ [Truck update] Final error message: $errorMessage');
       Get.snackbar('Error', errorMessage, snackPosition: SnackPosition.BOTTOM);
       return false;
     } finally {
