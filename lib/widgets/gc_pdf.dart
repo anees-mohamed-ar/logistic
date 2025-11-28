@@ -154,6 +154,15 @@ class GCPdfGenerator {
                               decoration: pw.BoxDecoration(
                                 border: pw.Border.all(width: 0.5),
                               ),
+                              child: pw.Center(
+                                child: pw.SvgImage(
+                                  svg:
+                                      '<svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" fill="none" stroke="#00AA00" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+                                  width: 7,
+                                  height: 7,
+                                  fit: pw.BoxFit.contain,
+                                ),
+                              ),
                             ),
                             pw.Expanded(
                               child: pw.Text(
@@ -168,7 +177,6 @@ class GCPdfGenerator {
                           style: pw.TextStyle(font: font, fontSize: 9),
                         ),
                         pw.SizedBox(height: 3),
-                        _buildDynamicBranches(branches, selectedBranch, font),
                       ],
                     ),
                   ),
@@ -580,7 +588,7 @@ class GCPdfGenerator {
                             ),
                             pw.TextSpan(
                               text: controller.consignorNameCtrl.text,
-                              style: pw.TextStyle(font: font, fontSize: 9),
+                              style: pw.TextStyle(font: font, fontSize: 10),
                             ),
                           ],
                         ),
@@ -595,7 +603,7 @@ class GCPdfGenerator {
                             ),
                             pw.TextSpan(
                               text: controller.consignorAddressCtrl.text,
-                              style: pw.TextStyle(font: font, fontSize: 9),
+                              style: pw.TextStyle(font: font, fontSize: 8),
                             ),
                           ],
                         ),
@@ -610,7 +618,7 @@ class GCPdfGenerator {
                             ),
                             pw.TextSpan(
                               text: controller.consignorGstCtrl.text,
-                              style: pw.TextStyle(font: font, fontSize: 9),
+                              style: pw.TextStyle(font: font, fontSize: 10),
                             ),
                           ],
                         ),
@@ -639,7 +647,7 @@ class GCPdfGenerator {
                             ),
                             pw.TextSpan(
                               text: controller.billToNameCtrl.text,
-                              style: pw.TextStyle(font: font, fontSize: 9),
+                              style: pw.TextStyle(font: font, fontSize: 10),
                             ),
                           ],
                         ),
@@ -654,7 +662,7 @@ class GCPdfGenerator {
                             ),
                             pw.TextSpan(
                               text: controller.billToAddressCtrl.text,
-                              style: pw.TextStyle(font: font, fontSize: 9),
+                              style: pw.TextStyle(font: font, fontSize: 8),
                             ),
                           ],
                         ),
@@ -669,7 +677,7 @@ class GCPdfGenerator {
                             ),
                             pw.TextSpan(
                               text: controller.billToGstCtrl.text,
-                              style: pw.TextStyle(font: font, fontSize: 9),
+                              style: pw.TextStyle(font: font, fontSize: 10),
                             ),
                           ],
                         ),
@@ -711,7 +719,7 @@ class GCPdfGenerator {
                             ),
                             pw.TextSpan(
                               text: controller.consigneeAddressCtrl.text,
-                              style: pw.TextStyle(font: font, fontSize: 9),
+                              style: pw.TextStyle(font: font, fontSize: 8),
                             ),
                           ],
                         ),
@@ -726,7 +734,7 @@ class GCPdfGenerator {
                             ),
                             pw.TextSpan(
                               text: controller.consigneeGstCtrl.text,
-                              style: pw.TextStyle(font: font, fontSize: 9),
+                              style: pw.TextStyle(font: font, fontSize: 10),
                             ),
                           ],
                         ),
@@ -825,7 +833,7 @@ class GCPdfGenerator {
                       ),
                       // Values
                       pw.Container(
-                        height: 36,
+                        height: 25,
                         child: pw.Row(
                           children: [
                             pw.Expanded(
@@ -842,7 +850,7 @@ class GCPdfGenerator {
                                     controller.packagesCtrl.text,
                                     style: pw.TextStyle(
                                       font: font,
-                                      fontSize: 8,
+                                      fontSize: 10,
                                     ),
                                   ),
                                 ),
@@ -862,7 +870,7 @@ class GCPdfGenerator {
                                     controller.methodPackageCtrl.text,
                                     style: pw.TextStyle(
                                       font: font,
-                                      fontSize: 8,
+                                      fontSize: 10,
                                     ),
                                   ),
                                 ),
@@ -877,7 +885,7 @@ class GCPdfGenerator {
                                     controller.natureGoodsCtrl.text,
                                     style: pw.TextStyle(
                                       font: font,
-                                      fontSize: 8,
+                                      fontSize: 10,
                                     ),
                                   ),
                                 ),
@@ -916,25 +924,25 @@ class GCPdfGenerator {
                                   right: pw.BorderSide(width: 1),
                                 ),
                               ),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                children: [
-                                  pw.Text(
-                                    'Invoice No.:',
-                                    style: pw.TextStyle(
-                                      font: boldFont,
-                                      fontSize: 7,
+                              child: pw.RichText(
+                                text: pw.TextSpan(
+                                  children: [
+                                    pw.TextSpan(
+                                      text: 'Invoice No.:  ',
+                                      style: pw.TextStyle(
+                                        font: boldFont,
+                                        fontSize: 9,
+                                      ),
                                     ),
-                                  ),
-                                  pw.SizedBox(height: 2),
-                                  pw.Text(
-                                    controller.customInvoiceCtrl.text,
-                                    style: pw.TextStyle(
-                                      font: font,
-                                      fontSize: 6.5,
+                                    pw.TextSpan(
+                                      text: controller.customInvoiceCtrl.text,
+                                      style: pw.TextStyle(
+                                        font: font,
+                                        fontSize: 9,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -942,25 +950,25 @@ class GCPdfGenerator {
                             flex: 1,
                             child: pw.Container(
                               padding: const pw.EdgeInsets.all(3),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                children: [
-                                  pw.Text(
-                                    'Date',
-                                    style: pw.TextStyle(
-                                      font: boldFont,
-                                      fontSize: 7,
+                              child: pw.RichText(
+                                text: pw.TextSpan(
+                                  children: [
+                                    pw.TextSpan(
+                                      text: 'Date  ',
+                                      style: pw.TextStyle(
+                                        font: boldFont,
+                                        fontSize: 9,
+                                      ),
                                     ),
-                                  ),
-                                  pw.SizedBox(height: 1),
-                                  pw.Text(
-                                    controller.gcDateCtrl.text,
-                                    style: pw.TextStyle(
-                                      font: font,
-                                      fontSize: 6.5,
+                                    pw.TextSpan(
+                                      text: controller.gcDateCtrl.text,
+                                      style: pw.TextStyle(
+                                        font: font,
+                                        fontSize: 8,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -969,7 +977,6 @@ class GCPdfGenerator {
                     ),
                     // E-way section
                     pw.Container(
-                      height: 26,
                       child: pw.Row(
                         children: [
                           pw.Expanded(
@@ -984,25 +991,25 @@ class GCPdfGenerator {
                                   right: pw.BorderSide(width: 1),
                                 ),
                               ),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                children: [
-                                  pw.Text(
-                                    'E-way Billing',
-                                    style: pw.TextStyle(
-                                      font: boldFont,
-                                      fontSize: 7,
+                              child: pw.RichText(
+                                text: pw.TextSpan(
+                                  children: [
+                                    pw.TextSpan(
+                                      text: 'E-way Billing : ',
+                                      style: pw.TextStyle(
+                                        font: boldFont,
+                                        fontSize: 9,
+                                      ),
                                     ),
-                                  ),
-                                  pw.SizedBox(height: 2),
-                                  pw.Text(
-                                    controller.ewayBillCtrl.text,
-                                    style: pw.TextStyle(
-                                      font: font,
-                                      fontSize: 6.5,
+                                    pw.TextSpan(
+                                      text: controller.ewayBillCtrl.text,
+                                      style: pw.TextStyle(
+                                        font: font,
+                                        fontSize: 9,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -1013,25 +1020,25 @@ class GCPdfGenerator {
                                 horizontal: 3,
                                 vertical: 2,
                               ),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                children: [
-                                  pw.Text(
-                                    'Exp Date',
-                                    style: pw.TextStyle(
-                                      font: boldFont,
-                                      fontSize: 7,
+                              child: pw.RichText(
+                                text: pw.TextSpan(
+                                  children: [
+                                    pw.TextSpan(
+                                      text: 'Exp Date  ',
+                                      style: pw.TextStyle(
+                                        font: boldFont,
+                                        fontSize: 9,
+                                      ),
                                     ),
-                                  ),
-                                  pw.SizedBox(height: 1),
-                                  pw.Text(
-                                    controller.ewayExpiredCtrl.text,
-                                    style: pw.TextStyle(
-                                      font: font,
-                                      fontSize: 6.5,
+                                    pw.TextSpan(
+                                      text: controller.ewayExpiredCtrl.text,
+                                      style: pw.TextStyle(
+                                        font: font,
+                                        fontSize: 8,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -1277,11 +1284,13 @@ class GCPdfGenerator {
                             ),
                           ),
                           pw.SizedBox(height: 4),
-                          pw.Text(
-                            controller.deliveryInstructionsCtrl.text,
-                            style: pw.TextStyle(font: font, fontSize: 7),
-                            maxLines: 3,
-                            overflow: pw.TextOverflow.clip,
+                          pw.Center(
+                            child: pw.Text(
+                              controller.deliveryInstructionsCtrl.text,
+                              style: pw.TextStyle(font: font, fontSize: 9),
+                              maxLines: 3,
+                              overflow: pw.TextOverflow.clip,
+                            ),
                           ),
                         ],
                       ),
@@ -1387,63 +1396,116 @@ class GCPdfGenerator {
                           // GSTIN Payer info column (cargo PDF: always show three options, Transporter fixed as selected)
                           pw.Expanded(
                             flex: 5,
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.all(6),
-                              decoration: pw.BoxDecoration(
-                                border: pw.Border(
-                                  right: pw.BorderSide(width: 1),
+                            child: pw.Center(
+                              child: pw.Container(
+                                padding: const pw.EdgeInsets.all(6),
+                                decoration: pw.BoxDecoration(
+                                  border: pw.Border(
+                                    right: pw.BorderSide(width: 1),
+                                  ),
                                 ),
-                              ),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                mainAxisAlignment: pw.MainAxisAlignment.center,
-                                children: [
-                                  // First line: Consignor / Consignee (shown but never selected)
-                                  pw.RichText(
-                                    text: pw.TextSpan(
-                                      style: pw.TextStyle(
-                                        font: font,
-                                        fontSize: 9,
+                                child: pw.Center(
+                                  child: pw.Column(
+                                    crossAxisAlignment:
+                                        pw.CrossAxisAlignment.start,
+                                    mainAxisAlignment:
+                                        pw.MainAxisAlignment.center,
+                                    children: [
+                                      // First line: Consignor / Consignee laid out in a centered Row
+                                      pw.Row(
+                                        mainAxisAlignment:
+                                            pw.MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            pw.CrossAxisAlignment.center,
+                                        children: [
+                                          // Consignor (always unchecked in cargo)
+                                          pw.Row(
+                                            mainAxisSize: pw.MainAxisSize.min,
+                                            children: [
+                                              pw.Container(
+                                                alignment: pw.Alignment.center,
+                                                width: 12,
+                                                height: 12,
+                                                margin:
+                                                    const pw.EdgeInsets.only(
+                                                      right: 4,
+                                                    ),
+                                                decoration: pw.BoxDecoration(
+                                                  border: pw.Border.all(
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                              ),
+                                              pw.Text(
+                                                'Consignor',
+                                                style: pw.TextStyle(
+                                                  font: font,
+                                                  fontSize: 9,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          pw.SizedBox(width: 6),
+                                          pw.Text(
+                                            '/',
+                                            style: pw.TextStyle(
+                                              font: font,
+                                              fontSize: 9,
+                                            ),
+                                          ),
+                                          pw.SizedBox(width: 6),
+                                          // Consignee (always unchecked in cargo)
+                                          pw.Row(
+                                            mainAxisSize: pw.MainAxisSize.min,
+                                            children: [
+                                              pw.Container(
+                                                alignment: pw.Alignment.center,
+                                                width: 12,
+                                                height: 12,
+                                                margin:
+                                                    const pw.EdgeInsets.only(
+                                                      right: 4,
+                                                    ),
+                                                decoration: pw.BoxDecoration(
+                                                  border: pw.Border.all(
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                              ),
+                                              pw.Text(
+                                                'Consignee  /',
+                                                style: pw.TextStyle(
+                                                  font: font,
+                                                  fontSize: 9,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ),
-                                      children: [
-                                        ..._buildGstPayerSelection(
-                                          'Consignor',
-                                          'Transporter',
-                                          font,
-                                        ),
-                                        pw.TextSpan(
-                                          text: '   /   ',
-                                          style: pw.TextStyle(
-                                            font: font,
-                                            fontSize: 9,
+                                      pw.SizedBox(height: 3),
+
+                                      // Second line: Transporter (always selected)
+                                      pw.Center(
+                                        child: pw.RichText(
+                                          text: pw.TextSpan(
+                                            style: pw.TextStyle(
+                                              font: font,
+                                              fontSize: 9,
+                                            ),
+                                            children: [
+                                              ..._buildGstPayerSelection(
+                                                'Transporter',
+                                                'Transporter',
+                                                font,
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        ..._buildGstPayerSelection(
-                                          'Consignee',
-                                          'Transporter',
-                                          font,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  pw.SizedBox(height: 3),
-                                  // Second line: Transporter (always selected)
-                                  pw.RichText(
-                                    text: pw.TextSpan(
-                                      style: pw.TextStyle(
-                                        font: font,
-                                        fontSize: 9,
                                       ),
-                                      children: [
-                                        ..._buildGstPayerSelection(
-                                          'Transporter',
-                                          'Transporter',
-                                          font,
-                                        ),
-                                      ],
-                                    ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                           ),
@@ -1671,11 +1733,11 @@ class GCPdfGenerator {
             pw.Expanded(
               child: pw.Column(
                 children: [
-                  pw.Container(width: 150, height: 0.5, child: pw.Divider()),
-                  pw.SizedBox(height: 2),
+                  pw.Container(width: 120, height: 0.5, child: pw.Divider()),
+                  pw.SizedBox(height: 1),
                   pw.Text(
                     'Signature of Consignor or his Agent',
-                    style: pw.TextStyle(font: font, fontSize: 8),
+                    style: pw.TextStyle(font: font, fontSize: 7),
                   ),
                 ],
               ),
@@ -1827,78 +1889,14 @@ class GCPdfGenerator {
     String selectedBranch,
     pw.Font font,
   ) {
-    if (branches.isEmpty) {
-      return pw.Row(
-        children: [
-          pw.Text(
-            'Branch Office :',
-            style: pw.TextStyle(font: font, fontSize: 9),
-          ),
-          pw.SizedBox(width: 5),
-          pw.Text(
-            'No branches available',
-            style: pw.TextStyle(font: font, fontSize: 7),
-          ),
-        ],
-      );
-    }
-
-    // Split branches into rows (max 3 per row for better spacing)
-    final List<List<Map<String, dynamic>>> branchRows = [];
-    for (int i = 0; i < branches.length; i += 3) {
-      branchRows.add(
-        branches.sublist(i, i + 3 > branches.length ? branches.length : i + 3),
-      );
-    }
-
-    // Calculate equal column width for grid alignment
-    const double labelWidth = 78.0; // Width for "Branch Office :" label
-    const double availableWidth = 400.0; // Available width for branches
-    const double columnWidth =
-        availableWidth / 3; // Equal width per column (100px each)
-
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
+    return pw.Row(
       children: [
-        for (int rowIndex = 0; rowIndex < branchRows.length; rowIndex++)
-          pw.Padding(
-            padding: pw.EdgeInsets.only(
-              bottom: rowIndex < branchRows.length - 1 ? 2 : 0,
-            ),
-            child: pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: [
-                // Label or spacer
-                pw.SizedBox(
-                  width: labelWidth,
-                  child: rowIndex == 0
-                      ? pw.Text(
-                          'Branch Office :',
-                          style: pw.TextStyle(font: font, fontSize: 9),
-                        )
-                      : pw.SizedBox(),
-                ),
-                // Grid columns for branches
-                for (int i = 0; i < 3; i++)
-                  pw.SizedBox(
-                    width: columnWidth,
-                    child: i < branchRows[rowIndex].length
-                        ? _buildCheckboxWithLabel(
-                            branchRows[rowIndex][i]['branch_name']
-                                    ?.toString()
-                                    .toUpperCase() ??
-                                'UNKNOWN',
-                            font,
-                            isChecked:
-                                branchRows[rowIndex][i]['branch_name']
-                                    ?.toString() ==
-                                selectedBranch,
-                          )
-                        : pw.SizedBox(), // Empty cell for alignment
-                  ),
-              ],
-            ),
-          ),
+        pw.Text(
+          'Branch Office :',
+          style: pw.TextStyle(font: font, fontSize: 9),
+        ),
+        pw.SizedBox(width: 5),
+        _buildCheckboxWithLabel('HEAD OFFICE CHENNAI', font, isChecked: true),
       ],
     );
   }
@@ -1947,7 +1945,8 @@ class GCPdfGenerator {
     pw.Font font,
   ) {
     final bool isSelected = selectedValue == option;
-    final bool strikeThrough = selectedValue.isNotEmpty && !isSelected;
+    // Do not strike out unselected GSTIN payer options; keep labels clean
+    const bool strikeThrough = false;
 
     return [
       _buildPdfCheck(isSelected),
@@ -1974,16 +1973,24 @@ class GCPdfGenerator {
           ),
         ),
       ] else ...[
-        pw.TextSpan(
-          text: option,
-          style: pw.TextStyle(
-            font: font,
-            fontSize: 9,
-            decoration: strikeThrough
-                ? pw.TextDecoration.lineThrough
-                : pw.TextDecoration.none,
-            decorationColor: PdfColors.black,
-            decorationThickness: 1.5,
+        // Use WidgetSpan with a fixed-height container so text vertically
+        // aligns with the checkbox next to it.
+        pw.WidgetSpan(
+          child: pw.Container(
+            height: 12,
+            alignment: pw.Alignment.centerLeft,
+            child: pw.Text(
+              option,
+              style: pw.TextStyle(
+                font: font,
+                fontSize: 9,
+                decoration: strikeThrough
+                    ? pw.TextDecoration.lineThrough
+                    : pw.TextDecoration.none,
+                decorationColor: PdfColors.black,
+                decorationThickness: 1.5,
+              ),
+            ),
           ),
         ),
       ],

@@ -11,6 +11,7 @@ import 'package:logistic/config/flavor_config.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:logistic/api_config.dart';
+import 'package:logistic/controller/feature_flag_controller.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -831,6 +832,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               color: const Color(0xFF8E24AA),
               onTap: () => Get.toNamed(AppRoutes.gcAssignment),
             ),
+            if (FeatureFlagController.to.isGcHistoryEnabled.value)
+              _ActionData(
+                icon: Icons.history_toggle_off,
+                title: 'GC History',
+                subtitle: 'Usage overview',
+                color: const Color(0xFF0097A7),
+                onTap: () => Get.toNamed(AppRoutes.gcHistory),
+              ),
             _ActionData(
               icon: Icons.local_shipping_outlined,
               title: 'Truck Management',

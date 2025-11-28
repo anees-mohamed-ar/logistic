@@ -15,6 +15,7 @@ import 'controller/login_controller.dart';
 import 'controller/branch_controller.dart';
 import 'controller/temporary_gc_controller.dart';
 import 'controller/broker_controller.dart';
+import 'controller/feature_flag_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +42,7 @@ Future<void> _initializeApp() async {
   Get.put(BranchController());
   Get.put(BrokerController());
   Get.put(TemporaryGCController());
+  Get.put(FeatureFlagController());
 }
 
 class LogisticsGCApp extends StatelessWidget {

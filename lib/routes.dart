@@ -36,6 +36,7 @@ import 'package:logistic/bindings/truck_binding.dart';
 import 'package:logistic/register_screen.dart';
 import 'package:logistic/gc_assignment_page.dart';
 import 'package:logistic/screens/temporary_gc_list_screen.dart';
+import 'package:logistic/gc_history_page.dart';
 
 class AppRoutes {
   // Route names
@@ -75,14 +76,12 @@ class AppRoutes {
   static const String truckForm = '/truck_form';
   static const String gcAssignment = '/gc_assignment';
   static const String temporaryGcList = '/temporary-gc-list';
+  static const String gcHistory = '/gc_history';
 
   static final routes = [
+    GetPage(name: splash, page: () => const SplashScreen()),
     GetPage(
-      name: splash, 
-      page: () => const SplashScreen(),
-    ),
-    GetPage(
-      name: login, 
+      name: login,
       page: () => const LoginScreen(),
       transition: Transition.fadeIn,
     ),
@@ -92,12 +91,12 @@ class AppRoutes {
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: home, 
+      name: home,
       page: () => const HomePage(),
       transition: Transition.fadeIn,
     ),
     GetPage(
-      name: gcForm, 
+      name: gcForm,
       page: () => const GCFormScreen(),
       transition: Transition.rightToLeft,
     ),
@@ -122,63 +121,63 @@ class AppRoutes {
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: gcList, 
+      name: gcList,
       page: () => const GCListPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: gcReport, 
+      name: gcReport,
       page: () => const GCReportPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: updateTransit, 
+      name: updateTransit,
       page: () => const UpdateTransitPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: consignorList, 
+      name: consignorList,
       page: () => ConsignorListPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: consigneeList, 
+      name: consigneeList,
       page: () => ConsigneeListPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: userManagement, 
+      name: userManagement,
       page: () => const UserManagementPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: driverManagement, 
+      name: driverManagement,
       page: () => const DriverManagementPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: kmList, 
+      name: kmList,
       page: () => KMListPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: kmForm, 
+      name: kmForm,
       page: () => const KMFormPage(),
       transition: Transition.rightToLeft,
     ),
     // GST Form page commented out as it's not currently used
     // GetPage(
-    //   name: gstForm, 
+    //   name: gstForm,
     //   page: () => GSTFormPage(),
     //   transition: Transition.rightToLeft,
     // ),
     GetPage(
-      name: brokerList, 
+      name: brokerList,
       page: () => BrokerListPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: brokerForm, 
+      name: brokerForm,
       page: () => AddEditBrokerPage(),
       transition: Transition.rightToLeft,
     ),
@@ -193,17 +192,17 @@ class AppRoutes {
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: weightRateList, 
+      name: weightRateList,
       page: () => WeightRateListPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: weightRateForm, 
+      name: weightRateForm,
       page: () => AddEditWeightRatePage.create(Get.arguments),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: weightRateEdit, 
+      name: weightRateEdit,
       page: () => AddEditWeightRatePage.create(Get.arguments),
       transition: Transition.rightToLeft,
     ),
@@ -218,37 +217,35 @@ class AppRoutes {
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: customerList, 
+      name: customerList,
       page: () => CustomerListPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: customerForm, 
+      name: customerForm,
       page: () => const CustomerFormPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
       name: supplierList,
-      page: () =>  SupplierListPage(),
+      page: () => SupplierListPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: supplierForm, 
+      name: supplierForm,
       page: () => const SupplierFormPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: gstList, 
+      name: gstList,
       page: () => GstListPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: gstForm, 
+      name: gstForm,
       page: () {
         final gst = Get.arguments;
-        return gst != null 
-            ? GstFormPage(gst: gst)
-            : const GstFormPage();
+        return gst != null ? GstFormPage(gst: gst) : const GstFormPage();
       },
       transition: Transition.rightToLeft,
     ),
@@ -258,7 +255,7 @@ class AppRoutes {
       transition: Transition.rightToLeft,
     ),
     GetPage(
-      name: truckList, 
+      name: truckList,
       page: () => TruckListPage(),
       binding: TruckBinding(),
       transition: Transition.rightToLeft,
@@ -267,7 +264,9 @@ class AppRoutes {
       name: truckForm,
       page: () {
         final truck = Get.arguments as Truck?;
-        print('🚚 Navigating to truck form with truck: ${truck?.vechileNumber} (ID: ${truck?.id})');
+        print(
+          '🚚 Navigating to truck form with truck: ${truck?.vechileNumber} (ID: ${truck?.id})',
+        );
         return truck != null
             ? TruckFormPage(truck: truck)
             : const TruckFormPage();
@@ -278,6 +277,11 @@ class AppRoutes {
     GetPage(
       name: temporaryGcList,
       page: () => const TemporaryGCListScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: gcHistory,
+      page: () => GCHistoryPage(),
       transition: Transition.rightToLeft,
     ),
   ];

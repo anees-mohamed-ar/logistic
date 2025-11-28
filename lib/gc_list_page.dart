@@ -9,6 +9,7 @@ import 'package:logistic/controller/gc_form_controller.dart';
 import 'package:logistic/gc_attachments_page.dart';
 import 'api_config.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:logistic/services/gc_pdf_preview_service.dart';
 
 class GCListPage extends StatefulWidget {
   const GCListPage({Key? key}) : super(key: key);
@@ -25,6 +26,7 @@ class _GCListPageState extends State<GCListPage> {
   bool isLoading = true;
   String? error;
   final searchController = TextEditingController();
+  final Set<String> _expandedCards = <String>{};
 
   // Filter state
   String? selectedBranchFilter;
@@ -33,7 +35,7 @@ class _GCListPageState extends State<GCListPage> {
   DateTimeRange? dateRangeFilter;
 
   // Sort state
-  String sortBy = 'GcDate'; // Default sort
+  String sortBy = 'created_at'; // Default sort by creation date
   bool sortAscending = false; // Default descending (newest first)
 
   // Available options for filters
@@ -1041,71 +1043,138 @@ class _GCListPageState extends State<GCListPage> {
             tilePadding: EdgeInsets.zero,
           ),
         ),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.all(16),
-          childrenPadding: EdgeInsets.zero,
-          title: _buildCardHeader(gc),
-          subtitle: _buildCardSubtitle(gc),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                margin: const EdgeInsets.only(right: 8),
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.attach_file,
-                    size: 20,
-                    color: Colors.orange,
-                  ),
-                  onPressed: () => _viewAttachments(gc),
-                  padding: const EdgeInsets.all(6),
-                  constraints: const BoxConstraints(),
-                  tooltip: 'View Attachments',
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.orange.withOpacity(0.1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                ),
-              ),
-              if (_canEditGC(gc))
-                Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  child: IconButton(
-                    icon: Icon(
-                      Icons.edit,
-                      size: 20,
-                      color: Theme.of(context).primaryColor,
-                    ),
-                    onPressed: () => _editGC(gc),
-                    padding: const EdgeInsets.all(6),
-                    constraints: const BoxConstraints(),
-                    tooltip: 'Edit GC',
-                    style: IconButton.styleFrom(
-                      backgroundColor: Theme.of(
-                        context,
-                      ).primaryColor.withOpacity(0.1),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
+              // Card header and subtitle
+              _buildCardHeader(gc),
+              const SizedBox(height: 8),
+              _buildCardSubtitle(gc),
+              const SizedBox(height: 12),
+
+              // Button row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.attach_file,
+                        size: 20,
+                        color: Colors.orange,
+                      ),
+                      onPressed: () => _viewAttachments(gc),
+                      padding: const EdgeInsets.all(6),
+                      constraints: const BoxConstraints(),
+                      tooltip: 'View Attachments',
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.orange.withOpacity(0.1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.expand_more,
-                  color: Theme.of(context).primaryColor,
-                ),
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.picture_as_pdf,
+                        size: 20,
+                        color: Colors.red,
+                      ),
+                      onPressed: () =>
+                          GCPdfPreviewService.showPdfPreviewFromGCData(
+                            context,
+                            gc['GcNumber']?.toString() ?? '',
+                          ).then((_) {
+                            // Ensure the temporary controller is deleted after use
+                            if (Get.isRegistered<GCFormController>()) {
+                              Get.delete<GCFormController>();
+                            }
+                          }),
+                      padding: const EdgeInsets.all(6),
+                      constraints: const BoxConstraints(),
+                      tooltip: 'PDF Preview',
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.red.withOpacity(0.1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_canEditGC(gc))
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.edit,
+                          size: 20,
+                          color: Theme.of(context).primaryColor,
+                        ),
+                        onPressed: () => _editGC(gc),
+                        padding: const EdgeInsets.all(6),
+                        constraints: const BoxConstraints(),
+                        tooltip: 'Edit GC',
+                        style: IconButton.styleFrom(
+                          backgroundColor: Theme.of(
+                            context,
+                          ).primaryColor.withOpacity(0.1),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                      ),
+                    ),
+                  const Spacer(),
+                  // Expand button
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        final gcNumber = gc['GcNumber']?.toString() ?? '';
+                        if (_expandedCards.contains(gcNumber)) {
+                          _expandedCards.remove(gcNumber);
+                        } else {
+                          _expandedCards.add(gcNumber);
+                        }
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        _expandedCards.contains(
+                              gc['GcNumber']?.toString() ?? '',
+                            )
+                            ? Icons.expand_less
+                            : Icons.expand_more,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                  ),
+                ],
               ),
+
+              // Expandable details section (only when expanded)
+              if (_expandedCards.contains(gc['GcNumber']?.toString() ?? ''))
+                Container(
+                  padding: const EdgeInsets.only(top: 16),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: Colors.grey.shade200),
+                    ),
+                  ),
+                  child: _buildCardDetails(gc),
+                ),
             ],
           ),
-          children: [_buildCardDetails(gc)],
         ),
       ),
     );
@@ -1168,12 +1237,12 @@ class _GCListPageState extends State<GCListPage> {
           if (gc['GcDate']?.toString().isNotEmpty == true)
             _buildInfoChip(
               Icons.calendar_today,
-              _formatDisplayDate(gc['GcDate']),
+              'GC Date: ${_formatDisplayDate(gc['GcDate'])}',
             ),
           if (gc['created_at']?.toString().isNotEmpty == true)
             _buildInfoChip(
               Icons.access_time,
-              _formatDisplayDateWithTime(gc['created_at']),
+              'Created: ${_formatDisplayDateWithTime(gc['created_at'])}',
             ),
         ],
       ),
@@ -1627,8 +1696,19 @@ class _GCListPageState extends State<GCListPage> {
     final formattedMethod = (methodOfPkg?.isNotEmpty ?? false)
         ? '${methodOfPkg![0].toUpperCase()}${methodOfPkg.substring(1).toLowerCase()}'
         : 'Boxes';
+
+    print('📦 [editActualGC] Package method from DB: "${methodOfPkg}"');
+    print('📦 [editActualGC] Formatted method: "${formattedMethod}"');
+
     controller.methodPackageCtrl.text = formattedMethod;
     controller.selectedPackageMethod.value = formattedMethod;
+
+    print(
+      '📦 [editActualGC] Set selectedPackageMethod to: "${controller.selectedPackageMethod.value}"',
+    );
+    print(
+      '📦 [editActualGC] Set methodPackageCtrl to: "${controller.methodPackageCtrl.text}"',
+    );
 
     controller.packagesCtrl.text = gc['NumberofPkg']?.toString() ?? '';
     controller.actualWeightCtrl.text = normalizedWeight;

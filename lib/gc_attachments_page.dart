@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'api_config.dart';
+import 'package:logistic/services/gc_pdf_preview_service.dart';
 
 class GCAttachmentsPage extends StatefulWidget {
   final String gcNumber;
@@ -730,6 +731,16 @@ class _GCAttachmentsPageState extends State<GCAttachmentsPage> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            onPressed: () => GCPdfPreviewService.showPdfPreviewFromGCData(
+              context,
+              widget.gcNumber,
+              companyId: widget.companyId,
+              branchId: widget.branchId,
+            ),
+            tooltip: 'PDF Preview',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: fetchAttachments,

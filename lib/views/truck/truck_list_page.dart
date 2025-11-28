@@ -423,6 +423,65 @@ class _TruckListPageState extends State<TruckListPage> {
     );
   }
 
+  Widget _buildCompactExpiryChip(
+    String label,
+    int days,
+    Color color,
+    IconData icon,
+  ) {
+    String text;
+    if (days == -999) {
+      text = 'No data';
+    } else if (days < 0) {
+      text = '${days.abs()} days overdue';
+    } else if (days == 0) {
+      text = 'Expires today';
+    } else {
+      text = 'In $days days';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: color,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSortOption(TruckSortBy sortBy, String label, IconData icon) {
     final isSelected = _currentSort == sortBy;
     return Container(
@@ -1222,7 +1281,7 @@ class _TruckListPageState extends State<TruckListPage> {
         (taxDays >= 7 && taxDays <= 30);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 6),
       elevation: hasUrgentWarning ? 4 : 2,
       shadowColor: hasUrgentWarning ? Colors.red.withOpacity(0.3) : null,
       shape: RoundedRectangleBorder(
@@ -1243,7 +1302,7 @@ class _TruckListPageState extends State<TruckListPage> {
         },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1335,77 +1394,65 @@ class _TruckListPageState extends State<TruckListPage> {
                     ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
 
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.person_outline,
-                          size: 14,
-                          color: Colors.grey.shade700,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            truck.ownerName ?? 'No owner assigned',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade800,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (truck.ownerMobileNumber != null) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.phone_outlined,
-                            size: 16,
-                            color: Colors.grey.shade700,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            truck.ownerMobileNumber!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ],
+              Row(
+                children: [
+                  Icon(
+                    Icons.person_outline,
+                    size: 16,
+                    color: Colors.grey.shade700,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      truck.ownerName ?? 'No owner assigned',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
                       ),
-                    ],
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              if (truck.ownerMobileNumber != null) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.phone_outlined,
+                      size: 14,
+                      color: Colors.grey.shade700,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      truck.ownerMobileNumber!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
                   ],
                 ),
-              ),
+              ],
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
 
-              // Expiry Status Cards
               Row(
                 children: [
                   Expanded(
-                    child: _buildDetailedExpiryCard(
+                    child: _buildCompactExpiryChip(
                       'Insurance',
                       insuranceDays,
                       insuranceColor,
                       Icons.shield_outlined,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: _buildDetailedExpiryCard(
+                    child: _buildCompactExpiryChip(
                       'Road Tax',
                       taxDays,
                       taxColor,
@@ -1415,7 +1462,7 @@ class _TruckListPageState extends State<TruckListPage> {
                 ],
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
 
               // Action Buttons (unchanged layout, slightly tighter spacing)
               Row(
@@ -1441,7 +1488,7 @@ class _TruckListPageState extends State<TruckListPage> {
                             context,
                           ).primaryColor.withOpacity(0.4),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),

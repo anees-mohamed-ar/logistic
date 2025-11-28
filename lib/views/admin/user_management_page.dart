@@ -38,6 +38,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   bool isAddingUser = false;
   bool isEditing = false;
   String? editingUserId;
+  String _userSearchQuery = '';
 
   @override
   void initState() {
@@ -206,6 +207,18 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredUsers = _userSearchQuery.isEmpty
+        ? users
+        : users.where((user) {
+            final query = _userSearchQuery.toLowerCase();
+            final name = (user['userName'] ?? '').toString().toLowerCase();
+            final email = (user['userEmail'] ?? '').toString().toLowerCase();
+            final phone = (user['phoneNumber'] ?? '').toString().toLowerCase();
+            return name.contains(query) ||
+                email.contains(query) ||
+                phone.contains(query);
+          }).toList();
+
     return MainLayout(
       title: 'User Management',
       child: SingleChildScrollView(
@@ -394,6 +407,19 @@ class _UserManagementPageState extends State<UserManagementPage> {
               ),
             ),
             const SizedBox(height: 24),
+            TextField(
+              decoration: const InputDecoration(
+                labelText: 'Search Users',
+                hintText: 'Search by name, email, or phone',
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _userSearchQuery = value.trim();
+                });
+              },
+            ),
+            const SizedBox(height: 12),
             // Users List
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -403,7 +429,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  '${users.length} Users',
+                  '${filteredUsers.length} Users',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -411,7 +437,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
             const SizedBox(height: 12),
             isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : users.isEmpty
+                : filteredUsers.isEmpty
                 ? const Center(
                     child: Padding(
                       padding: EdgeInsets.all(16.0),
@@ -426,11 +452,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     child: ListView.separated(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: users.length,
+                      itemCount: filteredUsers.length,
                       separatorBuilder: (_, __) =>
                           const Divider(height: 1, thickness: 1),
                       itemBuilder: (context, index) {
-                        final user = users[index];
+                        final user = filteredUsers[index];
                         final isAdmin =
                             (user['user_role'] ?? '')
                                 .toString()

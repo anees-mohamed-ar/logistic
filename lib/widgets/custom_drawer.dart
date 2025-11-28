@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:logistic/controller/id_controller.dart';
 import 'package:logistic/controller/login_controller.dart';
+import 'package:logistic/controller/feature_flag_controller.dart';
 import 'package:logistic/routes.dart';
 import 'package:logistic/api_config.dart';
 
@@ -82,6 +83,21 @@ class _CustomDrawerState extends State<CustomDrawer> {
                               title: 'Reports',
                               route: AppRoutes.gcReport,
                               onTap: () => _navigateTo(AppRoutes.gcReport),
+                            ),
+                            Obx(
+                              () =>
+                                  FeatureFlagController
+                                      .to
+                                      .isGcHistoryEnabled
+                                      .value
+                                  ? _buildMenuItem(
+                                      icon: Icons.history_toggle_off,
+                                      title: 'GC History',
+                                      route: AppRoutes.gcHistory,
+                                      onTap: () =>
+                                          _navigateTo(AppRoutes.gcHistory),
+                                    )
+                                  : const SizedBox.shrink(),
                             ),
                             const SizedBox(height: 16),
 

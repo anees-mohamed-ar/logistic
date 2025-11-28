@@ -908,7 +908,14 @@ class _GCFormScreenState extends State<GCFormScreen> {
                         textInputAction: TextInputAction.next,
                         validator: (value) =>
                             value == null || value.isEmpty ? 'Required' : null,
-                        onChanged: (_) {},
+                        onChanged: (value) {
+                          print(
+                            '📦 [UI] methodPackageCtrl changed to: "$value"',
+                          );
+                          print(
+                            '📦 [UI] selectedPackageMethod is currently: "${controller.selectedPackageMethod.value}"',
+                          );
+                        },
                         onFieldSubmitted: (_) {
                           controller.truckTypeFocus.requestFocus();
                         },
@@ -2459,16 +2466,16 @@ class _GCFormScreenState extends State<GCFormScreen> {
               //     ),
               //   ),
               // ),
-              const SizedBox(height: 8),
-              Text(
-                'You can attach any type of file (PDF, images, documents, etc.). Maximum 10 files, 10MB each.\n\n'
-                'Tip: Hold Ctrl/Cmd to select multiple files, or click "Add Files" multiple times.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey[600],
-                  fontSize: 11,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              // const SizedBox(height: 8),
+              // Text(
+              //   'You can attach any type of file (PDF, images, documents, etc.). Maximum 10 files, 10MB each.\n\n'
+              //   'Tip: Hold Ctrl/Cmd to select multiple files, or click "Add Files" multiple times.',
+              //   style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              //     color: Colors.grey[600],
+              //     fontSize: 11,
+              //   ),
+              //   textAlign: TextAlign.center,
+              // ),
             ],
           ),
         ),

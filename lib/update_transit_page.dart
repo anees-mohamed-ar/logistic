@@ -122,7 +122,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       context: context,
       initialDate: reportDate ?? DateTime.now(),
       firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      lastDate: DateTime.now(),
       builder: (context, child) {
         final theme = Theme.of(context);
         return Theme(
@@ -292,6 +292,18 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
         placeControllers[0].text = gcDetails!['TruckFrom'].toString();
       }
 
+      // Set Day 1 date to GC date if not already set
+      if (transitDates[0] == null &&
+          gcDetails!.containsKey('GcDate') &&
+          gcDetails!['GcDate'] != null) {
+        try {
+          transitDates[0] = DateTime.tryParse(gcDetails!['GcDate'].toString());
+          print('Set Day 1 date to GC date: ${transitDates[0]}');
+        } catch (e) {
+          print('Error parsing GC date for Day 1: ${gcDetails!['GcDate']}');
+        }
+      }
+
       // Parse other dates and fields
       if (gcDetails!.containsKey('ReportDate') &&
           gcDetails!['ReportDate'] != null) {
@@ -379,7 +391,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       context: context,
       initialDate: transitDates[index] ?? transitDates[0] ?? DateTime.now(),
       firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      lastDate: DateTime.now(),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -407,7 +419,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       context: context,
       initialDate: unloadedDate ?? DateTime.now(),
       firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      lastDate: DateTime.now(),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -455,7 +467,7 @@ class _UpdateTransitPageState extends State<UpdateTransitPage> {
       context: context,
       initialDate: receiptDate ?? DateTime.now(),
       firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      lastDate: DateTime.now(),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(

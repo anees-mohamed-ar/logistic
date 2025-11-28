@@ -57,6 +57,8 @@ class WeightRate {
 }
 
 class GCFormController extends GetxController {
+  // Read-only mode flag for GC form
+  final isReadOnlyMode = false.obs;
   // NEW: Get an instance of IdController to trigger refreshes
   final IdController _idController = Get.find<IdController>();
   final Random _random = Random();
@@ -1383,6 +1385,15 @@ class GCFormController extends GetxController {
       } catch (_) {}
     }
 
+    // E-way bill date
+    if (tempGC.eBillDate != null) {
+      try {
+        final parsed = DateTime.parse(tempGC.eBillDate!);
+        ewayBillDate.value = parsed;
+        ewayBillDateCtrl.text = DateFormat('dd-MMM-yyyy').format(parsed);
+      } catch (_) {}
+    }
+
     // E-days and delivery date
     if (tempGC.eda != null && tempGC.eda!.isNotEmpty) {
       eDaysCtrl.text = tempGC.eda!;
@@ -1442,19 +1453,19 @@ class GCFormController extends GetxController {
     // Bill To details
     final billToName = tempGC.billToName ?? '';
     if (billToName.isNotEmpty) {
-      selectedBillTo.value = billToName;
-      billToNameCtrl.text = billToName;
-      billToGstCtrl.text = tempGC.billToGst ?? '';
-      billToAddressCtrl.text = tempGC.billToAddress ?? '';
-
       // Ensure dropdown data includes this bill-to entry even if not in fetched list yet
       billToInfo[billToName] = {
-        'gst': billToGstCtrl.text,
-        'address': billToAddressCtrl.text,
+        'gst': tempGC.billToGst ?? '',
+        'address': tempGC.billToAddress ?? '',
       };
       if (!billTos.contains(billToName)) {
         billTos.add(billToName);
       }
+
+      selectedBillTo.value = billToName;
+      billToNameCtrl.text = billToName;
+      billToGstCtrl.text = tempGC.billToGst ?? '';
+      billToAddressCtrl.text = tempGC.billToAddress ?? '';
     } else {
       selectedBillTo.value = 'Select Bill To';
       billToNameCtrl.clear();
@@ -1469,9 +1480,31 @@ class GCFormController extends GetxController {
     if (tempGC.numberofPkg != null) {
       packagesCtrl.text = tempGC.numberofPkg!;
     }
-    if (tempGC.methodofPkg != null) {
+    if (tempGC.methodofPkg != null && tempGC.methodofPkg!.isNotEmpty) {
+      print(
+        '📦 [loadTemporaryGc] Package method from DB: "${tempGC.methodofPkg}"',
+      );
       selectedPackageMethod.value = tempGC.methodofPkg!;
       methodPackageCtrl.text = tempGC.methodofPkg!;
+      print(
+        '📦 [loadTemporaryGc] Set selectedPackageMethod to: "${selectedPackageMethod.value}"',
+      );
+      print(
+        '📦 [loadTemporaryGc] Set methodPackageCtrl to: "${methodPackageCtrl.text}"',
+      );
+    } else {
+      // Only default to "Boxes" if not set
+      print(
+        '📦 [loadTemporaryGc] Package method is null or empty, defaulting to "Boxes"',
+      );
+      selectedPackageMethod.value = 'Boxes';
+      methodPackageCtrl.text = 'Boxes';
+      print(
+        '📦 [loadTemporaryGc] Defaulted selectedPackageMethod to: "${selectedPackageMethod.value}"',
+      );
+      print(
+        '📦 [loadTemporaryGc] Defaulted methodPackageCtrl to: "${methodPackageCtrl.text}"',
+      );
     }
     if (tempGC.totalWeight != null) {
       actualWeightCtrl.text = tempGC.totalWeight!;
@@ -1791,24 +1824,52 @@ class GCFormController extends GetxController {
         child: child!,
       ),
     );
-    if (picked != null) {
-      targetDate.value = picked;
-      if (textController != null) {
-        textController.text = DateFormat('dd-MMM-yyyy').format(picked);
-      }
 
-      // If GC Date was picked and E-way Bill Date is still empty,
-      // default E-way Bill Date to the same date. User can later
-      // change E-way Bill Date explicitly from the form.
-      if (identical(targetDate, gcDate) &&
+    if (picked != null) {
+      // If this is the GC Date being changed and e-way bill date is already set
+      if (identical(targetDate, gcDate) && ewayBillDate.value != null) {
+        final bool? shouldUpdate = await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) => AlertDialog(
+            title: const Text('Update E-way Bill Date?'),
+            content: const Text(
+              'Do you want to update the E-way Bill Date to match the new GC Date?',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('No'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Yes'),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldUpdate == true) {
+          ewayBillDate.value = picked;
+          ewayBillDateCtrl.text = DateFormat('dd-MMM-yyyy').format(picked);
+        }
+      }
+      // If this is the GC Date and e-way bill date is not set
+      else if (identical(targetDate, gcDate) &&
           ewayBillDate.value == null &&
           ewayBillDateCtrl.text.trim().isEmpty) {
         ewayBillDate.value = picked;
         ewayBillDateCtrl.text = DateFormat('dd-MMM-yyyy').format(picked);
       }
 
-      // Re-compute delivery date in case GC date changed
-      updateDeliveryDateFromInputs();
+      targetDate.value = picked;
+      if (textController != null) {
+        textController.text = DateFormat('dd-MMM-yyyy').format(picked);
+      }
+
+      // Update delivery date if EDA is set
+      if (eDaysCtrl.text.isNotEmpty) {
+        updateDeliveryDateFromInputs();
+      }
     }
   }
 
@@ -3131,6 +3192,25 @@ class GCFormController extends GetxController {
     // Normalize actual weight to three decimals for submission
     actualWeightCtrl.text = _normalizeActualWeight(actualWeightCtrl.text);
 
+    // Log package method before submission
+    if (isTemporaryMode.value && isFillTemporaryMode.value) {
+      print(
+        '📦 [fillTemporaryGC] Package method being sent: "${methodPackageCtrl.text}"',
+      );
+    } else if (isTemporaryMode.value && !isFillTemporaryMode.value) {
+      print(
+        '📦 [createTemporaryGC] Package method being sent: "${methodPackageCtrl.text}"',
+      );
+    } else if (isEditMode.value) {
+      print(
+        '📦 [editActualGC] Package method being sent: "${methodPackageCtrl.text}"',
+      );
+    } else {
+      print(
+        '📦 [createActualGC] Package method being sent: "${methodPackageCtrl.text}"',
+      );
+    }
+
     final Map<String, dynamic> data = {
       'Branch': selectedBranch.value,
       'BranchCode': selectedBranchCode.value,
@@ -3174,7 +3254,7 @@ class GCFormController extends GetxController {
       'EInvDate': ewayBillDate.value?.toIso8601String(),
       'Eda': eDaysCtrl.text,
       'NumberofPkg': packagesCtrl.text,
-      'MethodofPkg': selectedPackageMethod.value,
+      'MethodofPkg': methodPackageCtrl.text,
       'ActualWeightKgs': actualWeightCtrl.text,
       'km': '',
       'PrivateMark': remarksCtrl.text,

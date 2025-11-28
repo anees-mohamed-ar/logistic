@@ -38,6 +38,7 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
   bool isAddingDriver = false;
   bool isEditMode = false;
   String? editingDriverDlNumber;
+  String _driverSearchQuery = '';
 
   // State dropdown data
   List<StateModel> _states = [];
@@ -332,6 +333,24 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredDrivers = _driverSearchQuery.isEmpty
+        ? drivers
+        : drivers.where((driver) {
+            final query = _driverSearchQuery.toLowerCase();
+            final name = (driver['driverName'] ?? '').toString().toLowerCase();
+            final dl = (driver['dlNumber'] ?? '').toString().toLowerCase();
+            final phone = (driver['phoneNumber'] ?? '')
+                .toString()
+                .toLowerCase();
+            final mobile = (driver['mobileNumber'] ?? '')
+                .toString()
+                .toLowerCase();
+            return name.contains(query) ||
+                dl.contains(query) ||
+                phone.contains(query) ||
+                mobile.contains(query);
+          }).toList();
+
     return MainLayout(
       title: 'Driver Management',
       child: SingleChildScrollView(
@@ -520,6 +539,19 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
               ),
             ),
             const SizedBox(height: 24),
+            TextField(
+              decoration: const InputDecoration(
+                labelText: 'Search Drivers',
+                hintText: 'Search by name, DL number, phone, or mobile',
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _driverSearchQuery = value.trim();
+                });
+              },
+            ),
+            const SizedBox(height: 12),
             // Drivers List
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -529,7 +561,7 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  '${drivers.length} Drivers',
+                  '${filteredDrivers.length} Drivers',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -537,7 +569,7 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
             const SizedBox(height: 12),
             isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : drivers.isEmpty
+                : filteredDrivers.isEmpty
                 ? const Center(
                     child: Padding(
                       padding: EdgeInsets.all(16.0),
@@ -547,9 +579,9 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
                 : ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: drivers.length,
+                    itemCount: filteredDrivers.length,
                     itemBuilder: (context, index) {
-                      final driver = drivers[index];
+                      final driver = filteredDrivers[index];
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ExpansionTile(
