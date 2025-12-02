@@ -177,7 +177,10 @@ class SearchableDropdown<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isError = validator?.call(value) != null || error != null;
+    // Only treat the explicit `error` prop as an external error state.
+    // Do NOT call the validator here, otherwise the field appears in error
+    // state even before the form is validated.
+    final isError = error != null && error!.isNotEmpty;
 
     // Log debug information
     if (kDebugMode) {
@@ -343,6 +346,9 @@ class SearchableDropdown<T> extends StatelessWidget {
             ), // Ensure minimum width
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
+              // When using validator-based errors, DropdownButtonFormField
+              // will handle the error border itself. This container-level
+              // border is only for explicit external errors.
               border: isError
                   ? Border.all(color: theme.colorScheme.error, width: 1.5)
                   : null,
@@ -367,9 +373,10 @@ class SearchableDropdown<T> extends StatelessWidget {
                 hintStyle: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.hintColor,
                 ),
-                errorText: isError
-                    ? (error ?? (validator?.call(value) as String?))
-                    : null,
+                // Let DropdownButtonFormField + Form + validator decide when
+                // to show validation errors. Here we only surface explicit
+                // external `error` messages.
+                errorText: isError ? error : null,
                 errorStyle: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.error,
                 ),

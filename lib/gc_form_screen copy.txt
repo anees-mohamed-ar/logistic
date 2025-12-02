@@ -252,13 +252,17 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 ),
                 const SizedBox(width: 12),
                 // Title text
-                Text(
-                  controller.isTemporaryMode.value
-                      ? 'Create Temporary GC'
-                      : 'Fill Temporary GC',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                Obx(
+                  () => Text(
+                    controller.isPreviewMode.value
+                        ? 'Preview Temporary GC'
+                        : (controller.isTemporaryMode.value
+                              ? 'Create Temporary GC'
+                              : 'Fill Temporary GC'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -336,287 +340,385 @@ class _GCFormScreenState extends State<GCFormScreen> {
         ),
         backgroundColor: const Color(0xFFF7F9FC),
         body: SafeArea(
-          child: Form(
-            key: controller.formKey,
-            child: Column(
-              children: [
-                Obx(
-                  () => Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: theme.cardColor,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
+          child: Column(
+            children: [
+              // Preview Mode Banner
+              Obx(
+                () => controller.isPreviewMode.value
+                    ? Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
                         ),
-                      ],
-                    ),
-                    child: SingleChildScrollView(
-                      controller: controller.tabScrollController,
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: List.generate(
-                          maxTabIndex + 1,
-                          (index) => GestureDetector(
-                            onTap: () {
-                              controller.changeTab(index);
-                              // Force UI rebuild
-                              setState(() {});
-                            },
-                            child: AnimatedContainer(
-                              duration: 300.ms,
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Colors.orange.shade200,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.visibility_rounded,
+                              color: Colors.orange.shade700,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Preview Mode - Read Only',
+                                style: TextStyle(
+                                  color: Colors.orange.shade700,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
+                                horizontal: 8,
+                                vertical: 4,
                               ),
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
                               decoration: BoxDecoration(
-                                color: controller.currentTab.value == index
-                                    ? theme.primaryColor
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(20),
+                                color: Colors.orange.shade100,
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    [
-                                      Icons.local_shipping,
-                                      Icons.group,
-                                      Icons.inventory,
-                                      if (!isTempCreation) Icons.attach_file,
-                                    ][index],
-                                    size: 16,
-                                    color: controller.currentTab.value == index
-                                        ? Colors.white
-                                        : theme.hintColor,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    [
-                                      'Shipment',
-                                      'Parties',
-                                      'Goods',
-                                      if (!isTempCreation) 'Attachments',
-                                    ][index],
-                                    style: theme.textTheme.labelLarge?.copyWith(
-                                      color:
-                                          controller.currentTab.value == index
-                                          ? Colors.white
-                                          : theme.hintColor,
+                              child: Text(
+                                'READ ONLY',
+                                style: TextStyle(
+                                  color: Colors.orange.shade800,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+              // Main Form Content
+              Expanded(
+                child: Form(
+                  key: controller.formKey,
+                  child: Column(
+                    children: [
+                      Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: theme.cardColor,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: SingleChildScrollView(
+                            controller: controller.tabScrollController,
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: List.generate(
+                                maxTabIndex + 1,
+                                (index) => Obx(
+                                  () => GestureDetector(
+                                    onTap: controller.isPreviewMode.value
+                                        ? null
+                                        : () {
+                                            controller.changeTab(index);
+                                            // Force UI rebuild
+                                            setState(() {});
+                                          },
+                                    child: AnimatedContainer(
+                                      duration: 300.ms,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            controller.currentTab.value == index
+                                            ? theme.primaryColor
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            [
+                                              Icons.group,
+                                              Icons.inventory,
+                                              if (!isTempCreation)
+                                                Icons.attach_file,
+                                            ][index],
+                                            size: 16,
+                                            color:
+                                                controller.currentTab.value ==
+                                                    index
+                                                ? Colors.white
+                                                : theme.hintColor,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            [
+                                              'Shipment',
+                                              'Parties',
+                                              'Goods',
+                                              if (!isTempCreation)
+                                                'Attachments',
+                                            ][index],
+                                            style: theme.textTheme.labelLarge
+                                                ?.copyWith(
+                                                  color:
+                                                      controller
+                                                              .currentTab
+                                                              .value ==
+                                                          index
+                                                      ? Colors.white
+                                                      : theme.hintColor,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+            ],),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          child: Obx(
+                            () => IgnorePointer(
+                              ignoring: controller.isPreviewMode.value,
+                              child: AnimatedSwitcher(
+                                duration: 300.ms,
+                                child:
+                                    (isTempCreation
+                                    ? [
+                                        _buildShipmentTab(
+                                          context,
+                                          controller,
+                                          isSmallScreen,
+                                        ),
+                                        _buildPartiesTab(
+                                          context,
+                                          controller,
+                                          isSmallScreen,
+                                        ),
+                                        _buildGoodsTab(
+                                          context,
+                                          controller,
+                                          isSmallScreen,
+                                        ),
+                                      ]
+                                    : [
+                                        _buildShipmentTab(
+                                          context,
+                                          controller,
+                                          isSmallScreen,
+                                        ),
+                                        _buildPartiesTab(
+                                          context,
+                                          controller,
+                                          isSmallScreen,
+                                        ),
+                                        _buildGoodsTab(
+                                          context,
+                                          controller,
+                                          isSmallScreen,
+                                        ),
+                                        _buildAttachmentsTab(
+                                          context,
+                                          controller,
+                                          isSmallScreen,
+                                        ),
+                                      ])[controller.currentTab.value
+                                        .clamp(0, maxTabIndex)
+                                        .toInt()],
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: Obx(
-                      () => AnimatedSwitcher(
-                        duration: 300.ms,
-                        child:
-                            (isTempCreation
-                            ? [
-                                _buildShipmentTab(
-                                  context,
-                                  controller,
-                                  isSmallScreen,
-                                ),
-                                _buildPartiesTab(
-                                  context,
-                                  controller,
-                                  isSmallScreen,
-                                ),
-                                _buildGoodsTab(
-                                  context,
-                                  controller,
-                                  isSmallScreen,
-                                ),
-                              ]
-                            : [
-                                _buildShipmentTab(
-                                  context,
-                                  controller,
-                                  isSmallScreen,
-                                ),
-                                _buildPartiesTab(
-                                  context,
-                                  controller,
-                                  isSmallScreen,
-                                ),
-                                _buildGoodsTab(
-                                  context,
-                                  controller,
-                                  isSmallScreen,
-                                ),
-                                _buildAttachmentsTab(
-                                  context,
-                                  controller,
-                                  isSmallScreen,
-                                ),
-                              ])[controller.currentTab.value
-                                .clamp(0, maxTabIndex)
-                                .toInt()],
-                      ),
-                    ),
-                  ),
-                ),
-                Obx(
-                  () => Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: theme.cardColor,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, -2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            if (controller.currentTab.value > 0)
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () {
-                                    controller.navigateToPreviousTab();
-                                    // Force UI rebuild
-                                    setState(() {});
-                                  },
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: theme.primaryColor,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    side: BorderSide(color: theme.primaryColor),
-                                    elevation: 2,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.arrow_back, size: 16),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Previous',
-                                        style: theme.textTheme.labelLarge,
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                      Obx(
+                        () => Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: theme.cardColor,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 8,
+                                offset: const Offset(0, -2),
                               ),
-                            if (controller.currentTab.value > 0)
-                              const SizedBox(width: 12),
-                            if (controller.currentTab.value < maxTabIndex)
-                              Expanded(
-                                flex: controller.currentTab.value > 0 ? 1 : 2,
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    controller.navigateToNextTab();
-                                    // Force UI rebuild
-                                    setState(() {});
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                    backgroundColor: theme.primaryColor,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'Next',
-                                        style: theme.textTheme.labelLarge
-                                            ?.copyWith(color: Colors.white),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      const Icon(
-                                        Icons.arrow_forward,
-                                        size: 16,
-                                        color: Colors.white,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            if (controller.currentTab.value == maxTabIndex)
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: controller.isLoading.value
-                                      ? null
-                                      : controller.submitFormToBackend,
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                    backgroundColor: Colors.green,
-                                  ),
-                                  child: controller.isLoading.value
-                                      ? const SizedBox(
-                                          height: 20,
-                                          width: 20,
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 2,
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  if (controller.currentTab.value > 0)
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () {
+                                          controller.navigateToPreviousTab();
+                                          // Force UI rebuild
+                                          setState(() {});
+                                        },
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 12,
                                           ),
-                                        )
-                                      : Obx(
-                                          () => Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Text(
-                                                controller.isTemporaryMode.value
-                                                    ? 'Create Temporary GC'
-                                                    : controller
-                                                          .isFillTemporaryMode
-                                                          .value
-                                                    ? 'Submit & Convert'
-                                                    : 'Submit Form',
-                                                style: theme
-                                                    .textTheme
-                                                    .labelLarge
-                                                    ?.copyWith(
+                                          backgroundColor: Colors.white,
+                                          foregroundColor: theme.primaryColor,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          side: BorderSide(
+                                            color: theme.primaryColor,
+                                          ),
+                                          elevation: 2,
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            const Icon(
+                                              Icons.arrow_back,
+                                              size: 16,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Previous',
+                                              style: theme.textTheme.labelLarge,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  if (controller.currentTab.value > 0)
+                                    const SizedBox(width: 12),
+                                  if (controller.currentTab.value < maxTabIndex)
+                                    Expanded(
+                                      flex: controller.currentTab.value > 0
+                                          ? 1
+                                          : 2,
+                                      child: ElevatedButton(
+                                        onPressed: () {
+                                          controller.navigateToNextTab();
+                                          // Force UI rebuild
+                                          setState(() {});
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 12,
+                                          ),
+                                          backgroundColor: theme.primaryColor,
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              'Next',
+                                              style: theme.textTheme.labelLarge
+                                                  ?.copyWith(
+                                                    color: Colors.white,
+                                                  ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            const Icon(
+                                              Icons.arrow_forward,
+                                              size: 16,
+                                              color: Colors.white,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  if (controller.currentTab.value ==
+                                      maxTabIndex)
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: controller.isLoading.value
+                                            ? null
+                                            : controller.submitFormToBackend,
+                                        style: ElevatedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 12,
+                                          ),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                        child: controller.isLoading.value
+                                            ? const SizedBox(
+                                                height: 20,
+                                                width: 20,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      color: Colors.white,
+                                                      strokeWidth: 2,
+                                                    ),
+                                              )
+                                            : Obx(
+                                                () => Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Text(
+                                                      controller
+                                                              .isTemporaryMode
+                                                              .value
+                                                          ? 'Create Temporary GC'
+                                                          : controller
+                                                                .isFillTemporaryMode
+                                                                .value
+                                                          ? 'Submit & Convert'
+                                                          : 'Submit Form',
+                                                      style: theme
+                                                          .textTheme
+                                                          .labelLarge
+                                                          ?.copyWith(
+                                                            color: Colors.white,
+                                                          ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    const Icon(
+                                                      Icons.check,
+                                                      size: 16,
                                                       color: Colors.white,
                                                     ),
+                                                  ],
+                                                ),
                                               ),
-                                              const SizedBox(width: 8),
-                                              const Icon(
-                                                Icons.check,
-                                                size: 16,
-                                                color: Colors.white,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                ),
+                                      ),
+                                    ),
+                                ],
                               ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
@@ -895,8 +997,47 @@ class _GCFormScreenState extends State<GCFormScreen> {
                       );
                     }),
                   ),
+                  if (!isSmallScreen) const SizedBox(width: 16),
+                  if (!isSmallScreen)
+                    Expanded(
+                      child: TextFormField(
+                        controller: controller.poNumberCtrl,
+                        focusNode: controller.poNumberFocus,
+                        decoration: _inputDecoration(
+                          'PO Number',
+                          Icons.description,
+                        ),
+                        textInputAction: TextInputAction.next,
+                        validator: (value) =>
+                            value == null || value.isEmpty ? 'Required' : null,
+                        onChanged: (value) {
+                          print(
+                            '📦 [UI] methodPackageCtrl changed to: "$value"',
+                          );
+                          print(
+                            '📦 [UI] selectedPackageMethod is currently: "${controller.selectedPackageMethod.value}"',
+                          );
+                        },
+                        onFieldSubmitted: (_) {
+                          controller.truckTypeFocus.requestFocus();
+                        },
+                      ),
+                    ),
                 ],
               ),
+              if (isSmallScreen) const SizedBox(height: 16),
+              if (isSmallScreen)
+                TextFormField(
+                  controller: controller.poNumberCtrl,
+                  focusNode: controller.poNumberFocus,
+                  decoration: _inputDecoration('PO Number', Icons.description),
+                  textInputAction: TextInputAction.next,
+                  validator: null,
+                  onChanged: (_) {},
+                  onFieldSubmitted: (_) {
+                    controller.truckTypeFocus.requestFocus();
+                  },
+                ),
               const SizedBox(height: 16),
               // Truck Type and Driver Name row
               Row(
@@ -914,8 +1055,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
                       validator: null,
                       onChanged: (_) {},
                       onFieldSubmitted: (_) {
-                        // Last field in Shipment tab - move to next tab
-                        controller.navigateToNextTab();
+                        controller.tripIdFocus.requestFocus();
                       },
                     ),
                   ),
@@ -1047,6 +1187,18 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 validator: null,
               ),
               const SizedBox(height: 16),
+              TextFormField(
+                controller: controller.tripIdCtrl,
+                focusNode: controller.tripIdFocus,
+                decoration: _inputDecoration('Trip ID', Icons.route),
+                textInputAction: TextInputAction.next,
+                validator: null,
+                onChanged: (_) {},
+                onFieldSubmitted: (_) {
+                  // Last field in Shipment tab - move to next tab
+                  controller.navigateToNextTab();
+                },
+              ),
             ],
           ),
         ),

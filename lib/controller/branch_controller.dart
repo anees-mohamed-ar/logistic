@@ -7,7 +7,7 @@ import 'package:logistic/controller/id_controller.dart';
 import 'package:logistic/config/company_config.dart';
 
 class BranchController extends GetxController {
-  final String baseUrl = '${ApiConfig.baseUrl}/branch';
+  String get baseUrl => '${ApiConfig.baseUrl}/branch';
   final branches = <Branch>[].obs;
   final filteredBranches = <Branch>[].obs;
   final isLoading = false.obs;
@@ -22,12 +22,14 @@ class BranchController extends GetxController {
     }
 
     final queryLower = query.toLowerCase();
-    filteredBranches.assignAll(branches.where((branch) {
-      return branch.branchName.toLowerCase().contains(queryLower) ||
-          (branch.branchCode?.toLowerCase().contains(queryLower) ?? false) ||
-          (branch.address?.toLowerCase().contains(queryLower) ?? false) ||
-          (branch.phone?.toLowerCase().contains(queryLower) ?? false);
-    }));
+    filteredBranches.assignAll(
+      branches.where((branch) {
+        return branch.branchName.toLowerCase().contains(queryLower) ||
+            (branch.branchCode?.toLowerCase().contains(queryLower) ?? false) ||
+            (branch.address?.toLowerCase().contains(queryLower) ?? false) ||
+            (branch.phone?.toLowerCase().contains(queryLower) ?? false);
+      }),
+    );
   }
 
   // Refresh branches list

@@ -1519,12 +1519,47 @@ class _TruckListPageState extends State<TruckListPage> {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 10),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    tooltip: 'Delete Truck',
+                    onPressed: () => _confirmDeleteTruck(truck.vechileNumber),
+                  ),
                 ],
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  void _confirmDeleteTruck(String vechileNumber) {
+    if (vechileNumber.isEmpty) {
+      Get.snackbar(
+        'Error',
+        'Invalid vehicle number',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    Get.defaultDialog(
+      title: 'Delete Truck',
+      content: Text('Are you sure you want to delete $vechileNumber?'),
+      actions: [
+        TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () async {
+            Get.back();
+            final success = await controller.deleteTruck(vechileNumber);
+            if (success) {
+              await _loadAllTrucks();
+            }
+          },
+          child: const Text('Delete', style: TextStyle(color: Colors.red)),
+        ),
+      ],
     );
   }
 

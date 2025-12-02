@@ -6,28 +6,30 @@ import 'package:logistic/api_config.dart';
 import 'package:logistic/controller/id_controller.dart';
 
 class BrokerController extends GetxController {
-  final String baseUrl = '${ApiConfig.baseUrl}/broker';
+  String get baseUrl => '${ApiConfig.baseUrl}/broker';
   final brokers = <Broker>[].obs;
   final filteredBrokers = <Broker>[].obs;
   final isLoading = false.obs;
   final error = ''.obs;
   final idController = Get.find<IdController>();
-  
+
   // For search functionality
   void filterBrokers(String query) {
     if (query.isEmpty) {
       filteredBrokers.assignAll(brokers);
       return;
     }
-    
+
     final queryLower = query.toLowerCase();
-    filteredBrokers.assignAll(brokers.where((broker) {
-      return broker.brokerName.toLowerCase().contains(queryLower) ||
-          (broker.phoneNumber?.toLowerCase().contains(queryLower) ?? false) ||
-          (broker.email?.toLowerCase().contains(queryLower) ?? false);
-    }));
+    filteredBrokers.assignAll(
+      brokers.where((broker) {
+        return broker.brokerName.toLowerCase().contains(queryLower) ||
+            (broker.phoneNumber?.toLowerCase().contains(queryLower) ?? false) ||
+            (broker.email?.toLowerCase().contains(queryLower) ?? false);
+      }),
+    );
   }
-  
+
   // Refresh brokers list
   Future<void> refreshBrokers() async {
     await fetchBrokers();
@@ -68,7 +70,7 @@ class BrokerController extends GetxController {
       isLoading(true);
       error.value = '';
       final brokerData = broker.toJson();
-      
+
       final response = await http.post(
         Uri.parse('$baseUrl/add'),
         headers: {'Content-Type': 'application/json'},
@@ -100,11 +102,11 @@ class BrokerController extends GetxController {
         Get.snackbar('Error', error.value);
         return false;
       }
-      
+
       isLoading(true);
       error.value = '';
       final brokerData = broker.toJson();
-      
+
       final response = await http.put(
         Uri.parse('$baseUrl/update/${broker.id}'),
         headers: {'Content-Type': 'application/json'},

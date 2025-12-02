@@ -6,6 +6,7 @@ import 'package:logistic/controller/temporary_gc_controller.dart';
 import 'package:logistic/controller/gc_form_controller.dart';
 import 'package:logistic/models/temporary_gc.dart';
 import 'package:logistic/routes.dart';
+import 'package:logistic/screens/temporary_gc_preview_screen.dart';
 import 'package:intl/intl.dart';
 // Removed unused imports to clean up the code
 
@@ -16,7 +17,8 @@ class TemporaryGCListScreen extends StatefulWidget {
   State<TemporaryGCListScreen> createState() => _TemporaryGCListScreenState();
 }
 
-class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with WidgetsBindingObserver {
+class _TemporaryGCListScreenState extends State<TemporaryGCListScreen>
+    with WidgetsBindingObserver {
   late TemporaryGCController controller;
   // Simplified access control - you can implement proper authentication later
   final RxBool hasGCAccess = true.obs;
@@ -49,16 +51,18 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
   Future<void> _checkGCAccess() async {
     try {
       isCheckingAccess.value = true;
-      
+
       // Check for active or queued GC ranges using existing endpoints
       final hasAccess = await controller.checkGCAccess();
       hasGCAccess.value = hasAccess;
-      accessMessage.value = hasAccess ? 'Access granted' : 'No active GC ranges found';
-      
+      accessMessage.value = hasAccess
+          ? 'Access granted'
+          : 'No active GC ranges found';
     } catch (e) {
       // If there's an error, we default to denying access to ensure security.
       hasGCAccess.value = false;
-      accessMessage.value = 'Could not verify access. Please check your connection and try again.';
+      accessMessage.value =
+          'Could not verify access. Please check your connection and try again.';
       print('Error checking GC access, defaulting to denied access: $e');
 
       // Optionally, show a temporary error message to the user.
@@ -69,8 +73,7 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
         backgroundColor: Colors.red.shade100,
         colorText: Colors.red.shade900,
       );
-    }
-    finally {
+    } finally {
       isCheckingAccess.value = false;
     }
   }
@@ -82,10 +85,10 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
   void dispose() {
     // Clean up the search controller
     searchController.dispose();
-    
+
     // Remove lifecycle observer
     WidgetsBinding.instance.removeObserver(this);
-    
+
     // Call super.dispose()
     super.dispose();
   }
@@ -108,72 +111,79 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
         elevation: 0,
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: Colors.white,
-        title: Obx(() => isSearching.value
-            ? Container(
-                height: 42,
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+        title: Obx(
+          () => isSearching.value
+              ? Container(
+                  height: 42,
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: searchController,
+                    autofocus: true,
+                    style: const TextStyle(color: Colors.black87, fontSize: 16),
+                    decoration: InputDecoration(
+                      hintText: 'Search GCs...',
+                      hintStyle: TextStyle(color: Colors.grey[600]),
+                      border: InputBorder.none,
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: Colors.grey,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      suffixIcon: searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(
+                                Icons.clear_rounded,
+                                size: 20,
+                                color: Colors.grey,
+                              ),
+                              onPressed: () {
+                                searchController.clear();
+                                controller.updateSearchQuery('');
+                              },
+                            )
+                          : null,
+                    ),
+                    cursorColor: theme.colorScheme.primary,
+                    onChanged: controller.updateSearchQuery,
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Temporary GC Forms',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '${controller.filteredGCs.length} of ${controller.temporaryGCs.length} form${controller.temporaryGCs.length != 1 ? 's' : ''} shown',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.9),
+                        fontWeight: FontWeight.w400,
+                      ),
                     ),
                   ],
                 ),
-                child: TextField(
-                  controller: searchController,
-                  autofocus: true,
-                  style: const TextStyle(color: Colors.black87, fontSize: 16),
-                  decoration: InputDecoration(
-                    hintText: 'Search GCs...',
-                    hintStyle: TextStyle(color: Colors.grey[600]),
-                    border: InputBorder.none,
-                    prefixIcon: const Icon(Icons.search_rounded, color: Colors.grey),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                    suffixIcon: searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, 
-                                size: 20, 
-                                color: Colors.grey),
-                            onPressed: () {
-                              searchController.clear();
-                              controller.updateSearchQuery('');
-                            },
-                          )
-                        : null,
-                  ),
-                  cursorColor: theme.colorScheme.primary,
-                  onChanged: controller.updateSearchQuery,
-                ),
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Temporary GC Forms',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    '${controller.filteredGCs.length} of ${controller.temporaryGCs.length} form${controller.temporaryGCs.length != 1 ? 's' : ''} shown',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white.withOpacity(0.9),
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ],
-              )),
+        ),
         actions: [
           // Search toggle button
           Obx(() {
             if (controller.temporaryGCs.isEmpty) return const SizedBox.shrink();
-            
+
             return isSearching.value
                 ? IconButton(
                     icon: const Icon(Icons.close_rounded),
@@ -265,9 +275,8 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
               showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (context) => const Center(
-                  child: CircularProgressIndicator(),
-                ),
+                builder: (context) =>
+                    const Center(child: CircularProgressIndicator()),
               );
 
               await controller.fetchTemporaryGCs();
@@ -309,14 +318,18 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
             valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade600),
           ),
           const SizedBox(height: 24),
-          Obx(() => Text(
-            isCheckingAccess.value ? 'Verifying access...' : 'Loading temporary forms...',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
+          Obx(
+            () => Text(
+              isCheckingAccess.value
+                  ? 'Verifying access...'
+                  : 'Loading temporary forms...',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -362,17 +375,19 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
                 ),
               ),
               const SizedBox(height: 12),
-              Obx(() => Text(
-                accessMessage.value.isEmpty
-                    ? 'No active or queued GC ranges found or Server down'
-                    : accessMessage.value,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.grey[600],
-                  height: 1.5,
+              Obx(
+                () => Text(
+                  accessMessage.value.isEmpty
+                      ? 'No active or queued GC ranges found or Server down'
+                      : accessMessage.value,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.grey[600],
+                    height: 1.5,
+                  ),
                 ),
-              )),
+              ),
               const SizedBox(height: 8),
               Text(
                 'Please contact your administrator to get GC range access',
@@ -425,7 +440,10 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
                         colorText: Colors.blue.shade900,
                         margin: const EdgeInsets.all(16),
                         borderRadius: 12,
-                        icon: Icon(Icons.info_outline, color: Colors.blue.shade900),
+                        icon: Icon(
+                          Icons.info_outline,
+                          color: Colors.blue.shade900,
+                        ),
                       );
                     },
                     icon: const Icon(Icons.support_agent_rounded),
@@ -446,7 +464,10 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
     );
   }
 
-  Widget _buildEmptyState(BuildContext context, TemporaryGCController controller) {
+  Widget _buildEmptyState(
+    BuildContext context,
+    TemporaryGCController controller,
+  ) {
     return RefreshIndicator(
       onRefresh: controller.fetchTemporaryGCs,
       color: Theme.of(context).colorScheme.primary,
@@ -538,7 +559,10 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
     );
   }
 
-  Widget _buildStatisticsCard(TemporaryGCController controller, ThemeData theme) {
+  Widget _buildStatisticsCard(
+    TemporaryGCController controller,
+    ThemeData theme,
+  ) {
     final total = controller.temporaryGCs.length;
     final locked = controller.temporaryGCs.where((gc) => gc.isLocked).length;
     final available = total - locked;
@@ -563,22 +587,14 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
             value: total.toString(),
             color: theme.colorScheme.primary,
           ),
-          Container(
-            height: 30,
-            width: 1,
-            color: Colors.grey.shade300,
-          ),
+          Container(height: 30, width: 1, color: Colors.grey.shade300),
           _CompactStatItem(
             icon: Icons.check_circle_rounded,
             label: 'Available',
             value: available.toString(),
             color: Colors.green.shade600,
           ),
-          Container(
-            height: 30,
-            width: 1,
-            color: Colors.grey.shade300,
-          ),
+          Container(height: 30, width: 1, color: Colors.grey.shade300),
           _CompactStatItem(
             icon: Icons.lock_rounded,
             label: 'In Use',
@@ -616,56 +632,67 @@ class _TemporaryGCListScreenState extends State<TemporaryGCListScreen> with Widg
 
   // Removed _showSearchDialog as we've moved search to the app bar
 
-  void _showFilterDialog(BuildContext context, TemporaryGCController controller) {
+  void _showFilterDialog(
+    BuildContext context,
+    TemporaryGCController controller,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Filter Forms'),
-        content: Obx(() => Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.all_inclusive_rounded),
-              title: const Text('All Forms'),
-              trailing: controller.currentFilter.value == 'all' 
-                  ? const Icon(Icons.check_rounded, color: Colors.green)
-                  : null,
-              onTap: () {
-                controller.updateFilter('all');
-                Navigator.pop(context);
-              },
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.check_circle_outline_rounded, color: Colors.green),
-              title: const Text('Available Only'),
-              trailing: controller.currentFilter.value == 'available' 
-                  ? const Icon(Icons.check_rounded, color: Colors.green)
-                  : null,
-              onTap: () {
-                controller.updateFilter('available');
-                Navigator.pop(context);
-              },
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.lock_outline_rounded, color: Colors.orange),
-              title: const Text('In Use Only'),
-              trailing: controller.currentFilter.value == 'in_use' 
-                  ? const Icon(Icons.check_rounded, color: Colors.green)
-                  : null,
-              onTap: () {
-                controller.updateFilter('in_use');
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        )),
+        content: Obx(
+          () => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.all_inclusive_rounded),
+                title: const Text('All Forms'),
+                trailing: controller.currentFilter.value == 'all'
+                    ? const Icon(Icons.check_rounded, color: Colors.green)
+                    : null,
+                onTap: () {
+                  controller.updateFilter('all');
+                  Navigator.pop(context);
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(
+                  Icons.check_circle_outline_rounded,
+                  color: Colors.green,
+                ),
+                title: const Text('Available Only'),
+                trailing: controller.currentFilter.value == 'available'
+                    ? const Icon(Icons.check_rounded, color: Colors.green)
+                    : null,
+                onTap: () {
+                  controller.updateFilter('available');
+                  Navigator.pop(context);
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(
+                  Icons.lock_outline_rounded,
+                  color: Colors.orange,
+                ),
+                title: const Text('In Use Only'),
+                trailing: controller.currentFilter.value == 'in_use'
+                    ? const Icon(Icons.check_rounded, color: Colors.green)
+                    : null,
+                onTap: () {
+                  controller.updateFilter('in_use');
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () {
               // Reset filters when canceling
-              if (controller.currentFilter.value != 'all' || 
+              if (controller.currentFilter.value != 'all' ||
                   controller.searchQuery.value.isNotEmpty) {
                 controller.updateFilter('all');
                 controller.updateSearchQuery('');
@@ -840,10 +867,10 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
                           child: Padding(
                             padding: const EdgeInsets.all(6),
                             child: Icon(
-                              Icons.delete_outline_rounded,
+                              Icons.refresh_rounded,
                               size: 20,
-                              color: Colors.red.shade400,
-                              semanticLabel: 'Delete',
+                              color: Colors.orange.shade600,
+                              semanticLabel: 'Reset Slot',
                             ),
                           ),
                         ),
@@ -857,7 +884,11 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
                   if (tempGC.truckFrom != null || tempGC.truckTo != null)
                     Row(
                       children: [
-                        Icon(Icons.route_rounded, size: 15, color: Colors.grey[600]),
+                        Icon(
+                          Icons.route_rounded,
+                          size: 15,
+                          color: Colors.grey[600],
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
@@ -875,7 +906,8 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
                     ),
 
                   // Consignor/Consignee
-                  if (tempGC.consignorName != null || tempGC.consigneeName != null) ...[
+                  if (tempGC.consignorName != null ||
+                      tempGC.consigneeName != null) ...[
                     const SizedBox(height: 6),
                     Row(
                       children: [
@@ -886,7 +918,11 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
                             color: Colors.purple,
                           ),
                         ),
-                        Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.grey[400]),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 14,
+                          color: Colors.grey[400],
+                        ),
                         const SizedBox(width: 4),
                         Expanded(
                           child: _CompactInfo(
@@ -925,53 +961,94 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // Action Button
-                      SizedBox(
-                        width: 90, // Slightly reduced fixed width
-                        child: ElevatedButton(
-                          onPressed: tempGC.isLocked || !hasGCAccess.value
-                              ? null
-                              : () => _handleTap(context),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 8,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            elevation: 1,
-                            minimumSize: const Size(0, 36), // Ensure minimum touch target
-                          ),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  tempGC.isLocked 
-                                    ? Icons.lock_rounded 
-                                    : (!hasGCAccess.value
-                                        ? Icons.block_rounded
-                                        : Icons.edit_rounded),
-                                  size: 14,
+                      // Action Buttons
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Preview Button
+                          SizedBox(
+                            width: 90,
+                            child: OutlinedButton(
+                              onPressed: () => _handlePreview(context),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 6,
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  tempGC.isLocked 
-                                    ? 'Locked' 
-                                    : (!hasGCAccess.value
-                                        ? 'No Access'
-                                        : 'Fill'),
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    letterSpacing: 0.2,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                side: BorderSide(color: Colors.blue.shade600),
+                                minimumSize: const Size(0, 28),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.visibility_rounded,
+                                    size: 12,
+                                    color: Colors.blue.shade600,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    'Preview',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      letterSpacing: 0.2,
+                                      color: Colors.blue.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
+                          const SizedBox(height: 4),
+                          // Fill Button
+                          SizedBox(
+                            width: 90,
+                            child: ElevatedButton(
+                              onPressed: tempGC.isLocked || !hasGCAccess.value
+                                  ? null
+                                  : () => _handleTap(context),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 6,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                elevation: 1,
+                                minimumSize: const Size(0, 28),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    tempGC.isLocked
+                                        ? Icons.lock_rounded
+                                        : (!hasGCAccess.value
+                                              ? Icons.block_rounded
+                                              : Icons.edit_rounded),
+                                    size: 12,
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    tempGC.isLocked
+                                        ? 'Locked'
+                                        : (!hasGCAccess.value
+                                              ? 'No Access'
+                                              : 'Fill'),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -980,14 +1057,15 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.schedule_rounded, size: 12, color: Colors.grey[500]),
+                      Icon(
+                        Icons.schedule_rounded,
+                        size: 12,
+                        color: Colors.grey[500],
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         dateFormat.format(istDate),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -1010,13 +1088,17 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
               Icon(Icons.block_rounded, color: Colors.white),
               SizedBox(width: 12),
               Expanded(
-                child: Text('You do not have access to fill GC forms. Please contact admin.'),
+                child: Text(
+                  'You do not have access to fill GC forms. Please contact admin.',
+                ),
               ),
             ],
           ),
           backgroundColor: Colors.orange.shade700,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           duration: const Duration(seconds: 4),
         ),
       );
@@ -1031,13 +1113,17 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
               Icon(Icons.lock_rounded, color: Colors.white),
               SizedBox(width: 12),
               Expanded(
-                child: Text('This form is currently being used by another user'),
+                child: Text(
+                  'This form is currently being used by another user',
+                ),
               ),
             ],
           ),
           backgroundColor: Colors.orange.shade700,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
@@ -1065,10 +1151,7 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
               const SizedBox(height: 16),
               const Text(
                 'Locking form...',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -1116,17 +1199,30 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
               Icon(Icons.error_outline_rounded, color: Colors.white),
               SizedBox(width: 12),
               Expanded(
-                child: Text('Unable to lock form. It may be in use by another user.'),
+                child: Text(
+                  'Unable to lock form. It may be in use by another user.',
+                ),
               ),
             ],
           ),
           backgroundColor: Colors.red.shade600,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           duration: const Duration(seconds: 4),
         ),
       );
     }
+  }
+
+  void _handlePreview(BuildContext context) {
+    // Navigate to preview screen
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => TemporaryGCPreviewScreen(tempGC: tempGC),
+      ),
+    );
   }
 
   void _showAdminUnlockConfirmation(BuildContext context) {
@@ -1152,22 +1248,23 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              
+
               // Show loading indicator
               showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (context) => const Center(
-                  child: CircularProgressIndicator(),
-                ),
+                builder: (context) =>
+                    const Center(child: CircularProgressIndicator()),
               );
-              
+
               // Call admin unlock
-              final success = await controller.adminUnlockTemporaryGC(tempGC.tempGcNumber);
-              
+              final success = await controller.adminUnlockTemporaryGC(
+                tempGC.tempGcNumber,
+              );
+
               // Close loading indicator
               Navigator.pop(context);
-              
+
               if (success) {
                 // Show success message
                 if (context.mounted) {
@@ -1180,7 +1277,7 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
                     ),
                   );
                 }
-                
+
                 // Refresh the list
                 await controller.fetchTemporaryGCs();
               } else if (context.mounted) {
@@ -1212,13 +1309,13 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: Colors.orange.shade50,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(Icons.delete_rounded, color: Colors.red.shade600),
+              child: Icon(Icons.refresh_rounded, color: Colors.orange.shade600),
             ),
             const SizedBox(width: 12),
-            const Text('Delete Temporary GC'),
+            const Text('Reset Temporary GC Slot'),
           ],
         ),
         content: Column(
@@ -1226,11 +1323,8 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Are you sure you want to delete this form?',
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.grey[800],
-              ),
+              'This will clear the slot and make it available for new entries.',
+              style: TextStyle(fontSize: 15, color: Colors.grey[800]),
             ),
             const SizedBox(height: 12),
             Container(
@@ -1248,12 +1342,32 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            Text(
-              '⚠️ This action cannot be undone.',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.red.shade700,
-                fontWeight: FontWeight.w500,
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: Colors.blue.shade700,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '✅ Safe operation - clears data without deleting the slot',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.blue.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1267,7 +1381,7 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
             onPressed: () async {
               Navigator.pop(context);
 
-              // Show deleting indicator
+              // Show resetting indicator
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: const Row(
@@ -1277,11 +1391,13 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       ),
                       SizedBox(width: 12),
-                      Text('Deleting form...'),
+                      Text('Resetting slot...'),
                     ],
                   ),
                   backgroundColor: Colors.grey.shade700,
@@ -1293,18 +1409,18 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
                 ),
               );
 
-              await controller.deleteTemporaryGC(tempGC.tempGcNumber);
+              await controller.resetTemporaryGC(tempGC.tempGcNumber);
 
-              // Refresh the list immediately after deletion
+              // Refresh the list immediately after reset
               await controller.fetchTemporaryGCs();
 
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: const Row(
                     children: [
-                      Icon(Icons.check_circle_rounded, color: Colors.white),
+                      Icon(Icons.check_circle, color: Colors.white),
                       SizedBox(width: 12),
-                      Text('Form deleted successfully'),
+                      Text('Slot reset successfully'),
                     ],
                   ),
                   backgroundColor: Colors.green.shade600,
@@ -1312,18 +1428,20 @@ class _EnhancedTemporaryGCCard extends StatelessWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
+                  duration: const Duration(seconds: 3),
                 ),
               );
             },
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Reset Slot'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade600,
+              backgroundColor: Colors.orange.shade600,
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
-            icon: const Icon(Icons.delete_rounded),
-            label: const Text('Delete'),
           ),
         ],
       ),
@@ -1379,7 +1497,10 @@ class _CompactStatusBadgeState extends State<_CompactStatusBadge> {
     _updateRemaining();
 
     if (_remaining != null && _remaining! > Duration.zero) {
-      _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateRemaining());
+      _timer = Timer.periodic(
+        const Duration(seconds: 1),
+        (_) => _updateRemaining(),
+      );
     }
   }
 
@@ -1433,8 +1554,8 @@ class _CompactStatusBadgeState extends State<_CompactStatusBadge> {
           Text(
             isLocked
                 ? showCountdown
-                    ? 'In Use · ${_formatDuration(_remaining!)}'
-                    : 'In Use'
+                      ? 'In Use · ${_formatDuration(_remaining!)}'
+                      : 'In Use'
                 : 'Available',
             style: TextStyle(
               fontSize: 10,
@@ -1487,10 +1608,7 @@ class _MiniChip extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _MiniChip({
-    required this.icon,
-    required this.label,
-  });
+  const _MiniChip({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {

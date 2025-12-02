@@ -174,7 +174,9 @@ class LoginController extends GetxController {
     selectedBranch = null;
     ipController.text = ApiConfig.baseUrl;
 
-    print('LOGOUT: Local state reset. selectedCompany.id: ${selectedCompany.id}');
+    print(
+      'LOGOUT: Local state reset. selectedCompany.id: ${selectedCompany.id}',
+    );
 
     // Navigate to login screen
     Get.offAllNamed(AppRoutes.login);
@@ -194,6 +196,14 @@ class LoginController extends GetxController {
       final userData = _box.read('userData');
       final savedCompany = _box.read('selectedCompany');
       final savedBranch = _box.read('selectedBranch');
+
+      // Restore saved backend IP
+      final savedIp = _box.read('backend_ip');
+      if (savedIp != null) {
+        print('AUTO-LOGIN: Restoring saved backend IP: $savedIp');
+        ApiConfig.baseUrl = savedIp;
+        ipController.text = savedIp;
+      }
 
       print('AUTO-LOGIN: userData: ${userData != null ? "present" : "null"}');
       print(

@@ -60,7 +60,7 @@ class Company {
 }
 
 class CompanyController extends GetxController {
-  final String baseUrl = '${ApiConfig.baseUrl}/company';
+  String get baseUrl => '${ApiConfig.baseUrl}/company';
   final companies = <Company>[].obs;
   final isLoading = false.obs;
   final error = RxString('');
@@ -84,13 +84,14 @@ class CompanyController extends GetxController {
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         companies.value = data.map((json) => Company.fromJson(json)).toList();
-        
+
         // Select the first company by default if available
         if (companies.isNotEmpty) {
           selectedCompany.value = companies.first;
         }
       } else {
-        final errorMsg = json.decode(response.body)['message'] ?? 'Failed to load companies';
+        final errorMsg =
+            json.decode(response.body)['message'] ?? 'Failed to load companies';
         error.value = errorMsg;
         Get.snackbar('Error', errorMsg);
       }

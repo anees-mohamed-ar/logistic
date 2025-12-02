@@ -18,7 +18,7 @@ class DriverManagementPage extends StatefulWidget {
 }
 
 class _DriverManagementPageState extends State<DriverManagementPage> {
-  final String baseUrl = '${ApiConfig.baseUrl}/driver';
+  String get baseUrl => '${ApiConfig.baseUrl}/driver';
   final _formKey = GlobalKey<FormState>();
   final _formSectionKey = GlobalKey();
   final _nameController = TextEditingController();
@@ -586,10 +586,14 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ExpansionTile(
                           leading: CircleAvatar(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).primaryColor.withOpacity(0.1),
                             child: Text(
                               (driver['driverName']?[0] ?? 'D').toUpperCase(),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.bold,
+                                color: Theme.of(context).primaryColor,
                               ),
                             ),
                           ),
@@ -601,9 +605,26 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
                             'DL: ${driver['dlNumber'] ?? 'N/A'}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.edit, color: Colors.blue),
-                            onPressed: () => _editDriver(driver),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.edit,
+                                  color: Colors.blue,
+                                ),
+                                onPressed: () => _editDriver(driver),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () => _confirmDeleteDriver(
+                                  (driver['dlNumber'] ?? '').toString(),
+                                ),
+                              ),
+                            ],
                           ),
                           children: [
                             Padding(
@@ -676,6 +697,78 @@ class _DriverManagementPageState extends State<DriverManagementPage> {
         ],
       ),
     );
+  }
+
+  void _confirmDeleteDriver(String dlNumber) {
+    if (dlNumber.isEmpty || dlNumber == 'N/A') {
+      Get.snackbar(
+        'Error',
+        'Invalid driving license number',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    Get.defaultDialog(
+      title: 'Delete Driver',
+      content: Text(
+        'Are you sure you want to delete driver with DL $dlNumber?',
+      ),
+      actions: [
+        TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () async {
+            Get.back();
+            await _deleteDriver(dlNumber);
+          },
+          child: const Text('Delete', style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _deleteDriver(String dlNumber) async {
+    setState(() => isLoading = true);
+    try {
+      final uri = Uri.parse('$baseUrl/delete/$dlNumber');
+      final response = await http.delete(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        Get.snackbar(
+          'Success',
+          'Driver deleted successfully',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        await _fetchDrivers();
+      } else if (response.statusCode == 404) {
+        Get.snackbar(
+          'Not Found',
+          'Driver not found',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      } else {
+        String message = 'Failed to delete driver';
+        try {
+          final body = json.decode(response.body);
+          message =
+              body['error']?.toString() ??
+              body['message']?.toString() ??
+              message;
+        } catch (_) {}
+        Get.snackbar('Error', message, snackPosition: SnackPosition.BOTTOM);
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to delete driver: $e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      setState(() => isLoading = false);
+    }
   }
 
   @override

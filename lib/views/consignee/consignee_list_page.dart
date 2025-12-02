@@ -199,12 +199,54 @@ class ConsigneeListPage extends StatelessWidget {
               ),
           ],
         ),
-        onTap: () => Get.to(() => AddEditConsigneePage(consignee: consignee)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(
+                Icons.edit,
+                color: Theme.of(Get.context!).primaryColor,
+                size: 20,
+              ),
+              onPressed: () => _navigateToEditPage(consignee),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+              onPressed: () => _deleteConsignee(consignee.consigneeName),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ),
+        onTap: () => _navigateToEditPage(consignee),
       ),
     );
   }
 
   void _navigateToEditPage(Consignee consignee) {
     Get.to(() => AddEditConsigneePage(consignee: consignee));
+  }
+
+  void _deleteConsignee(String consigneeName) {
+    Get.defaultDialog(
+      title: 'Delete Consignee',
+      content: Text('Are you sure you want to delete $consigneeName?'),
+      actions: [
+        TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () async {
+            Get.back();
+            final success = await controller.deleteConsignee(consigneeName);
+            if (success) {
+              Get.snackbar('Success', 'Consignee deleted successfully');
+            }
+          },
+          child: const Text('Delete', style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    );
   }
 }

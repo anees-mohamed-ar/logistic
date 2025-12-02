@@ -9,6 +9,8 @@ import 'package:excel/excel.dart' as excel;
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
 import 'dart:io';
 
 class GCReportPage extends StatefulWidget {
@@ -337,8 +339,7 @@ class _GCReportPageState extends State<GCReportPage>
           context: context,
           barrierDismissible: false,
           builder: (dialogContext) => const AlertDialog(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
+            content: Row(
               children: [
                 CircularProgressIndicator(),
                 SizedBox(height: 16),
@@ -351,7 +352,19 @@ class _GCReportPageState extends State<GCReportPage>
 
       // Create Excel workbook
       final excel.Excel workbook = excel.Excel.createExcel();
+
+      // Remove all default sheets and create our custom sheet
+      workbook.delete('Sheet1');
+
       final excel.Sheet sheet = workbook['GC_Report'];
+
+      // Ensure no other sheets exist
+      final sheetNames = workbook.sheets.keys.toList();
+      for (final sheetName in sheetNames) {
+        if (sheetName != 'GC_Report') {
+          workbook.delete(sheetName);
+        }
+      }
 
       // Define headers
       final headers = [
@@ -425,6 +438,20 @@ class _GCReportPageState extends State<GCReportPage>
               fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
               fontSize: 11,
               numberFormat: excel.NumFormat.standard_2,
+            );
+          } else if (key == 'GcDate') {
+            // Format date field
+            final displayValue = _formatDate(value?.toString() ?? '');
+            final cell = sheet.cell(
+              excel.CellIndex.indexByColumnRow(
+                columnIndex: colIndex,
+                rowIndex: rowIndex + 1,
+              ),
+            );
+            cell.value = excel.TextCellValue(displayValue);
+            cell.cellStyle = excel.CellStyle(
+              fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
+              fontSize: 11,
             );
           } else {
             // Handle null values and convert to string
@@ -465,7 +492,7 @@ class _GCReportPageState extends State<GCReportPage>
         Navigator.of(context).pop();
       }
 
-      // Show success message
+      // Show success message with open location button
       if (mounted) {
         final location =
             downloadDir.path.contains('Download') ||
@@ -477,6 +504,13 @@ class _GCReportPageState extends State<GCReportPage>
             content: Text(
               'Excel file downloaded successfully to $location: $fileName',
             ),
+            action: SnackBarAction(
+              label: 'Open Location',
+              onPressed: () => _openFileLocation(filePath),
+            ),
+            duration: const Duration(
+              seconds: 5,
+            ), // Keep it visible longer for action
           ),
         );
       }
@@ -508,7 +542,19 @@ class _GCReportPageState extends State<GCReportPage>
     try {
       // Create Excel workbook
       final excel.Excel workbook = excel.Excel.createExcel();
+
+      // Remove all default sheets and create our custom sheet
+      workbook.delete('Sheet1');
+
       final excel.Sheet sheet = workbook['GC_Report'];
+
+      // Ensure no other sheets exist
+      final sheetNames = workbook.sheets.keys.toList();
+      for (final sheetName in sheetNames) {
+        if (sheetName != 'GC_Report') {
+          workbook.delete(sheetName);
+        }
+      }
 
       // Define headers
       final headers = [
@@ -582,6 +628,20 @@ class _GCReportPageState extends State<GCReportPage>
               fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
               fontSize: 11,
               numberFormat: excel.NumFormat.standard_2,
+            );
+          } else if (key == 'GcDate') {
+            // Format date field
+            final displayValue = _formatDate(value?.toString() ?? '');
+            final cell = sheet.cell(
+              excel.CellIndex.indexByColumnRow(
+                columnIndex: colIndex,
+                rowIndex: rowIndex + 1,
+              ),
+            );
+            cell.value = excel.TextCellValue(displayValue);
+            cell.cellStyle = excel.CellStyle(
+              fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
+              fontSize: 11,
             );
           } else {
             // Handle null values and convert to string
@@ -1113,6 +1173,12 @@ class _GCReportPageState extends State<GCReportPage>
   }
 
   Widget _buildCardRow(String label, dynamic value) {
+    // Format date specifically for GcDate
+    String displayValue = value?.toString() ?? 'N/A';
+    if (label == 'Date' && displayValue != 'N/A') {
+      displayValue = _formatDate(displayValue);
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -1131,13 +1197,242 @@ class _GCReportPageState extends State<GCReportPage>
           ),
           Expanded(
             child: Text(
-              value?.toString() ?? 'N/A',
+              displayValue,
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w400),
             ),
           ),
         ],
       ),
     );
+  }
+
+  // Helper method to format date properly
+  String _formatDate(String dateString) {
+    if (dateString.isEmpty) return 'N/A';
+
+    try {
+      // Try to parse the date string
+      DateTime date;
+
+      // Handle different date formats
+      if (dateString.contains('T')) {
+        // ISO format: 2024-01-15T10:30:00.000Z
+        date = DateTime.parse(dateString);
+      } else if (dateString.contains('-')) {
+        // Simple format: 2024-01-15
+        date = DateTime.parse(dateString);
+      } else if (dateString.contains('/')) {
+        // Format like 15/01/2024
+        final parts = dateString.split('/');
+        if (parts.length == 3) {
+          date = DateTime(
+            int.parse(parts[2]), // year
+            int.parse(parts[1]), // month
+            int.parse(parts[0]), // day
+          );
+        } else {
+          return dateString; // Return original if can't parse
+        }
+      } else {
+        return dateString; // Return original if format is unknown
+      }
+
+      // Format to DD/MM/YYYY
+      return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    } catch (e) {
+      // If parsing fails, return original string
+      return dateString;
+    }
+  }
+
+  // Helper method to open file location
+  Future<void> _openFileLocation(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (await file.exists()) {
+        // Copy filename to clipboard for easy searching
+        final fileName = filePath.split('/').last;
+        await Clipboard.setData(ClipboardData(text: fileName));
+
+        // Show brief toast that filename was copied
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Filename copied to clipboard'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+
+        if (Platform.isWindows) {
+          // For Windows, open the folder and select the file
+          await Process.run('explorer', ['/select,', filePath]);
+        } else if (Platform.isAndroid) {
+          // For Android, prioritize opening the Downloads folder to avoid app selection issues
+          bool fileOpened = false;
+
+          // First try to open the Downloads folder using MediaStore content URI
+          try {
+            final downloadsUri = Uri.parse(
+              'content://com.android.externalstorage.documents/document/primary%3ADownload',
+            );
+            if (await canLaunchUrl(downloadsUri)) {
+              await launchUrl(downloadsUri);
+              fileOpened = true;
+            }
+          } catch (e) {
+            debugPrint('Downloads folder opening failed: $e');
+          }
+
+          // If folder opening fails, try file-specific content URI (may highlight file)
+          if (!fileOpened) {
+            try {
+              final encodedFileName = Uri.encodeComponent(fileName);
+              final fileContentUri = Uri.parse(
+                'content://com.android.externalstorage.documents/document/primary%3ADownload%2F$encodedFileName',
+              );
+
+              if (await canLaunchUrl(fileContentUri)) {
+                await launchUrl(fileContentUri);
+                fileOpened = true;
+              }
+            } catch (e) {
+              debugPrint('File-specific content URI failed: $e');
+            }
+          }
+
+          // Final fallback: show file path dialog with highlighting info
+          if (!fileOpened) {
+            _showFilePathDialog(filePath, showHighlightInfo: true);
+          }
+        } else if (Platform.isIOS) {
+          // For iOS, try to open the parent directory
+          final directory = file.parent;
+          final uri = Uri.directory(directory.path);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri);
+          }
+        } else {
+          // Fallback: try to open the parent directory
+          final directory = file.parent;
+          final uri = Uri.directory(directory.path);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error opening file location: $e');
+      // Show file path dialog as fallback
+      _showFilePathDialog(filePath);
+    }
+  }
+
+  // Helper method to show file path in a dialog
+  void _showFilePathDialog(String filePath, {bool showHighlightInfo = false}) {
+    if (mounted) {
+      final fileName = filePath.split('/').last;
+
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('File Location'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  showHighlightInfo
+                      ? 'Your file has been saved to this location:'
+                      : 'Your Excel file has been saved to:',
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SelectableText(
+                    filePath,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (showHighlightInfo) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: Colors.blue[700],
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Look for this file:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Colors.blue.withOpacity(0.5),
+                            ),
+                          ),
+                          child: Text(
+                            fileName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Text(
+                  showHighlightInfo
+                      ? 'Open your file manager app, navigate to the Downloads folder, and look for the highlighted file above.'
+                      : 'Please open your file manager app and navigate to this location to find your file.',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    }
   }
 
   Widget _buildAmountChip(String label, String amount, Color color) {
@@ -1320,8 +1615,12 @@ class _GCReportPageState extends State<GCReportPage>
                     cells: fieldKeys.map((key) {
                       String displayValue = item[key]?.toString() ?? '';
 
+                      // Format date field
+                      if (key == 'GcDate') {
+                        displayValue = _formatDate(displayValue);
+                      }
                       // Format currency fields
-                      if ([
+                      else if ([
                         'HireAmount',
                         'AdvanceAmount',
                         'FreightCharge',

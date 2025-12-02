@@ -182,9 +182,34 @@ class ConsignorListPage extends StatelessWidget {
                               ),
                           ],
                         ),
-                        onTap: () => Get.to(
-                          () => AddEditConsignorPage(consignor: consignor),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                Icons.edit,
+                                color: Theme.of(context).primaryColor,
+                                size: 20,
+                              ),
+                              onPressed: () => _navigateToEditPage(consignor),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete,
+                                color: Colors.red,
+                                size: 20,
+                              ),
+                              onPressed: () =>
+                                  _deleteConsignor(consignor.consignorName),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
                         ),
+                        onTap: () => _navigateToEditPage(consignor),
                       ),
                     );
                   },
@@ -205,5 +230,25 @@ class ConsignorListPage extends StatelessWidget {
 
   void _navigateToEditPage(Consignor consignor) {
     Get.to(() => AddEditConsignorPage(consignor: consignor));
+  }
+
+  void _deleteConsignor(String consignorName) {
+    Get.defaultDialog(
+      title: 'Delete Consignor',
+      content: const Text('Are you sure you want to delete this consignor?'),
+      actions: [
+        TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () async {
+            Get.back();
+            final success = await controller.deleteConsignor(consignorName);
+            if (success) {
+              Get.snackbar('Success', 'Consignor deleted successfully');
+            }
+          },
+          child: const Text('Delete', style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    );
   }
 }

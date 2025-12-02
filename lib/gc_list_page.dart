@@ -27,6 +27,8 @@ class _GCListPageState extends State<GCListPage> {
   String? error;
   final searchController = TextEditingController();
   final Set<String> _expandedCards = <String>{};
+  String? _highlightGcId; // GC ID to highlight and scroll to
+  final ScrollController _scrollController = ScrollController();
 
   // Filter state
   String? selectedBranchFilter;
@@ -46,6 +48,13 @@ class _GCListPageState extends State<GCListPage> {
   @override
   void initState() {
     super.initState();
+
+    // Check for highlight parameter from navigation
+    final args = Get.arguments as Map<String, dynamic>?;
+    if (args != null) {
+      _highlightGcId = args['highlightGcId']?.toString();
+    }
+
     fetchGCList();
   }
 
@@ -75,6 +84,13 @@ class _GCListPageState extends State<GCListPage> {
             _applyFiltersAndSort();
             isLoading = false;
           });
+
+          // Scroll to and highlight the specific GC if provided
+          if (_highlightGcId != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _scrollToAndHighlightGC(_highlightGcId!);
+            });
+          }
         } else {
           setState(() {
             error = 'Failed to load GC list: Unexpected data format';
@@ -565,6 +581,7 @@ class _GCListPageState extends State<GCListPage> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     searchController.dispose();
     super.dispose();
   }
@@ -1012,6 +1029,7 @@ class _GCListPageState extends State<GCListPage> {
       onRefresh: fetchGCList,
       color: Theme.of(context).primaryColor,
       child: ListView.builder(
+        controller: _scrollController,
         padding: const EdgeInsets.all(16),
         itemCount: filteredGcList.length,
         itemBuilder: (context, index) {
@@ -1023,15 +1041,22 @@ class _GCListPageState extends State<GCListPage> {
   }
 
   Widget _buildGCCard(Map<String, dynamic> gc, int index) {
-    return Container(
+    final gcId = gc['Id']?.toString() ?? '';
+    final isHighlighted = _expandedCards.contains(gcId);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: isHighlighted ? Border.all(color: Colors.blue, width: 2) : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+            color: isHighlighted
+                ? Colors.blue.withOpacity(0.2)
+                : Colors.black.withOpacity(0.05),
+            blurRadius: isHighlighted ? 15 : 10,
             offset: const Offset(0, 2),
           ),
         ],
@@ -1226,24 +1251,90 @@ class _GCListPageState extends State<GCListPage> {
   }
 
   Widget _buildCardSubtitle(Map<String, dynamic> gc) {
+    // Helper method to clean names
+    String cleanName(String name) {
+      return name.replaceAll('"', '').trim();
+    }
+
+    final fromLocation = gc['TruckFrom']?.toString() ?? '';
+    final toLocation = gc['TruckTo']?.toString() ?? '';
+    final consignorName = cleanName(gc['ConsignorName']?.toString() ?? '');
+    final consigneeName = cleanName(gc['ConsigneeName']?.toString() ?? '');
+
     return Container(
       margin: const EdgeInsets.only(top: 8),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildInfoChip(Icons.business, gc['Branch']),
-          if (gc['GcDate']?.toString().isNotEmpty == true)
-            _buildInfoChip(
-              Icons.calendar_today,
-              'GC Date: ${_formatDisplayDate(gc['GcDate'])}',
+          // Location row
+          if (fromLocation.isNotEmpty && toLocation.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.location_on_outlined,
+                    size: 14,
+                    color: Colors.grey[600],
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      '${fromLocation.substring(0, fromLocation.length > 10 ? 10 : fromLocation.length)}${fromLocation.length > 10 ? '...' : ''} → ${toLocation.substring(0, toLocation.length > 10 ? 10 : toLocation.length)}${toLocation.length > 10 ? '...' : ''}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          if (gc['created_at']?.toString().isNotEmpty == true)
-            _buildInfoChip(
-              Icons.access_time,
-              'Created: ${_formatDisplayDateWithTime(gc['created_at'])}',
+
+          // Consignor to Consignee row
+          if (consignorName.isNotEmpty && consigneeName.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Icon(Icons.people_outline, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      '${consignorName.substring(0, consignorName.length > 12 ? 12 : consignorName.length)}${consignorName.length > 12 ? '...' : ''} → ${consigneeName.substring(0, consigneeName.length > 12 ? 12 : consigneeName.length)}${consigneeName.length > 12 ? '...' : ''}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             ),
+
+          // Original chips row
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _buildInfoChip(Icons.business, gc['Branch']),
+              if (gc['GcDate']?.toString().isNotEmpty == true)
+                _buildInfoChip(
+                  Icons.calendar_today,
+                  'GC Date: ${_formatDisplayDate(gc['GcDate'])}',
+                ),
+              if (gc['created_at']?.toString().isNotEmpty == true)
+                _buildInfoChip(
+                  Icons.access_time,
+                  'Created: ${_formatDisplayDateWithTime(gc['created_at'])}',
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -1790,5 +1881,40 @@ class _GCListPageState extends State<GCListPage> {
         ],
       ),
     );
+  }
+
+  // Method to scroll to and highlight a specific GC
+  void _scrollToAndHighlightGC(String gcId) {
+    // Find the index of the GC in the filtered list
+    final targetIndex = filteredGcList.indexWhere(
+      (gc) => gc['Id']?.toString() == gcId,
+    );
+
+    if (targetIndex != -1) {
+      // Calculate the scroll position (approximate item height)
+      const itemHeight = 200.0; // Approximate height of each GC card
+      final scrollPosition = targetIndex * itemHeight;
+
+      // Scroll to the position
+      _scrollController.animateTo(
+        scrollPosition,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+
+      // Highlight the card by temporarily expanding it
+      setState(() {
+        _expandedCards.add(gcId);
+      });
+
+      // Remove highlight after 3 seconds
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() {
+            _expandedCards.remove(gcId);
+          });
+        }
+      });
+    }
   }
 }

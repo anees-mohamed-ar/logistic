@@ -163,43 +163,49 @@ class GCPdfPreviewService {
     }
 
     // Set truck details
-    controller.selectedTruck.value = gcData['TruckNumber']?.toString() ?? '';
+    controller.selectedTruck.value =
+        gcData['TruckNumber']?.toString() ?? 'Select Truck';
+    controller.truckNumberCtrl.text = gcData['TruckNumber']?.toString() ?? '';
     controller.truckTypeCtrl.text = gcData['TruckType']?.toString() ?? '';
+    controller.poNumberCtrl.text = gcData['PoNumber']?.toString() ?? '';
+    controller.tripIdCtrl.text = gcData['TripId']?.toString() ?? '';
     controller.fromCtrl.text = gcData['TruckFrom']?.toString() ?? '';
     controller.toCtrl.text = gcData['TruckTo']?.toString() ?? '';
 
     // Set broker and driver
     controller.selectedBroker.value =
-        gcData['BrokerNameShow']?.toString() ?? '';
-    controller.brokerNameCtrl.text = gcData['BrokerNameShow']?.toString() ?? '';
+        gcData['BrokerName']?.toString() ?? 'Select Broker';
+    controller.brokerNameCtrl.text = gcData['BrokerName']?.toString() ?? '';
     controller.selectedDriver.value =
-        gcData['DriverNameShow']?.toString() ?? '';
-    controller.driverNameCtrl.text = gcData['DriverNameShow']?.toString() ?? '';
+        gcData['DriverName']?.toString() ?? 'Select Driver';
+    controller.driverNameCtrl.text = gcData['DriverName']?.toString() ?? '';
     controller.driverPhoneCtrl.text =
         gcData['DriverPhoneNumber']?.toString() ?? '';
 
     // Set consignor and consignee
-    controller.selectedConsignor.value = gcData['Consignor']?.toString() ?? '';
+    controller.selectedConsignor.value =
+        gcData['ConsignorName']?.toString() ?? 'Select Consignor';
     controller.consignorNameCtrl.text =
         gcData['ConsignorName']?.toString() ?? '';
+    controller.consignorGstCtrl.text = gcData['ConsignorGst']?.toString() ?? '';
     controller.consignorAddressCtrl.text =
         gcData['ConsignorAddress']?.toString() ?? '';
-    controller.consignorGstCtrl.text = gcData['ConsignorGst']?.toString() ?? '';
 
-    controller.selectedConsignee.value = gcData['Consignee']?.toString() ?? '';
+    final consigneeAddress = gcData['ConsigneeAddress']?.toString() ?? '';
+    controller.selectedConsignee.value =
+        gcData['ConsigneeName']?.toString() ?? 'Select Consignee';
     controller.consigneeNameCtrl.text =
         gcData['ConsigneeName']?.toString() ?? '';
-    controller.consigneeAddressCtrl.text =
-        gcData['ConsigneeAddress']?.toString() ?? '';
     controller.consigneeGstCtrl.text = gcData['ConsigneeGst']?.toString() ?? '';
+    controller.consigneeAddressCtrl.text = consigneeAddress;
 
     // Set bill to
     controller.selectedBillTo.value =
-        gcData['BillTo']?.toString() ?? 'Select Bill To';
+        gcData['BillToName']?.toString() ?? 'Select Bill To';
     controller.billToNameCtrl.text = gcData['BillToName']?.toString() ?? '';
+    controller.billToGstCtrl.text = gcData['BillToGst']?.toString() ?? '';
     controller.billToAddressCtrl.text =
         gcData['BillToAddress']?.toString() ?? '';
-    controller.billToGstCtrl.text = gcData['BillToGst']?.toString() ?? '';
 
     // Set goods info
     final natureOfGoods = gcData['GoodContain']?.toString() ?? '';
@@ -207,44 +213,60 @@ class GCPdfPreviewService {
         ? gcData['MethodofPkg'].toString()
         : 'Boxes';
 
-    controller.natureGoodsCtrl.text = natureOfGoods;
-    controller.packagesCtrl.text = gcData['NumberofPkg']?.toString() ?? '';
-    controller.methodPackageCtrl.text = methodOfPkg;
-    controller.selectedPackageMethod.value = methodOfPkg;
-
-    // Set weight
     final rawWeight =
         (gcData['TotalWeight'] ?? gcData['ActualWeightKgs'])?.toString() ?? '';
+
     final normalizedWeight = (() {
       final raw = rawWeight.trim();
       if (raw.isEmpty) return '';
+
       final cleaned = raw.replaceAll(RegExp(r'[^0-9\.]'), '');
       final parsed = double.tryParse(cleaned);
-      return parsed?.toStringAsFixed(0) ?? raw;
-    })();
-    controller.weightCtrl.text = normalizedWeight;
-    controller.actualWeightCtrl.text = normalizedWeight;
+      if (parsed == null) return raw;
 
-    // Set payment details
-    controller.selectedPayment.value =
-        gcData['PaymentDetails']?.toString() ?? 'To be billed';
+      // For the form field, we want only the integer part;
+      // the UI shows a fixed .000 suffix and the controller
+      // will append .000 on submit.
+      return parsed.toStringAsFixed(0);
+    })();
+
+    final formattedMethod = methodOfPkg.isNotEmpty
+        ? '${methodOfPkg[0].toUpperCase()}${methodOfPkg.substring(1).toLowerCase()}'
+        : 'Boxes';
+
+    controller.natureGoodsCtrl.text = natureOfGoods;
+    controller.packagesCtrl.text = gcData['NumberofPkg']?.toString() ?? '';
+    controller.methodPackageCtrl.text = formattedMethod;
+    controller.selectedPackageMethod.value = formattedMethod;
+    controller.actualWeightCtrl.text = normalizedWeight;
+    controller.weightCtrl.text = normalizedWeight;
+
+    // PrivateMark is a fixed value in the UI
+    controller.remarksCtrl.text = 'O / R';
+    controller.billingAddressCtrl.text =
+        gcData['ConsigneeAddress']?.toString() ?? '';
+
+    controller.kmCtrl.text = gcData['km']?.toString() ?? '';
+    controller.rateCtrl.text = gcData['Rate']?.toString() ?? '';
+
     controller.hireAmountCtrl.text = gcData['HireAmount']?.toString() ?? '';
     controller.advanceAmountCtrl.text =
         gcData['AdvanceAmount']?.toString() ?? '';
-    controller.freightChargeCtrl.text =
-        gcData['FreightCharge']?.toString() ?? '';
-
-    // Set other details
-    controller.poNumberCtrl.text = gcData['PoNumber']?.toString() ?? '';
-    controller.tripIdCtrl.text = gcData['TripId']?.toString() ?? '';
     controller.deliveryAddressCtrl.text =
         gcData['DeliveryAddress']?.toString() ?? '';
+    if ((controller.freightChargeCtrl.text).isEmpty) {
+      controller.freightChargeCtrl.text =
+          gcData['FreightCharge']?.toString() ?? '';
+    }
+    controller.selectedPayment.value =
+        gcData['PaymentDetails']?.toString() ?? 'Cash';
+
+    // Important: Set GST payer selection
+    controller.onGstPayerSelected(gcData['ServiceTax']?.toString());
+
+    controller.customInvoiceCtrl.text = gcData['CustInvNo']?.toString() ?? '';
     controller.deliveryInstructionsCtrl.text =
         gcData['DeliveryFromSpecial']?.toString() ?? '';
-    controller.remarksCtrl.text = 'O / R';
-
-    // Set invoice and e-way bill numbers
-    controller.customInvoiceCtrl.text = gcData['CustInvNo']?.toString() ?? '';
     controller.invValueCtrl.text = gcData['InvValue']?.toString() ?? '';
     controller.ewayBillCtrl.text = gcData['EInv']?.toString() ?? '';
     if (gcData['EInvDate'] != null) {

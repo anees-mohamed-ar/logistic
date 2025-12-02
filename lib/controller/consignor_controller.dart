@@ -36,14 +36,18 @@ class ConsignorController extends GetxController {
     }
 
     final searchLower = query.toLowerCase();
-    filteredConsignors.assignAll(consignors.where((consignor) {
-      return consignor.consignorName.toLowerCase().contains(searchLower) ||
-          (consignor.mobileNumber?.toLowerCase().contains(searchLower) ?? false) ||
-          (consignor.gst?.toLowerCase().contains(searchLower) ?? false) ||
-          (consignor.location?.toLowerCase().contains(searchLower) ?? false) ||
-          (consignor.state?.toLowerCase().contains(searchLower) ?? false) ||
-          (consignor.email?.toLowerCase().contains(searchLower) ?? false);
-    }));
+    filteredConsignors.assignAll(
+      consignors.where((consignor) {
+        return consignor.consignorName.toLowerCase().contains(searchLower) ||
+            (consignor.mobileNumber?.toLowerCase().contains(searchLower) ??
+                false) ||
+            (consignor.gst?.toLowerCase().contains(searchLower) ?? false) ||
+            (consignor.location?.toLowerCase().contains(searchLower) ??
+                false) ||
+            (consignor.state?.toLowerCase().contains(searchLower) ?? false) ||
+            (consignor.email?.toLowerCase().contains(searchLower) ?? false);
+      }),
+    );
   }
 
   Future<void> fetchConsignors() async {
@@ -59,7 +63,9 @@ class ConsignorController extends GetxController {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        consignors.value = data.map((json) => Consignor.fromJson(json)).toList();
+        consignors.value = data
+            .map((json) => Consignor.fromJson(json))
+            .toList();
       } else {
         Get.snackbar('Error', 'Failed to load consignors');
       }
@@ -70,12 +76,40 @@ class ConsignorController extends GetxController {
     }
   }
 
+  Future<bool> deleteConsignor(String consignorName) async {
+    try {
+      isLoading(true);
+      final response = await http.delete(
+        Uri.parse('${ApiConfig.baseUrl}/consignor/delete/$consignorName'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        await fetchConsignors();
+        return true;
+      } else {
+        final error =
+            json.decode(response.body)['error'] ?? 'Failed to delete consignor';
+        Get.snackbar('Error', error);
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to delete consignor: $e');
+      return false;
+    } finally {
+      isLoading(false);
+    }
+  }
+
   Future<bool> addConsignor(Consignor consignor) async {
     try {
       isLoading(true);
       final companyId = storage.read('companyId') ?? '';
       final payload = consignor.copyWith(companyId: companyId).toJson();
-      
+
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/consignor/add'),
         headers: {
@@ -89,7 +123,8 @@ class ConsignorController extends GetxController {
         await fetchConsignors();
         return true;
       } else {
-        final error = json.decode(response.body)['error'] ?? 'Failed to add consignor';
+        final error =
+            json.decode(response.body)['error'] ?? 'Failed to add consignor';
         throw error;
       }
     } catch (e) {
@@ -99,7 +134,10 @@ class ConsignorController extends GetxController {
     }
   }
 
-  Future<bool> updateConsignor(String consignorName, Consignor updatedConsignor) async {
+  Future<bool> updateConsignor(
+    String consignorName,
+    Consignor updatedConsignor,
+  ) async {
     try {
       isLoading(true);
       final response = await http.put(
@@ -115,7 +153,8 @@ class ConsignorController extends GetxController {
         await fetchConsignors();
         return true;
       } else {
-        final error = json.decode(response.body)['error'] ?? 'Failed to update consignor';
+        final error =
+            json.decode(response.body)['error'] ?? 'Failed to update consignor';
         throw error;
       }
     } catch (e) {
@@ -127,7 +166,9 @@ class ConsignorController extends GetxController {
 
   Consignor? getConsignorByName(String name) {
     try {
-      return consignors.firstWhere((consignor) => consignor.consignorName == name);
+      return consignors.firstWhere(
+        (consignor) => consignor.consignorName == name,
+      );
     } catch (e) {
       return null;
     }

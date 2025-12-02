@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:logistic/api_config.dart';
 import 'package:logistic/controller/id_controller.dart';
+import 'package:logistic/controller/login_controller.dart';
 import 'package:logistic/models/temporary_gc.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
@@ -133,7 +134,31 @@ class TemporaryGCController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    fetchTemporaryGCs().then((_) => _connectToLiveUpdates());
+    // Delay API call until after auto-login is complete
+    _delayedInit();
+  }
+
+  void _delayedInit() async {
+    // Wait a bit for auto-login to complete
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Check if user is logged in before fetching data
+    try {
+      final loginController = Get.find<LoginController>();
+      if (loginController.isLoggedIn()) {
+        print('TemporaryGCController: User logged in, fetching temporary GCs');
+        fetchTemporaryGCs().then((_) => _connectToLiveUpdates());
+      } else {
+        print(
+          'TemporaryGCController: User not logged in, skipping initial fetch',
+        );
+      }
+    } catch (e) {
+      // Login controller might not be ready yet
+      print(
+        'TemporaryGCController: Login controller not ready, skipping initial fetch',
+      );
+    }
   }
 
   @override
@@ -425,7 +450,9 @@ class TemporaryGCController extends GetxController {
         _handleGCUnlocked(data);
         break;
       case 'temp_gc_converted':
-        print('Handling temp_gc_converted event for: ${data['temp_gc_number']}');
+        print(
+          'Handling temp_gc_converted event for: ${data['temp_gc_number']}',
+        );
         _handleGCRemoved(data);
         break;
       case 'temp_gc_deleted':
@@ -569,11 +596,15 @@ class TemporaryGCController extends GetxController {
           print('=== GC NUMBER SUBMISSION SUCCESSFUL ===');
           return true;
         } else {
-          print('=== GC NUMBER SUBMISSION FAILED - API returned success=false ===');
+          print(
+            '=== GC NUMBER SUBMISSION FAILED - API returned success=false ===',
+          );
           return false;
         }
       } else {
-        print('=== GC NUMBER SUBMISSION FAILED - HTTP ${response.statusCode} ===');
+        print(
+          '=== GC NUMBER SUBMISSION FAILED - HTTP ${response.statusCode} ===',
+        );
         return false;
       }
     } catch (e) {
@@ -840,58 +871,89 @@ class TemporaryGCController extends GetxController {
     }
   }
 
-  // Delete temporary GC (Admin only)
-  Future<bool> deleteTemporaryGC(String tempGcNumber) async {
+  // Reset temporary GC slot (Admin only) - Safely clears slot without deleting record
+  Future<bool> resetTemporaryGC(String tempGcNumber) async {
+    debugPrint('🔄 Starting reset process for temporary GC: $tempGcNumber');
+
     try {
       if (!isAdmin) {
+        debugPrint('❌ Reset failed: User is not admin');
         Fluttertoast.showToast(
-          msg: 'Only admins can delete temporary GCs',
+          msg: 'Only admins can reset temporary GC slots',
           backgroundColor: Colors.red,
         );
         return false;
       }
 
+      debugPrint('✅ Admin access confirmed, proceeding with reset');
       isLoading.value = true;
       final userId = _idController.userId.value;
       final companyId = _idController.companyId.value;
       final branchId = _idController.branchId.value;
 
-      final url = Uri.parse(
-        '${ApiConfig.baseUrl}/temporary-gc/delete/$tempGcNumber',
-      );
+      debugPrint('📤 Preparing reset request with data:');
+      debugPrint('   - Temp GC Number: $tempGcNumber');
+      debugPrint('   - User ID: $userId');
+      debugPrint('   - Company ID: $companyId');
+      debugPrint('   - Branch ID: $branchId');
+
+      final url =
+          Uri.parse(
+            '${ApiConfig.baseUrl}/api/temporary-gc/$tempGcNumber/reset',
+          ).replace(
+            queryParameters: {
+              'companyId': companyId.toString(),
+              if (branchId.isNotEmpty) 'branchId': branchId.toString(),
+            },
+          );
+
+      debugPrint('🌐 Sending DELETE request to: ${url.toString()}');
+      debugPrint('📦 Query parameters: ${url.queryParameters}');
+
       final response = await http.delete(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'userId': userId,
-          'companyId': companyId,
-          if (branchId.isNotEmpty) 'branchId': branchId,
-        }),
       );
+
+      debugPrint('📥 Response received:');
+      debugPrint('   - Status Code: ${response.statusCode}');
+      debugPrint('   - Response Body: ${response.body}');
 
       final data = json.decode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
+        debugPrint('✅ Reset successful for temporary GC: $tempGcNumber');
         Fluttertoast.showToast(
-          msg: 'Temporary GC deleted successfully!',
+          msg: 'Temporary GC slot reset successfully!',
           backgroundColor: Colors.green,
         );
 
         // Refresh the list
+        debugPrint('🔄 Refreshing temporary GC list after reset');
         await fetchTemporaryGCs();
         return true;
       } else {
+        debugPrint('❌ Reset failed for temporary GC: $tempGcNumber');
+        debugPrint('   - Error message: ${data['message'] ?? 'Unknown error'}');
         Fluttertoast.showToast(
-          msg: data['message'] ?? 'Failed to delete temporary GC',
+          msg: data['message'] ?? 'Failed to reset temporary GC slot',
           backgroundColor: Colors.red,
         );
         return false;
       }
     } catch (e) {
-      print('Error deleting temporary GC: $e');
-      Fluttertoast.showToast(msg: 'Error: $e', backgroundColor: Colors.red);
+      debugPrint(
+        '💥 Exception occurred during reset of temporary GC: $tempGcNumber',
+      );
+      debugPrint('   - Error details: $e');
+      debugPrint('   - Stack trace: ${StackTrace.current}');
+      Fluttertoast.showToast(
+        msg: 'Error resetting temporary GC slot: $e',
+        backgroundColor: Colors.red,
+      );
       return false;
     } finally {
+      debugPrint('🏁 Reset process completed for temporary GC: $tempGcNumber');
       isLoading.value = false;
     }
   }

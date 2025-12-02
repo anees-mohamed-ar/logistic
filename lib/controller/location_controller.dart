@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:logistic/models/location_model.dart';
 import 'package:logistic/api_config.dart';
+import 'package:logistic/controller/login_controller.dart';
 
 class LocationController extends GetxController {
   final isLoading = false.obs;
@@ -13,23 +14,49 @@ class LocationController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    fetchLocations();
+    // Delay API call until after auto-login is complete
+    _delayedInit();
+  }
+
+  void _delayedInit() async {
+    // Wait a bit for auto-login to complete
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Check if user is logged in before fetching data
+    try {
+      final loginController = Get.find<LoginController>();
+      if (loginController.isLoggedIn()) {
+        print('LocationController: User logged in, fetching locations');
+        fetchLocations();
+      } else {
+        print('LocationController: User not logged in, skipping initial fetch');
+      }
+    } catch (e) {
+      // Login controller might not be ready yet
+      print(
+        'LocationController: Login controller not ready, skipping initial fetch',
+      );
+    }
   }
 
   Future<void> fetchLocations() async {
     try {
       error.value = '';
       isLoading.value = true;
-      final response = await _client.get(
-        Uri.parse('${ApiConfig.baseUrl}/location/search'),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(const Duration(seconds: 30));
-      
+      final response = await _client
+          .get(
+            Uri.parse('${ApiConfig.baseUrl}/location/search'),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 30));
+
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         locations.value = data.map((json) => Location.fromJson(json)).toList();
       } else {
-        throw Exception('Failed to load locations. Status code: ${response.statusCode}');
+        throw Exception(
+          'Failed to load locations. Status code: ${response.statusCode}',
+        );
       }
     } catch (e) {
       error.value = e.toString().replaceAll('Exception: ', '');
@@ -47,12 +74,13 @@ class LocationController extends GetxController {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(location.toJson()),
       );
-      
+
       if (response.statusCode == 200) {
         await fetchLocations();
         return true;
       } else {
-        final error = jsonDecode(response.body)['error'] ?? 'Failed to add location';
+        final error =
+            jsonDecode(response.body)['error'] ?? 'Failed to add location';
         Get.snackbar('Error', error.toString());
         return false;
       }
@@ -72,12 +100,13 @@ class LocationController extends GetxController {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(location.toJson()),
       );
-      
+
       if (response.statusCode == 200) {
         await fetchLocations();
         return true;
       } else {
-        final error = jsonDecode(response.body)['error'] ?? 'Failed to update location';
+        final error =
+            jsonDecode(response.body)['error'] ?? 'Failed to update location';
         Get.snackbar('Error', error.toString());
         return false;
       }
@@ -96,13 +125,14 @@ class LocationController extends GetxController {
         Uri.parse('${ApiConfig.baseUrl}/location/delete/$id'),
         headers: {'Content-Type': 'application/json'},
       );
-      
+
       if (response.statusCode == 200) {
         await fetchLocations();
         Get.snackbar('Success', 'Location deleted successfully');
         return true;
       } else {
-        final error = jsonDecode(response.body)['error'] ?? 'Failed to delete location';
+        final error =
+            jsonDecode(response.body)['error'] ?? 'Failed to delete location';
         Get.snackbar('Error', error.toString());
         return false;
       }
@@ -120,7 +150,7 @@ class LocationController extends GetxController {
         Uri.parse('${ApiConfig.baseUrl}/location/branches'),
         headers: {'Content-Type': 'application/json'},
       );
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return List<Map<String, dynamic>>.from(data);
@@ -130,7 +160,7 @@ class LocationController extends GetxController {
       return [];
     }
   }
-  
+
   @override
   void onClose() {
     _client.close();

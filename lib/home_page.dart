@@ -12,6 +12,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:logistic/api_config.dart';
 import 'package:logistic/controller/feature_flag_controller.dart';
+import 'package:logistic/controller/dashboard_controller.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -375,102 +376,194 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   // Initialize controllers
   final GCFormController gcFormController = Get.put(GCFormController());
   final IdController idController = Get.find<IdController>();
+  final DashboardController dashboardController = Get.put(
+    DashboardController(),
+  );
 
   @override
   Widget build(BuildContext context) {
     final isSmallScreen = MediaQuery.of(context).size.width < 700;
     final isAdmin = idController.userRole.value == 'admin';
+    final isUser = idController.userRole.value == 'user';
 
-    return MainLayout(
-      title: 'Logistics Dashboard',
-      showBackButton: false,
-      child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFF8FAFF), Color(0xFFF1F5FE)],
-          ),
-        ),
-        child: RefreshIndicator(
-          onRefresh: _handleRefresh,
-          displacement: 32,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
+    return WillPopScope(
+      onWillPop: () async {
+        return await _showExitConfirmationDialog();
+      },
+      child: MainLayout(
+        title: 'Logistics Dashboard',
+        showBackButton: false,
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFF8FAFF), Color(0xFFF1F5FE)],
             ),
-            padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Welcome Section
-                _buildWelcomeSection(context, isSmallScreen),
-                const SizedBox(height: 24),
-
-                // Summary Cards
-                if (isAdmin) ...[
-                  _buildSummaryCards(isSmallScreen)
-                      .animate()
-                      .slideX(duration: 600.ms, begin: -0.2)
-                      .fadeIn(duration: 800.ms),
+          ),
+          child: RefreshIndicator(
+            onRefresh: _handleRefresh,
+            displacement: 32,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Welcome Section
+                  _buildWelcomeSection(context, isSmallScreen),
                   const SizedBox(height: 24),
-                ],
 
-                // GC Usage Widget
-                Obx(() {
-                  return FutureBuilder<bool>(
-                    future: gcFormController.checkGCAccess(
-                      idController.userId.value,
-                    ),
-                    builder: (context, snapshot) {
-                      // If we're still checking access, show a loading indicator
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const SizedBox.shrink();
-                      }
+                  // Summary Cards - Hidden for admin users
+                  if (!isAdmin && !isUser) ...[
+                    _buildSummaryCards(isSmallScreen)
+                        .animate()
+                        .slideX(duration: 600.ms, begin: -0.2)
+                        .fadeIn(duration: 800.ms),
+                    const SizedBox(height: 24),
+                  ],
 
-                      // Show GCUsageWidget for all users
-                      return const GCUsageWidget();
-                    },
-                  );
-                }),
-                const SizedBox(height: 24),
-
-                // Quick Actions Section
-                _buildQuickActionsSection(context, isSmallScreen, isAdmin),
-                const SizedBox(height: 24),
-
-                // Dashboard Content Row
-                if (!isSmallScreen)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          children: [
-                            _buildNotificationsSection(),
-                            const SizedBox(height: 24),
-                            _buildRecentActivitySection(),
-                          ],
-                        ),
+                  // GC Usage Widget
+                  Obx(() {
+                    return FutureBuilder<bool>(
+                      future: gcFormController.checkGCAccess(
+                        idController.userId.value,
                       ),
-                      const SizedBox(width: 24),
-                      Expanded(flex: 1, child: _buildQuickStatsSection()),
-                    ],
-                  )
-                else ...[
-                  _buildNotificationsSection(),
+                      builder: (context, snapshot) {
+                        // If we're still checking access, show a loading indicator
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const SizedBox.shrink();
+                        }
+
+                        // Show GCUsageWidget for all users
+                        return const GCUsageWidget();
+                      },
+                    );
+                  }),
                   const SizedBox(height: 24),
-                  _buildQuickStatsSection(),
+
+                  // Quick Actions Section
+                  _buildQuickActionsSection(context, isSmallScreen, isAdmin),
                   const SizedBox(height: 24),
-                  _buildRecentActivitySection(),
+
+                  // Dashboard Content Row
+                  if (!isSmallScreen)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 24),
+                              _buildRecentActivitySection(),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 24),
+                        Expanded(flex: 1, child: _buildQuickStatsSection()),
+                      ],
+                    )
+                  else ...[
+                    const SizedBox(height: 24),
+                    _buildQuickStatsSection(),
+                    const SizedBox(height: 24),
+                    _buildRecentActivitySection(),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  Future<bool> _showExitConfirmationDialog() async {
+    final flavor = FlavorConfig.instance.flavor;
+    final companyName = FlavorConfig.instance.name;
+    final logoPath = flavor == Flavor.cargo
+        ? 'uploads/cargo.png'
+        : 'uploads/carrying.jpg';
+
+    return (await Get.dialog<bool>(
+          AlertDialog(
+            title: Row(
+              children: [
+                Image.asset(
+                  logoPath,
+                  width: 40,
+                  height: 40,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(
+                      Icons.business,
+                      size: 40,
+                      color: FlavorConfig.instance.primaryColor,
+                    );
+                  },
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Exit App',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E2A44),
+                        ),
+                      ),
+                      Text(
+                        companyName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: const Text(
+              'Are you sure you want to exit the app?',
+              style: TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => Get.back(result: true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Exit',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        )) ??
+        false;
   }
 
   Widget _buildWelcomeSection(BuildContext context, bool isSmallScreen) {
@@ -847,34 +940,38 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               color: const Color(0xFF5D4037),
               onTap: () => Get.toNamed(AppRoutes.truckList),
             ),
-            _ActionData(
-              icon: Icons.speed_outlined,
-              title: 'KM Management',
-              subtitle: 'Distance tracking',
-              color: const Color(0xFF00BFA5),
-              onTap: () => Get.toNamed(AppRoutes.kmList),
-            ),
-            _ActionData(
-              icon: Icons.location_on_outlined,
-              title: 'Locations',
-              subtitle: 'Manage locations',
-              color: const Color(0xFF9C27B0),
-              onTap: () => Get.toNamed(AppRoutes.locationList),
-            ),
-            _ActionData(
-              icon: Icons.people_outline,
-              title: 'Customers',
-              subtitle: 'Customer management',
-              color: const Color(0xFFFF9800),
-              onTap: () => Get.toNamed(AppRoutes.customerList),
-            ),
-            _ActionData(
-              icon: Icons.inventory_outlined,
-              title: 'Suppliers',
-              subtitle: 'Supplier management',
-              color: const Color(0xFF795548),
-              onTap: () => Get.toNamed(AppRoutes.supplierList),
-            ),
+            if (FeatureFlagController.to.isKmManagementEnabled.value)
+              _ActionData(
+                icon: Icons.speed_outlined,
+                title: 'KM Management',
+                subtitle: 'Distance tracking',
+                color: const Color(0xFF00BFA5),
+                onTap: () => Get.toNamed(AppRoutes.kmList),
+              ),
+            if (FeatureFlagController.to.isLocationEnabled.value)
+              _ActionData(
+                icon: Icons.location_on_outlined,
+                title: 'Locations',
+                subtitle: 'Manage locations',
+                color: const Color(0xFF9C27B0),
+                onTap: () => Get.toNamed(AppRoutes.locationList),
+              ),
+            if (FeatureFlagController.to.isCustomerManagementEnabled.value)
+              _ActionData(
+                icon: Icons.people_outline,
+                title: 'Customers',
+                subtitle: 'Customer management',
+                color: const Color(0xFFFF9800),
+                onTap: () => Get.toNamed(AppRoutes.customerList),
+              ),
+            if (FeatureFlagController.to.isSupplierManagementEnabled.value)
+              _ActionData(
+                icon: Icons.inventory_outlined,
+                title: 'Suppliers',
+                subtitle: 'Supplier management',
+                color: const Color(0xFF795548),
+                onTap: () => Get.toNamed(AppRoutes.supplierList),
+              ),
             _ActionData(
               icon: Icons.business_outlined,
               title: 'Branch Management',
@@ -896,20 +993,22 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               color: const Color(0xFF8BC34A),
               onTap: () => Get.toNamed(AppRoutes.userManagement),
             ),
-            _ActionData(
-              icon: Icons.scale_outlined,
-              title: 'Weight Management',
-              subtitle: 'Weight & rates',
-              color: const Color(0xFF607D8B),
-              onTap: () => Get.toNamed(AppRoutes.weightRateList),
-            ),
-            _ActionData(
-              icon: Icons.receipt_long_outlined,
-              title: 'GST Management',
-              subtitle: 'Tax management',
-              color: const Color(0xFF37474F),
-              onTap: () => Get.toNamed(AppRoutes.gstList),
-            ),
+            if (FeatureFlagController.to.isWeightManagementEnabled.value)
+              _ActionData(
+                icon: Icons.scale_outlined,
+                title: 'Weight Management',
+                subtitle: 'Weight & rates',
+                color: const Color(0xFF607D8B),
+                onTap: () => Get.toNamed(AppRoutes.weightRateList),
+              ),
+            if (FeatureFlagController.to.isGstEnabled.value)
+              _ActionData(
+                icon: Icons.receipt_long_outlined,
+                title: 'GST Management',
+                subtitle: 'Tax management',
+                color: const Color(0xFF37474F),
+                onTap: () => Get.toNamed(AppRoutes.gstList),
+              ),
             _ActionData(
               icon: Icons.settings_outlined,
               title: 'Settings',
@@ -1032,197 +1131,117 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildNotificationsSection() {
-    final notifications = [
-      _NotificationData(
-        icon: Icons.warning_amber_outlined,
-        color: const Color(0xFFFF9800),
-        title: 'E-Way Bills Expiring',
-        message: '2 E-Way Bills expiring soon',
-        time: '2 hours ago',
-        isUrgent: true,
-      ),
-      _NotificationData(
-        icon: Icons.local_shipping_outlined,
-        color: const Color(0xFF4A90E2),
-        title: 'Pending Deliveries',
-        message: '5 GCs are pending delivery',
-        time: '4 hours ago',
-        isUrgent: false,
-      ),
-      _NotificationData(
-        icon: Icons.build_outlined,
-        color: const Color(0xFFEA4335),
-        title: 'Maintenance Alert',
-        message: '1 Vehicle needs maintenance',
-        time: '6 hours ago',
-        isUrgent: true,
-      ),
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Notifications',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E2A44),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEA4335).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    '3',
+  Widget _buildQuickStatsSection() {
+    return Obx(() {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Overview',
                     style: TextStyle(
-                      color: Color(0xFFEA4335),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A1A),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ...notifications.map(
-              (notification) => _buildNotificationItem(notification),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNotificationItem(_NotificationData notification) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: notification.isUrgent
-            ? notification.color.withOpacity(0.05)
-            : Colors.grey.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: notification.isUrgent
-            ? Border.all(color: notification.color.withOpacity(0.2))
-            : null,
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: notification.color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(notification.icon, color: notification.color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  notification.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: Color(0xFF1E2A44),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  notification.message,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            notification.time,
-            style: TextStyle(fontSize: 10, color: Colors.grey[500]),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickStatsSection() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Quick Stats',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E2A44),
+                  if (dashboardController.isLoading.value)
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    InkWell(
+                      onTap: () => dashboardController.refreshData(),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.refresh_rounded,
+                          size: 20,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ),
-            const SizedBox(height: 16),
-            _buildStatItem(
-              'Active Routes',
-              '24',
-              Icons.route,
-              const Color(0xFF4A90E2),
-            ),
-            _buildStatItem(
-              'Drivers Available',
-              '18',
-              Icons.person,
-              const Color(0xFF34A853),
-            ),
-            _buildStatItem(
-              'Fuel Efficiency',
-              '12.5 km/L',
-              Icons.local_gas_station,
-              const Color(0xFFFF9800),
-            ),
-            _buildStatItem(
-              'On-Time Delivery',
-              '94.2%',
-              Icons.schedule,
-              const Color(0xFF9C27B0),
-            ),
-          ],
+              const SizedBox(height: 20),
+              if (dashboardController.error.value.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        color: Color(0xFFDC2626),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          dashboardController.error.value,
+                          style: const TextStyle(
+                            color: Color(0xFFDC2626),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatItem(
+                        'GCs',
+                        dashboardController.totalGCs.value.toString(),
+                        Icons.description,
+                        const Color(0xFF3B82F6),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatItem(
+                        'Drivers',
+                        dashboardController.totalDrivers.value.toString(),
+                        Icons.person,
+                        const Color(0xFF10B981),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatItem(
+                        'Trucks',
+                        dashboardController.totalTrucks.value.toString(),
+                        Icons.local_shipping,
+                        const Color(0xFFF59E0B),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   Widget _buildStatItem(
@@ -1231,36 +1250,32 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     IconData icon,
     Color color,
   ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: color,
             ),
-            child: Icon(icon, color: color, size: 16),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E2A44),
-                  ),
-                ),
-              ],
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[600],
             ),
           ),
         ],
@@ -1269,154 +1284,239 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildRecentActivitySection() {
-    final activities = [
-      _ActivityData(
-        gcNumber: 'GC-2023-001',
-        route: 'Delhi to Mumbai',
-        status: 'In Transit',
-        icon: Icons.local_shipping_outlined,
-        color: const Color(0xFF4A90E2),
-        date: '2023-11-01',
-        amount: '₹12,000',
-        progress: 0.6,
-      ),
-      _ActivityData(
-        gcNumber: 'GC-2023-002',
-        route: 'Bangalore to Chennai',
-        status: 'Delivered',
-        icon: Icons.check_circle_outline,
-        color: const Color(0xFF34A853),
-        date: '2023-10-28',
-        amount: '₹9,500',
-        progress: 1.0,
-      ),
-      _ActivityData(
-        gcNumber: 'GC-2023-003',
-        route: 'Hyderabad to Pune',
-        status: 'Pending',
-        icon: Icons.access_time_outlined,
-        color: const Color(0xFFFBBC05),
-        date: '2023-11-03',
-        amount: '₹7,800',
-        progress: 0.0,
-      ),
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    return Obx(() {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Recent Activity',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (dashboardController.isLoading.value)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (dashboardController.recentGCs.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(32),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.inbox_outlined,
+                          size: 56,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No recent activity',
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                ...dashboardController.recentGCs.map(
+                  (gc) => _buildRecentGCItem(gc),
+                ),
+            ],
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
+        ),
+      );
+    });
+  }
+
+  String _cleanName(String name) {
+    return name.replaceAll('"', '').trim();
+  }
+
+  Widget _buildRecentGCItem(Map<String, dynamic> gc) {
+    final gcNumber = gc['GcNumber']?.toString() ?? 'Unknown';
+    final fromLocation = gc['TruckFrom']?.toString() ?? 'Unknown';
+    final toLocation = gc['TruckTo']?.toString() ?? 'Unknown';
+    final date = gc['GcDate']?.toString() ?? '';
+    final consignorName = _cleanName(
+      gc['ConsignorName']?.toString() ?? 'Unknown',
+    );
+    final consigneeName = _cleanName(
+      gc['ConsigneeName']?.toString() ?? 'Unknown',
+    );
+
+    String formattedDate = 'Unknown date';
+    if (date.isNotEmpty) {
+      try {
+        final dateTime = DateTime.parse(date);
+        formattedDate = '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+      } catch (e) {
+        formattedDate = date;
+      }
+    }
+
+    return InkWell(
+      onTap: () {
+        // Navigate to GC list page with GC ID parameter
+        final gcId = gc['Id']?.toString() ?? '';
+        if (gcId.isNotEmpty) {
+          Get.toNamed('/gc_list', arguments: {'highlightGcId': gcId});
+        }
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9FAFB),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Recent Activity',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E2A44),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ...activities.map((activity) => _buildActivityItem(activity)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActivityItem(_ActivityData activity) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: activity.color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(activity.icon, color: activity.color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      activity.gcNumber,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: Color(0xFF1E2A44),
-                      ),
-                    ),
-                    Text(
-                      activity.amount,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                        color: Color(0xFF1E2A44),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
                 Text(
-                  activity.route,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  gcNumber,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: Color(0xFF1A1A1A),
+                  ),
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: activity.color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        activity.status,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: activity.color,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Text(
+                    formattedDate,
+                    style: TextStyle(
+                      color: Colors.grey[700],
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
                     ),
-                    const SizedBox(width: 8),
-                    if (activity.progress > 0)
-                      Expanded(
-                        child: LinearProgressIndicator(
-                          value: activity.progress,
-                          backgroundColor: Colors.grey[200],
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            activity.color,
-                          ),
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(
+                  Icons.location_on_outlined,
+                  size: 16,
+                  color: Colors.grey[500],
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '$fromLocation → $toLocation',
+                    style: TextStyle(
+                      color: Colors.grey[700],
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'From',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[500],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          consignorName,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF1A1A1A),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 32,
+                    color: Colors.grey.shade200,
+                    margin: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'To',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[500],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          consigneeName,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF1A1A1A),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1435,45 +1535,5 @@ class _ActionData {
     required this.subtitle,
     required this.color,
     required this.onTap,
-  });
-}
-
-class _NotificationData {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String message;
-  final String time;
-  final bool isUrgent;
-
-  _NotificationData({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.message,
-    required this.time,
-    required this.isUrgent,
-  });
-}
-
-class _ActivityData {
-  final String gcNumber;
-  final String route;
-  final String status;
-  final IconData icon;
-  final Color color;
-  final String date;
-  final String amount;
-  final double progress;
-
-  _ActivityData({
-    required this.gcNumber,
-    required this.route,
-    required this.status,
-    required this.icon,
-    required this.color,
-    required this.date,
-    required this.amount,
-    required this.progress,
   });
 }

@@ -12,7 +12,7 @@ class ConsigneeController extends GetxController {
   final filteredConsignees = <Consignee>[].obs;
   final searchController = TextEditingController();
   final storage = GetStorage();
-  
+
   @override
   void onClose() {
     searchController.dispose();
@@ -38,7 +38,9 @@ class ConsigneeController extends GetxController {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        consignees.value = data.map((json) => Consignee.fromJson(json)).toList();
+        consignees.value = data
+            .map((json) => Consignee.fromJson(json))
+            .toList();
         filterConsignees(''); // Initialize filtered list with all consignees
       } else {
         Get.snackbar('Error', 'Failed to load consignees');
@@ -49,21 +51,51 @@ class ConsigneeController extends GetxController {
       isLoading(false);
     }
   }
-  
+
+  Future<bool> deleteConsignee(String consigneeName) async {
+    try {
+      isLoading(true);
+      final response = await http.delete(
+        Uri.parse('${ApiConfig.baseUrl}/consignee/delete/$consigneeName'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        await fetchConsignees();
+        return true;
+      } else {
+        final error =
+            json.decode(response.body)['error'] ?? 'Failed to delete consignee';
+        Get.snackbar('Error', error);
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to delete consignee: $e');
+      return false;
+    } finally {
+      isLoading(false);
+    }
+  }
+
   void filterConsignees(String query) {
     if (query.isEmpty) {
       filteredConsignees.assignAll(consignees);
     } else {
       final searchQuery = query.toLowerCase();
-      filteredConsignees.assignAll(consignees.where((consignee) {
-        return consignee.consigneeName.toLowerCase().contains(searchQuery) ||
-               consignee.phoneNumber.toLowerCase().contains(searchQuery) ||
-               consignee.mobileNumber.toLowerCase().contains(searchQuery) ||
-               consignee.email.toLowerCase().contains(searchQuery) ||
-               consignee.address.toLowerCase().contains(searchQuery) ||
-               consignee.gst.toLowerCase().contains(searchQuery) ||
-               consignee.panNumber.toLowerCase().contains(searchQuery);
-      }).toList());
+      filteredConsignees.assignAll(
+        consignees.where((consignee) {
+          return consignee.consigneeName.toLowerCase().contains(searchQuery) ||
+              consignee.phoneNumber.toLowerCase().contains(searchQuery) ||
+              consignee.mobileNumber.toLowerCase().contains(searchQuery) ||
+              consignee.email.toLowerCase().contains(searchQuery) ||
+              consignee.address.toLowerCase().contains(searchQuery) ||
+              consignee.gst.toLowerCase().contains(searchQuery) ||
+              consignee.panNumber.toLowerCase().contains(searchQuery);
+        }).toList(),
+      );
     }
   }
 
@@ -72,7 +104,7 @@ class ConsigneeController extends GetxController {
       isLoading(true);
       final companyId = storage.read('companyId') ?? '';
       final payload = consignee.copyWith(companyId: companyId).toJson();
-      
+
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/consignee/add'),
         headers: {
@@ -86,7 +118,8 @@ class ConsigneeController extends GetxController {
         await fetchConsignees();
         return true;
       } else {
-        final error = json.decode(response.body)['error'] ?? 'Failed to add consignee';
+        final error =
+            json.decode(response.body)['error'] ?? 'Failed to add consignee';
         throw error;
       }
     } catch (e) {
@@ -96,7 +129,10 @@ class ConsigneeController extends GetxController {
     }
   }
 
-  Future<bool> updateConsignee(String consigneeName, Consignee updatedConsignee) async {
+  Future<bool> updateConsignee(
+    String consigneeName,
+    Consignee updatedConsignee,
+  ) async {
     try {
       isLoading(true);
       final response = await http.put(
@@ -112,7 +148,8 @@ class ConsigneeController extends GetxController {
         await fetchConsignees();
         return true;
       } else {
-        final error = json.decode(response.body)['error'] ?? 'Failed to update consignee';
+        final error =
+            json.decode(response.body)['error'] ?? 'Failed to update consignee';
         throw error;
       }
     } catch (e) {
@@ -124,7 +161,9 @@ class ConsigneeController extends GetxController {
 
   Consignee? getConsigneeByName(String name) {
     try {
-      return consignees.firstWhere((consignee) => consignee.consigneeName == name);
+      return consignees.firstWhere(
+        (consignee) => consignee.consigneeName == name,
+      );
     } catch (e) {
       return null;
     }

@@ -461,11 +461,12 @@ class TruckController extends GetxController {
     }
   }
 
-  Future<bool> deleteTruck(int id) async {
+  Future<bool> deleteTruck(String vechileNumber) async {
     try {
       isLoading.value = true;
+      final encoded = Uri.encodeComponent(vechileNumber);
       final response = await http.delete(
-        Uri.parse('${ApiConfig.baseUrl}/truckmaster/delete/$id'),
+        Uri.parse('${ApiConfig.baseUrl}/truckmaster/delete/$encoded'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -477,8 +478,24 @@ class TruckController extends GetxController {
           snackPosition: SnackPosition.BOTTOM,
         );
         return true;
+      } else if (response.statusCode == 404) {
+        Get.snackbar(
+          'Not Found',
+          'Truck not found',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return false;
       } else {
-        throw Exception('Failed to delete truck');
+        String message = 'Failed to delete truck';
+        try {
+          final body = json.decode(response.body);
+          message =
+              body['error']?.toString() ??
+              body['message']?.toString() ??
+              message;
+        } catch (_) {}
+        Get.snackbar('Error', message, snackPosition: SnackPosition.BOTTOM);
+        return false;
       }
     } catch (e) {
       error.value = 'Error deleting truck: ${e.toString()}';

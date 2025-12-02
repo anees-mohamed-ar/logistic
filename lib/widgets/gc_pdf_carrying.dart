@@ -1281,13 +1281,14 @@ class GCPdfGenerator {
                             ),
                           ),
                           pw.SizedBox(height: 2),
-                          pw.Center
-                            (child: pw.Text(
-                            controller.deliveryInstructionsCtrl.text,
-                            style: pw.TextStyle(font: font, fontSize: 9),
-                            maxLines: 1,
-                            overflow: pw.TextOverflow.clip,
-                          ),),
+                          pw.Center(
+                            child: pw.Text(
+                              controller.deliveryInstructionsCtrl.text,
+                              style: pw.TextStyle(font: font, fontSize: 9),
+                              maxLines: 1,
+                              overflow: pw.TextOverflow.clip,
+                            ),
+                          ),
                           pw.SizedBox(height: 1),
                           pw.Divider(height: 1),
                           pw.SizedBox(height: 1),
@@ -2285,24 +2286,7 @@ class PDFPreviewScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('PDF Preview - $displayName'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () async {
-              await Printing.sharePdf(bytes: pdfData, filename: displayName);
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.print),
-            onPressed: () async => await Printing.layoutPdf(
-              onLayout: (PdfPageFormat format) async => pdfData,
-              name: displayName,
-            ),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text('PDF Preview - $displayName')),
       body: PdfPreview(
         build: (format) => pdfData,
         onShared: (context) {

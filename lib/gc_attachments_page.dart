@@ -7,6 +7,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/services.dart';
 import 'api_config.dart';
 import 'package:logistic/services/gc_pdf_preview_service.dart';
 
@@ -372,7 +373,7 @@ class _GCAttachmentsPageState extends State<GCAttachmentsPage> {
         Navigator.of(context).pop();
       }
 
-      // Show success message
+      // Show success message with open location button
       if (mounted) {
         final location =
             downloadDir.path.contains('Download') ||
@@ -384,6 +385,13 @@ class _GCAttachmentsPageState extends State<GCAttachmentsPage> {
             content: Text(
               'File downloaded successfully to $location: $fileName',
             ),
+            action: SnackBarAction(
+              label: 'Open Location',
+              onPressed: () => _openFileLocation(filePath),
+            ),
+            duration: const Duration(
+              seconds: 5,
+            ), // Keep it visible longer for action
           ),
         );
       }
@@ -645,6 +653,13 @@ class _GCAttachmentsPageState extends State<GCAttachmentsPage> {
             content: Text(
               'File downloaded successfully to $location: $fileName',
             ),
+            action: SnackBarAction(
+              label: 'Open Location',
+              onPressed: () => _openFileLocation(filePath),
+            ),
+            duration: const Duration(
+              seconds: 5,
+            ), // Keep it visible longer for action
           ),
         );
       }
@@ -669,6 +684,196 @@ class _GCAttachmentsPageState extends State<GCAttachmentsPage> {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  // Helper method to open file location
+  Future<void> _openFileLocation(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (await file.exists()) {
+        // Copy filename to clipboard for easy searching
+        final fileName = filePath.split('/').last;
+        await Clipboard.setData(ClipboardData(text: fileName));
+
+        // Show brief toast that filename was copied
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Filename copied to clipboard'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+
+        if (Platform.isWindows) {
+          // For Windows, open the folder and select the file
+          await Process.run('explorer', ['/select,', filePath]);
+        } else if (Platform.isAndroid) {
+          // For Android, prioritize opening the Downloads folder to avoid app selection issues
+          bool fileOpened = false;
+
+          // First try to open the Downloads folder using MediaStore content URI
+          try {
+            final downloadsUri = Uri.parse(
+              'content://com.android.externalstorage.documents/document/primary%3ADownload',
+            );
+            if (await canLaunchUrl(downloadsUri)) {
+              await launchUrl(downloadsUri);
+              fileOpened = true;
+            }
+          } catch (e) {
+            debugPrint('Downloads folder opening failed: $e');
+          }
+
+          // If folder opening fails, try file-specific content URI (may highlight file)
+          if (!fileOpened) {
+            try {
+              final encodedFileName = Uri.encodeComponent(fileName);
+              final fileContentUri = Uri.parse(
+                'content://com.android.externalstorage.documents/document/primary%3ADownload%2F$encodedFileName',
+              );
+
+              if (await canLaunchUrl(fileContentUri)) {
+                await launchUrl(fileContentUri);
+                fileOpened = true;
+              }
+            } catch (e) {
+              debugPrint('File-specific content URI failed: $e');
+            }
+          }
+
+          // Final fallback: show file path dialog with highlighting info
+          if (!fileOpened) {
+            _showFilePathDialog(filePath, showHighlightInfo: true);
+          }
+        } else if (Platform.isIOS) {
+          // For iOS, try to open the parent directory
+          final directory = file.parent;
+          final uri = Uri.directory(directory.path);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri);
+          }
+        } else {
+          // Fallback: try to open the parent directory
+          final directory = file.parent;
+          final uri = Uri.directory(directory.path);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error opening file location: $e');
+      // Show file path dialog as fallback
+      _showFilePathDialog(filePath, showHighlightInfo: false);
+    }
+  }
+
+  // Helper method to show file path in a dialog
+  void _showFilePathDialog(String filePath, {bool showHighlightInfo = false}) {
+    if (mounted) {
+      final fileName = filePath.split('/').last;
+
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('File Location'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  showHighlightInfo
+                      ? 'Your file has been saved to this location:'
+                      : 'Your file has been saved to:',
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SelectableText(
+                    filePath,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (showHighlightInfo) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: Colors.blue[700],
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Look for this file:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Colors.blue.withOpacity(0.5),
+                            ),
+                          ),
+                          child: Text(
+                            fileName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Text(
+                  showHighlightInfo
+                      ? 'Open your file manager app, navigate to the Downloads folder, and look for the highlighted file above.'
+                      : 'Please open your file manager app and navigate to this location to find your file.',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    }
   }
 
   IconData _getFileIcon(String type) {

@@ -11,7 +11,7 @@ class KMController extends GetxController {
   final filteredKmList = <KMLocation>[].obs;
   final error = ''.obs;
   final box = GetStorage();
-  final String baseUrl = '${ApiConfig.baseUrl}/km';
+  String get baseUrl => '${ApiConfig.baseUrl}/km';
 
   @override
   void onInit() {
@@ -26,13 +26,14 @@ class KMController extends GetxController {
       isLoading(true);
       error.value = '';
       final response = await http.get(Uri.parse('$baseUrl/search'));
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         kmList.value = data.map((item) => KMLocation.fromJson(item)).toList();
         filterKmEntries('');
       } else {
-        final errorMessage = 'Failed to load KM data. Status: ${response.statusCode}';
+        final errorMessage =
+            'Failed to load KM data. Status: ${response.statusCode}';
         error.value = errorMessage;
         throw Exception(errorMessage);
       }
@@ -44,20 +45,22 @@ class KMController extends GetxController {
       isLoading(false);
     }
   }
-  
+
   void filterKmEntries(String query) {
     if (query.isEmpty) {
       filteredKmList.assignAll(kmList);
     } else {
       final queryLower = query.toLowerCase();
-      filteredKmList.assignAll(kmList.where((km) {
-        return km.from.toLowerCase().contains(queryLower) ||
-               km.to.toLowerCase().contains(queryLower) ||
-               km.km.toString().contains(query);
-      }).toList());
+      filteredKmList.assignAll(
+        kmList.where((km) {
+          return km.from.toLowerCase().contains(queryLower) ||
+              km.to.toLowerCase().contains(queryLower) ||
+              km.km.toString().contains(query);
+        }).toList(),
+      );
     }
   }
-  
+
   Future<void> refreshKmList() async {
     await fetchKMList();
   }
@@ -68,13 +71,9 @@ class KMController extends GetxController {
       final response = await http.post(
         Uri.parse('$baseUrl/add'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'from': from, 
-          'to': to, 
-          'km': km
-        }),
+        body: json.encode({'from': from, 'to': to, 'km': km}),
       );
-      
+
       if (response.statusCode == 200) {
         await fetchKMList();
         Get.back();
@@ -96,14 +95,9 @@ class KMController extends GetxController {
       final response = await http.put(
         Uri.parse('$baseUrl/update'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'id': id,
-          'from': from, 
-          'to': to, 
-          'km': km
-        }),
+        body: json.encode({'id': id, 'from': from, 'to': to, 'km': km}),
       );
-      
+
       if (response.statusCode == 200) {
         await fetchKMList();
         Get.back();

@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:logistic/models/state_model.dart';
+import 'package:logistic/api_config.dart';
 
 class StateService {
-  static const String baseUrl = 'http://192.168.1.166:8080/state';
+  static String get baseUrl => '${ApiConfig.baseUrl}/state';
 
   static Future<List<StateModel>> searchStates(String query) async {
     try {

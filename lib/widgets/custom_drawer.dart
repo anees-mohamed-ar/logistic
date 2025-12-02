@@ -430,49 +430,73 @@ class _CustomDrawerState extends State<CustomDrawer> {
                               route: AppRoutes.truckList,
                               onTap: () => _navigateTo(AppRoutes.truckList),
                             ),
-                            _buildSubMenuItem(
-                              icon: Icons.speed_outlined,
-                              title: 'KM Management',
-                              route: AppRoutes.kmList,
-                              onTap: () => _navigateTo(AppRoutes.kmList),
-                            ),
-                            _buildSubMenuItem(
-                              icon: Icons.location_on_outlined,
-                              title: 'Locations',
-                              route: AppRoutes.locationList,
-                              onTap: () => _navigateTo(AppRoutes.locationList),
-                            ),
-                            _buildSubMenuItem(
-                              icon: Icons.people_outline,
-                              title: 'Customers',
-                              route: AppRoutes.customerList,
-                              onTap: () => _navigateTo(AppRoutes.customerList),
-                            ),
-                            _buildSubMenuItem(
-                              icon: Icons.inventory_outlined,
-                              title: 'Suppliers',
-                              route: AppRoutes.supplierList,
-                              onTap: () => _navigateTo(AppRoutes.supplierList),
-                            ),
+                            if (FeatureFlagController
+                                .to
+                                .isKmManagementEnabled
+                                .value)
+                              _buildSubMenuItem(
+                                icon: Icons.speed_outlined,
+                                title: 'KM Management',
+                                route: AppRoutes.kmList,
+                                onTap: () => _navigateTo(AppRoutes.kmList),
+                              ),
+                            if (FeatureFlagController
+                                .to
+                                .isLocationEnabled
+                                .value)
+                              _buildSubMenuItem(
+                                icon: Icons.location_on_outlined,
+                                title: 'Locations',
+                                route: AppRoutes.locationList,
+                                onTap: () =>
+                                    _navigateTo(AppRoutes.locationList),
+                              ),
+                            if (FeatureFlagController
+                                .to
+                                .isCustomerManagementEnabled
+                                .value)
+                              _buildSubMenuItem(
+                                icon: Icons.people_outline,
+                                title: 'Customers',
+                                route: AppRoutes.customerList,
+                                onTap: () =>
+                                    _navigateTo(AppRoutes.customerList),
+                              ),
+                            if (FeatureFlagController
+                                .to
+                                .isSupplierManagementEnabled
+                                .value)
+                              _buildSubMenuItem(
+                                icon: Icons.inventory_outlined,
+                                title: 'Suppliers',
+                                route: AppRoutes.supplierList,
+                                onTap: () =>
+                                    _navigateTo(AppRoutes.supplierList),
+                              ),
                             _buildSubMenuItem(
                               icon: Icons.assignment_ind_outlined,
                               title: 'Broker Management',
                               route: AppRoutes.brokerList,
                               onTap: () => _navigateTo(AppRoutes.brokerList),
                             ),
-                            _buildSubMenuItem(
-                              icon: Icons.scale_outlined,
-                              title: 'Weight Management',
-                              route: AppRoutes.weightRateList,
-                              onTap: () =>
-                                  _navigateTo(AppRoutes.weightRateList),
-                            ),
-                            _buildSubMenuItem(
-                              icon: Icons.receipt_long_outlined,
-                              title: 'GST Management',
-                              route: AppRoutes.gstList,
-                              onTap: () => _navigateTo(AppRoutes.gstList),
-                            ),
+                            if (FeatureFlagController
+                                .to
+                                .isWeightManagementEnabled
+                                .value)
+                              _buildSubMenuItem(
+                                icon: Icons.scale_outlined,
+                                title: 'Weight Management',
+                                route: AppRoutes.weightRateList,
+                                onTap: () =>
+                                    _navigateTo(AppRoutes.weightRateList),
+                              ),
+                            if (FeatureFlagController.to.isGstEnabled.value)
+                              _buildSubMenuItem(
+                                icon: Icons.receipt_long_outlined,
+                                title: 'GST Management',
+                                route: AppRoutes.gstList,
+                                onTap: () => _navigateTo(AppRoutes.gstList),
+                              ),
                             _buildSubMenuItem(
                               icon: Icons.people_alt_outlined,
                               title: 'User Management',
