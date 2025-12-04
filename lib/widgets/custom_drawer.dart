@@ -600,7 +600,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
                         ),
                       ),
                       Text(
-                        'Version 1.2.0',
+                        'Version 1.2.1',
                         style: TextStyle(fontSize: 10, color: Colors.grey[600]),
                       ),
                     ],

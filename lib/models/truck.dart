@@ -68,9 +68,15 @@ class Truck {
       ownerPanNumber: json['ownerPanNumber'],
       vechileNumber: json['vechileNumber'] ?? '',
       typeofVechile: json['typeofVechile'],
-      lorryWeight: json['lorryWeight'] != null ? double.tryParse(json['lorryWeight'].toString()) : null,
-      unladenWeight: json['unladenWeight'] != null ? double.tryParse(json['unladenWeight'].toString()) : null,
-      overWeight: json['overWeight'] != null ? double.tryParse(json['overWeight'].toString()) : null,
+      lorryWeight: json['lorryWeight'] != null
+          ? double.tryParse(json['lorryWeight'].toString())
+          : null,
+      unladenWeight: json['unladenWeight'] != null
+          ? double.tryParse(json['unladenWeight'].toString())
+          : null,
+      overWeight: json['overWeight'] != null
+          ? double.tryParse(json['overWeight'].toString())
+          : null,
       engineeNumber: json['engineeNumber'],
       chaseNumber: json['chaseNumber'],
       roadTaxNumber: json['roadTaxNumber'],
@@ -95,7 +101,9 @@ class Truck {
       'truckMasterId': id, // Use truckMasterId for the backend
       'ownerName': ownerName,
       'ownerAddress': ownerAddress,
-      'ownerMobileNumber': ownerMobileNumber?.isNotEmpty == true ? ownerMobileNumber : null,
+      'ownerMobileNumber': ownerMobileNumber?.isNotEmpty == true
+          ? ownerMobileNumber
+          : null,
       'ownerEmail': ownerEmail,
       'ownerPanNumber': ownerPanNumber,
       'vechileNumber': vechileNumber, // This is our primary key for updates

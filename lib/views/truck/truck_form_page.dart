@@ -800,6 +800,8 @@ class _TruckFormPageState extends State<TruckFormPage>
             label: 'Vehicle Type',
             focusNodeKey: 'vehicleType',
             nextFocusNodeKey: 'lorryWeight',
+            required: true,
+            validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
           ),
           const SizedBox(height: 16),
           Row(

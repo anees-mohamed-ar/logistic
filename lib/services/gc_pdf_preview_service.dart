@@ -252,6 +252,10 @@ class GCPdfPreviewService {
     controller.hireAmountCtrl.text = gcData['HireAmount']?.toString() ?? '';
     controller.advanceAmountCtrl.text =
         gcData['AdvanceAmount']?.toString() ?? '';
+
+    // Set ETA days
+    controller.eDaysCtrl.text = gcData['Eda']?.toString() ?? '';
+
     controller.deliveryAddressCtrl.text =
         gcData['DeliveryAddress']?.toString() ?? '';
     if ((controller.freightChargeCtrl.text).isEmpty) {

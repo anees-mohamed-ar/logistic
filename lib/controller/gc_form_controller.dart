@@ -1032,6 +1032,8 @@ class GCFormController extends GetxController {
   final truckNumbers = <String>[
     'Select Truck',
   ].obs; // For truck numbers dropdown
+  final truckDetails = <String, Map<String, dynamic>>{}
+      .obs; // Maps truck number to truck details
   final selectedBroker = 'Select Broker'.obs;
   final brokersLoading = false.obs;
   final brokers = <String>['Select Broker'].obs;
@@ -2210,6 +2212,23 @@ class GCFormController extends GetxController {
             ..clear()
             ..addAll(['Select Truck', ...list]);
 
+          // Store truck details for automatic population
+          truckDetails.clear();
+          for (final truck in decoded) {
+            final vehicleNumber =
+                (truck['vechileNumber'] ?? truck['vehicleNumber'] ?? '')
+                    .toString();
+            final vehicleType = (truck['typeofVechile'] ?? '').toString();
+
+            if (vehicleNumber.isNotEmpty) {
+              truckDetails[vehicleNumber] = {
+                'typeofVechile': vehicleType,
+                'truckMasterId': truck['truckMasterId'],
+                // Store other relevant details if needed
+              };
+            }
+          }
+
           if (!truckNumbers.contains(selectedTruck.value)) {
             selectedTruck.value = 'Select Truck';
           }
@@ -2223,6 +2242,27 @@ class GCFormController extends GetxController {
       trucksError.value = 'Failed to load trucks. Tap to retry.';
     } finally {
       trucksLoading.value = false;
+    }
+  }
+
+  void onTruckSelected(String truckNumber) {
+    if (truckNumber == 'Select Truck' || truckNumber.isEmpty) {
+      selectedTruck.value = 'Select Truck';
+      truckNumberCtrl.text = '';
+      truckTypeCtrl.clear();
+      return;
+    }
+
+    selectedTruck.value = truckNumber;
+    truckNumberCtrl.text = truckNumber; // keep submission compatibility
+
+    // Automatically populate truck type
+    if (truckDetails.containsKey(truckNumber)) {
+      final truckDetail = truckDetails[truckNumber];
+      final truckType = truckDetail?['typeofVechile']?.toString() ?? '';
+      truckTypeCtrl.text = truckType;
+    } else {
+      truckTypeCtrl.clear();
     }
   }
 

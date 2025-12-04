@@ -876,15 +876,45 @@ class _GCFormScreenState extends State<GCFormScreen> {
                 children: [
                   Expanded(
                     child: Obx(() {
+                      // Create display strings that show truck number + type
+                      final displayItems = controller.truckNumbers.map((
+                        truckNumber,
+                      ) {
+                        if (truckNumber == 'Select Truck') {
+                          return truckNumber;
+                        }
+
+                        final truckDetail =
+                            controller.truckDetails[truckNumber];
+                        final truckType =
+                            truckDetail?['typeofVechile']?.toString() ?? '';
+                        return truckType.isNotEmpty
+                            ? '$truckNumber - $truckType'
+                            : truckNumber;
+                      }).toList();
+
                       return _buildDropdownField(
                         context: context,
                         label: 'Truck Number',
-                        value: controller.selectedTruck.value,
-                        items: controller.truckNumbers.toList(),
+                        value: controller.selectedTruck.value == 'Select Truck'
+                            ? 'Select Truck'
+                            : displayItems.firstWhere(
+                                (item) => item.startsWith(
+                                  controller.selectedTruck.value,
+                                ),
+                                orElse: () => controller.selectedTruck.value,
+                              ),
+                        items: displayItems,
                         onChanged: (value) {
-                          controller.selectedTruck.value = value!;
-                          controller.truckNumberCtrl.text =
-                              value; // keep submission compatibility
+                          // Extract truck number from display item
+                          if (value == 'Select Truck' || value == null) {
+                            controller.onTruckSelected('Select Truck');
+                          } else {
+                            final truckNumber = value.contains(' - ')
+                                ? value.split(' - ').first
+                                : value;
+                            controller.onTruckSelected(truckNumber);
+                          }
                         },
                         validator: null,
                         compact: true,
@@ -905,6 +935,11 @@ class _GCFormScreenState extends State<GCFormScreen> {
                     child: TextFormField(
                       controller: controller.truckTypeCtrl,
                       focusNode: controller.truckTypeFocus,
+                      readOnly: true,
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.bold,
+                      ),
                       decoration: _inputDecoration(
                         'Truck Type',
                         Icons.local_shipping,
@@ -3012,7 +3047,7 @@ class _GCFormScreenState extends State<GCFormScreen> {
     bool compact = false,
   }) {
     return InputDecoration(
-      labelText: label + (isOptional ? ' (Optional)' : ''),
+      labelText: label + (isOptional ? '' : ''),
       hintText: hintText,
       prefixIcon: Icon(
         icon,

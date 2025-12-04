@@ -1891,30 +1891,88 @@ class _GCListPageState extends State<GCListPage> {
     );
 
     if (targetIndex != -1) {
-      // Calculate the scroll position (approximate item height)
-      const itemHeight = 200.0; // Approximate height of each GC card
-      final scrollPosition = targetIndex * itemHeight;
+      debugPrint('🎯 Target GC found at index: $targetIndex');
 
-      // Scroll to the position
-      _scrollController.animateTo(
-        scrollPosition,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
+      // Use multiple strategies to ensure scrolling works
+      _scrollToGCWithMultipleStrategies(targetIndex, gcId);
+    } else {
+      debugPrint('❌ GC with ID $gcId not found in filtered list');
+    }
+  }
+
+  void _scrollToGCWithMultipleStrategies(int targetIndex, String gcId) {
+    // Strategy 1: Immediate scroll with estimated position
+    _scrollToEstimatedPosition(targetIndex);
+
+    // Strategy 2: Wait and try again with better positioning
+    Future.delayed(const Duration(milliseconds: 200), () {
+      _scrollToEstimatedPosition(targetIndex);
+    });
+
+    // Strategy 3: Final attempt with more delay
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _scrollToEstimatedPosition(targetIndex);
+      // Start highlighting after scrolling
+      _highlightCardWithRetry(gcId);
+    });
+  }
+
+  void _scrollToEstimatedPosition(int targetIndex) {
+    if (!_scrollController.hasClients) return;
+
+    try {
+      // Get current scroll metrics
+      final scrollMetrics = _scrollController.position;
+      final viewportHeight = scrollMetrics.viewportDimension;
+      final maxScroll = scrollMetrics.maxScrollExtent;
+
+      // More accurate height estimation
+      const itemHeight = 220.0; // Updated based on actual card height
+      const itemSpacing = 16.0; // Space between cards
+      final estimatedItemHeight = itemHeight + itemSpacing;
+
+      // Calculate position to show item in upper middle of screen
+      final targetPosition =
+          (targetIndex * estimatedItemHeight) - (viewportHeight * 0.3);
+
+      // Clamp to valid range
+      final finalPosition = targetPosition.clamp(0.0, maxScroll);
+
+      debugPrint(
+        '📏 Scrolling to position: $finalPosition (viewport: $viewportHeight, max: $maxScroll)',
       );
 
-      // Highlight the card by temporarily expanding it
-      setState(() {
-        _expandedCards.add(gcId);
-      });
+      _scrollController.animateTo(
+        finalPosition,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeOutCubic,
+      );
+    } catch (e) {
+      debugPrint('❌ Scroll error: $e');
+    }
+  }
 
-      // Remove highlight after 3 seconds
-      Future.delayed(const Duration(seconds: 3), () {
+  void _highlightCardWithRetry(String gcId) {
+    // Multiple highlight attempts with different delays
+    final delays = [0, 200, 500, 1000];
+
+    for (int i = 0; i < delays.length; i++) {
+      Future.delayed(Duration(milliseconds: delays[i]), () {
         if (mounted) {
           setState(() {
-            _expandedCards.remove(gcId);
+            _expandedCards.add(gcId);
           });
         }
       });
     }
+
+    // Remove highlight after longer duration
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() {
+          _expandedCards.remove(gcId);
+        });
+      }
+    });
   }
 }

@@ -3,12 +3,15 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:logistic/api_config.dart';
 import 'package:logistic/controller/id_controller.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class DashboardController extends GetxController {
   static DashboardController get to => Get.find();
 
   final isLoading = false.obs;
   final error = ''.obs;
+
+  IO.Socket? _socket;
 
   // Dashboard data observables
   final totalGCs = 0.obs;
@@ -24,6 +27,52 @@ class DashboardController extends GetxController {
   void onInit() {
     super.onInit();
     fetchDashboardData();
+    _initSocket();
+  }
+
+  void _initSocket() {
+    try {
+      final idController = Get.find<IdController>();
+      final companyId = idController.companyId.value;
+      final branchId = idController.branchId.value;
+
+      if (companyId.isEmpty) {
+        return;
+      }
+
+      _socket = IO.io(
+        ApiConfig.baseUrl,
+        IO.OptionBuilder()
+            .setTransports(['websocket'])
+            .enableAutoConnect()
+            .build(),
+      );
+
+      _socket!.onConnect((_) {
+        _socket!.emit('dashboard:subscribe', {
+          'companyId': companyId,
+          'branchId': branchId,
+        });
+      });
+
+      _socket!.on('dashboard:update', (data) {
+        try {
+          if (data is Map) {
+            _updateFromPayload(Map<String, dynamic>.from(data));
+          }
+        } catch (e) {
+          // swallow parsing errors to avoid breaking the stream
+        }
+      });
+
+      _socket!.on('dashboard:error', (data) {
+        if (data is Map && data['error'] != null) {
+          error.value = data['error'].toString();
+        }
+      });
+    } catch (_) {
+      // If socket setup fails, we still have HTTP fallback.
+    }
   }
 
   Future<void> fetchDashboardData() async {
@@ -56,52 +105,7 @@ class DashboardController extends GetxController {
         final data = jsonDecode(response.body);
 
         if (data['success'] == true) {
-          final dashboardData = data['data'];
-
-          // Update summary data
-          final summary = dashboardData['summary'] ?? {};
-          totalGCs.value = summary['totalGCs'] ?? 0;
-          avgGCRevenue.value = _parseDouble(summary['avgGCRevenue']);
-
-          // Update entities data
-          final entities = dashboardData['entities'] ?? {};
-          totalDrivers.value = entities['drivers'] ?? 0;
-          totalTrucks.value = entities['trucks'] ?? 0;
-
-          // Update recent activity
-          final recentActivity = dashboardData['recentActivity'] ?? {};
-          final rawRecentGCs = List<Map<String, dynamic>>.from(
-            recentActivity['recentGCs'] ?? [],
-          );
-
-          // Clean up the recent GCs data
-          recentGCs.value = rawRecentGCs.map((gc) {
-            final cleanedGC = Map<String, dynamic>.from(gc);
-            // Clean up consignor and consignee names by removing quotes
-            if (cleanedGC['ConsignorName'] != null) {
-              cleanedGC['ConsignorName'] = cleanedGC['ConsignorName']
-                  .toString()
-                  .replaceAll('"', '')
-                  .trim();
-            }
-            if (cleanedGC['ConsigneeName'] != null) {
-              cleanedGC['ConsigneeName'] = cleanedGC['ConsigneeName']
-                  .toString()
-                  .replaceAll('"', '')
-                  .trim();
-            }
-            return cleanedGC;
-          }).toList();
-
-          // Update operations data
-          final operations = dashboardData['operations'] ?? {};
-          revenueTrend.value = List<Map<String, dynamic>>.from(
-            operations['revenueTrend'] ?? [],
-          );
-
-          // Update last updated timestamp
-          lastUpdated.value = data['lastUpdated'] ?? '';
-
+          _updateFromPayload(Map<String, dynamic>.from(data));
           print('Dashboard: Data loaded successfully');
           print('Dashboard: Total GCs: ${totalGCs.value}');
           print('Dashboard: Total Drivers: ${totalDrivers.value}');
@@ -135,12 +139,79 @@ class DashboardController extends GetxController {
     return 0.0;
   }
 
+  void _updateFromPayload(Map<String, dynamic> payload) {
+    // Payload can be a full HTTP response or a socket event payload.
+    final dashboardData =
+        payload['data'] ?? payload['dashboardData'] ?? payload;
+
+    // Summary
+    final summary = dashboardData['summary'] ?? {};
+    totalGCs.value = summary['totalGCs'] ?? 0;
+    avgGCRevenue.value = _parseDouble(summary['avgGCRevenue']);
+
+    // Entities
+    final entities = dashboardData['entities'] ?? {};
+    totalDrivers.value = entities['drivers'] ?? 0;
+    totalTrucks.value = entities['trucks'] ?? 0;
+
+    // Recent activity
+    final recentActivity = dashboardData['recentActivity'] ?? {};
+    final rawRecentGCs = List<Map<String, dynamic>>.from(
+      recentActivity['recentGCs'] ?? [],
+    );
+
+    recentGCs.value = rawRecentGCs.map((gc) {
+      final cleanedGC = Map<String, dynamic>.from(gc);
+      if (cleanedGC['ConsignorName'] != null) {
+        cleanedGC['ConsignorName'] = cleanedGC['ConsignorName']
+            .toString()
+            .replaceAll('"', '')
+            .trim();
+      }
+      if (cleanedGC['ConsigneeName'] != null) {
+        cleanedGC['ConsigneeName'] = cleanedGC['ConsigneeName']
+            .toString()
+            .replaceAll('"', '')
+            .trim();
+      }
+      return cleanedGC;
+    }).toList();
+
+    // Operations
+    final operations = dashboardData['operations'] ?? {};
+    revenueTrend.value = List<Map<String, dynamic>>.from(
+      operations['revenueTrend'] ?? [],
+    );
+
+    // Last updated timestamp
+    lastUpdated.value =
+        payload['lastUpdated']?.toString() ??
+        dashboardData['lastUpdated']?.toString() ??
+        '';
+  }
+
   void refreshData() {
     fetchDashboardData();
+    final idController = Get.find<IdController>();
+    final companyId = idController.companyId.value;
+    final branchId = idController.branchId.value;
+
+    if (_socket != null && companyId.isNotEmpty) {
+      _socket!.emit('dashboard:subscribe', {
+        'companyId': companyId,
+        'branchId': branchId,
+      });
+    }
   }
 
   // Get recent GC count
   int get recentGCCount {
     return recentGCs.length;
+  }
+
+  @override
+  void onClose() {
+    _socket?.dispose();
+    super.onClose();
   }
 }

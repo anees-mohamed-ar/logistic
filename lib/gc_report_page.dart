@@ -47,17 +47,21 @@ class _GCReportPageState extends State<GCReportPage>
   // Table view mode
   bool _isCardView = false;
 
+  // Calculate meaningful metrics
   int get totalGCs => filteredGcList.length;
-  double get totalHireAmount =>
-      filteredGcList.fold(0, (sum, gc) => sum + _parseDouble(gc['HireAmount']));
-  double get totalAdvanceAmount => filteredGcList.fold(
-    0,
-    (sum, gc) => sum + _parseDouble(gc['AdvanceAmount']),
-  );
-  double get totalFreightCharge => filteredGcList.fold(
-    0,
-    (sum, gc) => sum + _parseDouble(gc['FreightCharge']),
-  );
+  int get totalWithAttachments => filteredGcList
+      .where((gc) => (gc['attachment_count'] as int? ?? 0) > 0)
+      .length;
+  int get totalPaid => filteredGcList
+      .where((gc) => (gc['PaymentDetails']?.toString().isNotEmpty ?? false))
+      .length;
+  double get avgWeight => filteredGcList.isEmpty
+      ? 0.0
+      : filteredGcList.fold(
+              0.0,
+              (sum, gc) => sum + _parseDouble(gc['ActualWeightKgs']),
+            ) /
+            filteredGcList.length;
 
   @override
   void initState() {
@@ -129,15 +133,15 @@ class _GCReportPageState extends State<GCReportPage>
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _totalHireAnim = Tween<double>(
       begin: 0,
-      end: totalHireAmount,
+      end: totalWithAttachments.toDouble(),
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _totalAdvanceAnim = Tween<double>(
       begin: 0,
-      end: totalAdvanceAmount,
+      end: totalPaid.toDouble(),
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _totalFreightAnim = Tween<double>(
       begin: 0,
-      end: totalFreightCharge,
+      end: avgWeight,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _controller.forward(from: 0);
   }
@@ -371,36 +375,36 @@ class _GCReportPageState extends State<GCReportPage>
         'GC Number',
         'Date',
         'Truck',
-        'PO Number',
-        'Trip ID',
-        'Broker',
+        'Truck Type',
+        'From',
+        'To',
         'Driver',
         'Consignor',
         'Consignee',
         'Packages',
         'Weight (kg)',
-        'Rate',
-        'Hire Amount',
-        'Advance',
-        'Freight',
+        'Delivery Date',
+        'Payment',
+        'Invoice',
+        'E-Way',
       ];
 
       final fieldKeys = [
         'GcNumber',
         'GcDate',
         'TruckNumber',
-        'PoNumber',
-        'TripId',
-        'BrokerName',
+        'TruckType',
+        'TruckFrom',
+        'TruckTo',
         'DriverName',
         'ConsignorName',
         'ConsigneeName',
         'NumberofPkg',
         'ActualWeightKgs',
-        'Rate',
-        'HireAmount',
-        'AdvanceAmount',
-        'FreightCharge',
+        'DeliveryDate',
+        'PaymentDetails',
+        'invoice_attachment',
+        'e_way_attachment',
       ];
 
       // Add headers
@@ -424,23 +428,8 @@ class _GCReportPageState extends State<GCReportPage>
           final key = fieldKeys[colIndex];
           dynamic value = gc[key];
 
-          // Format currency fields
-          if (['HireAmount', 'AdvanceAmount', 'FreightCharge'].contains(key)) {
-            value = _parseDouble(value);
-            final cell = sheet.cell(
-              excel.CellIndex.indexByColumnRow(
-                columnIndex: colIndex,
-                rowIndex: rowIndex + 1,
-              ),
-            );
-            cell.value = excel.DoubleCellValue(value);
-            cell.cellStyle = excel.CellStyle(
-              fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
-              fontSize: 11,
-              numberFormat: excel.NumFormat.standard_2,
-            );
-          } else if (key == 'GcDate') {
-            // Format date field
+          // Format date fields
+          if (['GcDate', 'DeliveryDate'].contains(key)) {
             final displayValue = _formatDate(value?.toString() ?? '');
             final cell = sheet.cell(
               excel.CellIndex.indexByColumnRow(
@@ -452,6 +441,25 @@ class _GCReportPageState extends State<GCReportPage>
             cell.cellStyle = excel.CellStyle(
               fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
               fontSize: 11,
+            );
+          }
+          // Format invoice and e-way attachment status
+          else if (['invoice_attachment', 'e_way_attachment'].contains(key)) {
+            final hasAttachment =
+                value?.toString().isNotEmpty == true &&
+                value?.toString() != 'null';
+            final displayValue = hasAttachment ? 'Yes' : 'No';
+            final cell = sheet.cell(
+              excel.CellIndex.indexByColumnRow(
+                columnIndex: colIndex,
+                rowIndex: rowIndex + 1,
+              ),
+            );
+            cell.value = excel.TextCellValue(displayValue);
+            cell.cellStyle = excel.CellStyle(
+              fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
+              fontSize: 11,
+              horizontalAlign: excel.HorizontalAlign.Center,
             );
           } else {
             // Handle null values and convert to string
@@ -539,6 +547,21 @@ class _GCReportPageState extends State<GCReportPage>
       return;
     }
 
+    // Show loading dialog while generating Excel
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text('Generating Excel file...'),
+          ],
+        ),
+      ),
+    );
+
     try {
       // Create Excel workbook
       final excel.Excel workbook = excel.Excel.createExcel();
@@ -561,36 +584,36 @@ class _GCReportPageState extends State<GCReportPage>
         'GC Number',
         'Date',
         'Truck',
-        'PO Number',
-        'Trip ID',
-        'Broker',
+        'Truck Type',
+        'From',
+        'To',
         'Driver',
         'Consignor',
         'Consignee',
         'Packages',
         'Weight (kg)',
-        'Rate',
-        'Hire Amount',
-        'Advance',
-        'Freight',
+        'Delivery Date',
+        'Payment',
+        'Invoice',
+        'E-Way',
       ];
 
       final fieldKeys = [
         'GcNumber',
         'GcDate',
         'TruckNumber',
-        'PoNumber',
-        'TripId',
-        'BrokerName',
+        'TruckType',
+        'TruckFrom',
+        'TruckTo',
         'DriverName',
         'ConsignorName',
         'ConsigneeName',
         'NumberofPkg',
         'ActualWeightKgs',
-        'Rate',
-        'HireAmount',
-        'AdvanceAmount',
-        'FreightCharge',
+        'DeliveryDate',
+        'PaymentDetails',
+        'invoice_attachment',
+        'e_way_attachment',
       ];
 
       // Add headers
@@ -614,23 +637,8 @@ class _GCReportPageState extends State<GCReportPage>
           final key = fieldKeys[colIndex];
           dynamic value = gc[key];
 
-          // Format currency fields
-          if (['HireAmount', 'AdvanceAmount', 'FreightCharge'].contains(key)) {
-            value = _parseDouble(value);
-            final cell = sheet.cell(
-              excel.CellIndex.indexByColumnRow(
-                columnIndex: colIndex,
-                rowIndex: rowIndex + 1,
-              ),
-            );
-            cell.value = excel.DoubleCellValue(value);
-            cell.cellStyle = excel.CellStyle(
-              fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
-              fontSize: 11,
-              numberFormat: excel.NumFormat.standard_2,
-            );
-          } else if (key == 'GcDate') {
-            // Format date field
+          // Format date fields
+          if (['GcDate', 'DeliveryDate'].contains(key)) {
             final displayValue = _formatDate(value?.toString() ?? '');
             final cell = sheet.cell(
               excel.CellIndex.indexByColumnRow(
@@ -642,6 +650,25 @@ class _GCReportPageState extends State<GCReportPage>
             cell.cellStyle = excel.CellStyle(
               fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
               fontSize: 11,
+            );
+          }
+          // Format invoice and e-way attachment status
+          else if (['invoice_attachment', 'e_way_attachment'].contains(key)) {
+            final hasAttachment =
+                value?.toString().isNotEmpty == true &&
+                value?.toString() != 'null';
+            final displayValue = hasAttachment ? 'Yes' : 'No';
+            final cell = sheet.cell(
+              excel.CellIndex.indexByColumnRow(
+                columnIndex: colIndex,
+                rowIndex: rowIndex + 1,
+              ),
+            );
+            cell.value = excel.TextCellValue(displayValue);
+            cell.cellStyle = excel.CellStyle(
+              fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
+              fontSize: 11,
+              horizontalAlign: excel.HorizontalAlign.Center,
             );
           } else {
             // Handle null values and convert to string
@@ -661,16 +688,16 @@ class _GCReportPageState extends State<GCReportPage>
         }
       }
 
-      // Auto-fit columns (approximate width based on content)
-      for (int i = 0; i < headers.length; i++) {
-        sheet.setColumnWidth(i, 15.0); // Set reasonable width
-      }
-
       // Get temporary directory for sharing
       final directory = await getTemporaryDirectory();
       final fileName =
           'GC_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx';
       final filePath = '${directory.path}/$fileName';
+
+      // Auto-fit columns for better readability
+      for (int i = 0; i < headers.length; i++) {
+        sheet.setColumnWidth(i, 15.0); // Set reasonable width
+      }
 
       // Save file
       final fileBytes = workbook.encode();
@@ -678,21 +705,45 @@ class _GCReportPageState extends State<GCReportPage>
         final file = File(filePath);
         await file.writeAsBytes(fileBytes);
 
+        // Close loading dialog
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+        }
+
         // Share the file
         final xFile = XFile(filePath);
         await Share.shareXFiles([xFile], text: 'GC Report Export');
 
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Excel file shared: $fileName')));
+        // Clean up temporary file after sharing (whether successful or cancelled)
+        try {
+          if (await file.exists()) {
+            await file.delete();
+            debugPrint('Temporary file deleted: $filePath');
+          }
+        } catch (e) {
+          debugPrint('Failed to delete temporary file: $e');
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Excel file ready for sharing: $fileName')),
+          );
+        }
       } else {
         throw Exception('Failed to encode Excel file');
       }
     } catch (e) {
+      // Close loading dialog if still open
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
       print('Excel share error: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
+      }
     }
   }
 
@@ -701,21 +752,17 @@ class _GCReportPageState extends State<GCReportPage>
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 768;
     final isTablet = screenWidth >= 768 && screenWidth < 1024;
-    final bottomPadding = isMobile ? 80.0 : 24.0;
 
     return Scaffold(
       appBar: _buildAppBar(isMobile),
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Padding(
-        padding: EdgeInsets.only(bottom: bottomPadding),
-        child: RefreshIndicator(
-          onRefresh: fetchGCList,
-          child: isLoading
-              ? _buildLoadingState()
-              : error != null
-              ? _buildErrorState()
-              : _buildMainContent(isMobile, isTablet),
-        ),
+      body: RefreshIndicator(
+        onRefresh: fetchGCList,
+        child: isLoading
+            ? _buildLoadingState()
+            : error != null
+            ? _buildErrorState()
+            : _buildMainContent(isMobile, isTablet),
       ),
     );
   }
@@ -865,23 +912,23 @@ class _GCReportPageState extends State<GCReportPage>
         true,
       ),
       _SummaryCardData(
-        'Total Hire',
+        'With Attachments',
         _totalHireAnim,
-        Icons.currency_rupee,
+        Icons.attach_file,
         const Color(0xFF10B981),
-        false,
+        true,
       ),
       _SummaryCardData(
-        'Total Advance',
+        'Paid GCs',
         _totalAdvanceAnim,
-        Icons.account_balance_wallet,
+        Icons.payments,
         const Color(0xFFF59E0B),
-        false,
+        true,
       ),
       _SummaryCardData(
-        'Total Freight',
+        'Avg Weight (kg)',
         _totalFreightAnim,
-        Icons.local_shipping,
+        Icons.monitor_weight,
         const Color(0xFF8B5CF6),
         false,
       ),
@@ -1100,12 +1147,16 @@ class _GCReportPageState extends State<GCReportPage>
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    'GC #${gc['GcNumber'] ?? 'N/A'}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).primaryColor,
+                  child: InkWell(
+                    onTap: () => _showGCOptions(gc),
+                    child: Text(
+                      'GC #${gc['GcNumber'] ?? 'N/A'}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).primaryColor,
+                        decoration: TextDecoration.underline,
+                      ),
                     ),
                   ),
                 ),
@@ -1132,8 +1183,12 @@ class _GCReportPageState extends State<GCReportPage>
             ),
             const SizedBox(height: 12),
             _buildCardRow('Date', gc['GcDate']),
+            _buildCardRow('Truck Type', gc['TruckType']),
+            _buildCardRow(
+              'Route',
+              '${gc['TruckFrom'] ?? 'N/A'} → ${gc['TruckTo'] ?? 'N/A'}',
+            ),
             _buildCardRow('Driver', gc['DriverName']),
-            _buildCardRow('Broker', gc['BrokerName']),
             _buildCardRow('Consignor', gc['ConsignorName']),
             _buildCardRow('Consignee', gc['ConsigneeName']),
             const SizedBox(height: 8),
@@ -1142,28 +1197,105 @@ class _GCReportPageState extends State<GCReportPage>
             Row(
               children: [
                 Expanded(
-                  child: _buildAmountChip(
-                    'Hire',
-                    _formatCurrency(_parseDouble(gc['HireAmount'])),
-                    Theme.of(context).primaryColor,
+                  child: _buildInfoChip(
+                    'Packages',
+                    gc['NumberofPkg']?.toString() ?? '0',
+                    Colors.blue,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _buildAmountChip(
-                    'Advance',
-                    _formatCurrency(_parseDouble(gc['AdvanceAmount'])),
+                  child: _buildInfoChip(
+                    'Weight',
+                    '${gc['ActualWeightKgs'] ?? '0'} kg',
                     Colors.orange,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _buildAmountChip(
-                    'Freight',
-                    _formatCurrency(_parseDouble(gc['FreightCharge'])),
-                    Colors.purple,
+                  child: _buildInfoChip(
+                    'Payment',
+                    (gc['PaymentDetails']?.toString().isEmpty ?? true)
+                        ? 'Pending'
+                        : gc['PaymentDetails'],
+                    Colors.green,
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Invoice and E-Way attachment status
+            Row(
+              children: [
+                Expanded(
+                  child: _buildAttachmentChip(
+                    (gc['invoice_attachment']?.toString().isNotEmpty ??
+                            false) &&
+                        gc['invoice_attachment']?.toString() != 'null',
+                    'invoice_attachment',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildAttachmentChip(
+                    (gc['e_way_attachment']?.toString().isNotEmpty ?? false) &&
+                        gc['e_way_attachment']?.toString() != 'null',
+                    'e_way_attachment',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(child: SizedBox()), // Spacer for alignment
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Attachments row - clickable
+            if ((gc['attachment_count'] as int? ?? 0) > 0)
+              InkWell(
+                onTap: () => _navigateToAttachments(gc),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.attach_file,
+                      size: 16,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${gc['attachment_count']} attachment(s)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).primaryColor,
+                        fontWeight: FontWeight.w500,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.open_in_new,
+                      size: 12,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 8),
+            // Action buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _viewInGCList(gc),
+                    icon: const Icon(Icons.list_alt, size: 16),
+                    label: const Text('View in List'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      textStyle: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Download button hidden
+                const Expanded(child: SizedBox()),
               ],
             ),
           ],
@@ -1435,7 +1567,7 @@ class _GCReportPageState extends State<GCReportPage>
     }
   }
 
-  Widget _buildAmountChip(String label, String amount, Color color) {
+  Widget _buildInfoChip(String label, String value, Color color) {
     // Create darker variants of the color for text
     final darkerColor = Color.alphaBlend(Colors.black.withOpacity(0.3), color);
     final evenDarkerColor = Color.alphaBlend(
@@ -1466,12 +1598,45 @@ class _GCReportPageState extends State<GCReportPage>
           ),
           const SizedBox(height: 1),
           Text(
-            amount,
+            value,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: evenDarkerColor,
               height: 1.1,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttachmentChip(bool hasAttachment, String type) {
+    final isInvoice = type == 'invoice_attachment';
+    final color = hasAttachment ? Colors.green : Colors.red;
+    final icon = isInvoice ? Icons.receipt : Icons.description;
+    final text = hasAttachment ? 'Yes' : 'No';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
             ),
           ),
         ],
@@ -1497,36 +1662,36 @@ class _GCReportPageState extends State<GCReportPage>
       'GC Number',
       'Date',
       'Truck',
-      'PO Number',
-      'Trip ID',
-      'Broker',
+      'Truck Type',
+      'From',
+      'To',
       'Driver',
       'Consignor',
       'Consignee',
       'Packages',
       'Weight (kg)',
-      'Rate',
-      'Hire Amount',
-      'Advance',
-      'Freight',
+      'Delivery Date',
+      'Payment',
+      'Invoice',
+      'E-Way',
     ];
 
     final fieldKeys = [
       'GcNumber',
       'GcDate',
       'TruckNumber',
-      'PoNumber',
-      'TripId',
-      'BrokerName',
+      'TruckType',
+      'TruckFrom',
+      'TruckTo',
       'DriverName',
       'ConsignorName',
       'ConsigneeName',
       'NumberofPkg',
       'ActualWeightKgs',
-      'Rate',
-      'HireAmount',
-      'AdvanceAmount',
-      'FreightCharge',
+      'DeliveryDate',
+      'PaymentDetails',
+      'invoice_attachment',
+      'e_way_attachment',
     ];
 
     // Pagination calculations
@@ -1577,90 +1742,164 @@ class _GCReportPageState extends State<GCReportPage>
             ),
           ),
 
-          // Scrollable table
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth:
-                    MediaQuery.of(context).size.width - (isMobile ? 24 : 32),
-              ),
-              child: DataTable(
-                headingRowHeight: 56,
-                dataRowHeight: 56,
-                headingRowColor: MaterialStateProperty.all(Colors.grey.shade50),
-                columns: columns
-                    .map(
-                      (c) => DataColumn(
-                        label: Expanded(
-                          child: Text(
-                            c,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
+          // Scrollable table with fixed GC number column
+          Row(
+            children: [
+              // Fixed GC number column
+              Container(
+                width: 80,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  border: Border(
+                    right: BorderSide(color: Colors.grey.shade300),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Header
+                    Container(
+                      height: 56,
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: const Text(
+                        'GC Number',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
                         ),
                       ),
-                    )
-                    .toList(),
-                rows: pageData.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final item = entry.value;
-                  final Color? rowColor = index % 2 == 0
-                      ? Colors.white
-                      : Colors.grey[50]; // Changed from shade25 to [50]
-                  return DataRow(
-                    color: MaterialStateProperty.all(rowColor),
-                    cells: fieldKeys.map((key) {
-                      String displayValue = item[key]?.toString() ?? '';
+                    ),
+                    // Data rows
+                    ...pageData.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final item = entry.value;
+                      final Color? rowColor = index % 2 == 0
+                          ? Colors.white
+                          : Colors.grey[50];
 
-                      // Format date field
-                      if (key == 'GcDate') {
-                        displayValue = _formatDate(displayValue);
-                      }
-                      // Format currency fields
-                      else if ([
-                        'HireAmount',
-                        'AdvanceAmount',
-                        'FreightCharge',
-                      ].contains(key)) {
-                        displayValue = _formatCurrency(_parseDouble(item[key]));
-                      }
-
-                      return DataCell(
-                        Container(
-                          constraints: const BoxConstraints(maxWidth: 140),
+                      return Container(
+                        height: 56,
+                        color: rowColor,
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: InkWell(
+                          onTap: () => _showGCOptions(item),
                           child: Text(
-                            displayValue,
-                            overflow: TextOverflow.ellipsis,
+                            item['GcNumber']?.toString() ?? 'N/A',
                             style: TextStyle(
                               fontSize: 12,
-                              fontWeight:
-                                  [
-                                    'HireAmount',
-                                    'AdvanceAmount',
-                                    'FreightCharge',
-                                  ].contains(key)
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                              color:
-                                  [
-                                    'HireAmount',
-                                    'AdvanceAmount',
-                                    'FreightCharge',
-                                  ].contains(key)
-                                  ? Theme.of(context).primaryColor
-                                  : Colors.black87,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).primaryColor,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       );
                     }).toList(),
-                  );
-                }).toList(),
+                  ],
+                ),
               ),
-            ),
+              // Scrollable other columns
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth:
+                          MediaQuery.of(context).size.width -
+                          152, // Account for fixed column
+                    ),
+                    child: DataTable(
+                      showCheckboxColumn: false,
+                      headingRowHeight: 56,
+                      dataRowHeight: 56,
+                      headingRowColor: MaterialStateProperty.all(
+                        Colors.grey.shade50,
+                      ),
+                      columns: columns
+                          .skip(1)
+                          .map(
+                            // Skip GC number column
+                            (c) => DataColumn(
+                              label: Expanded(
+                                child: Text(
+                                  c,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      rows: pageData.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final item = entry.value;
+                        final Color? rowColor = index % 2 == 0
+                            ? Colors.white
+                            : Colors.grey[50];
+                        return DataRow(
+                          color: MaterialStateProperty.all(rowColor),
+                          onSelectChanged: (selected) {
+                            if (selected == true) {
+                              _showGCOptions(item);
+                            }
+                          },
+                          cells: fieldKeys.skip(1).map((key) {
+                            // Skip GC number field
+                            String displayValue = item[key]?.toString() ?? '';
+
+                            // Format date fields
+                            if (key == 'GcDate' || key == 'DeliveryDate') {
+                              displayValue = _formatDate(displayValue);
+                            }
+                            // Format invoice and e-way attachment status
+                            else if (key == 'invoice_attachment' ||
+                                key == 'e_way_attachment') {
+                              final hasAttachment =
+                                  displayValue.isNotEmpty &&
+                                  displayValue != 'null';
+                              displayValue = hasAttachment ? 'Yes' : 'No';
+                            }
+                            // Format payment details with better styling
+                            else if (key == 'PaymentDetails') {
+                              displayValue = displayValue.isEmpty
+                                  ? 'Pending'
+                                  : displayValue;
+                            }
+
+                            return DataCell(
+                              Container(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 140,
+                                ),
+                                child:
+                                    key == 'invoice_attachment' ||
+                                        key == 'e_way_attachment'
+                                    ? _buildAttachmentChip(
+                                        displayValue == 'Yes',
+                                        key,
+                                      )
+                                    : Text(
+                                        displayValue,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w400,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
 
           // Pagination controls
@@ -1885,6 +2124,102 @@ class _GCReportPageState extends State<GCReportPage>
         ],
       ),
     );
+  }
+
+  // Feature-rich action methods
+  void _navigateToAttachments(Map<String, dynamic> gc) {
+    final gcNumber = gc['GcNumber']?.toString() ?? '';
+    final gcId = gc['Id']?.toString() ?? '';
+
+    if (gcNumber.isEmpty) {
+      Get.snackbar(
+        'Error',
+        'GC Number not found',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    // Navigate to attachments page
+    Get.toNamed(
+      '/gc_attachments',
+      arguments: {
+        'gcNumber': gcNumber,
+        'gcId': gcId,
+        'companyId': _idController.companyId.value,
+        'branchId': _idController.branchId.value,
+      },
+    );
+  }
+
+  void _showGCOptions(Map<String, dynamic> gc) {
+    final gcNumber = gc['GcNumber']?.toString() ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'GC #$gcNumber Options',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: const Icon(Icons.list_alt, color: Colors.blue),
+              title: const Text('View in GC List'),
+              subtitle: const Text('Highlight in GC list view'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _viewInGCList(gc);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.attach_file, color: Colors.green),
+              title: const Text('View Attachments'),
+              subtitle: const Text('See all attached files'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _navigateToAttachments(gc);
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _viewInGCList(Map<String, dynamic> gc) {
+    final gcId = gc['Id']?.toString() ?? '';
+    final gcNumber = gc['GcNumber']?.toString() ?? '';
+
+    if (gcId.isEmpty) {
+      Get.snackbar(
+        'Error',
+        'GC ID not found',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    Get.snackbar(
+      'Opening GC List',
+      'Navigating to GC #$gcNumber...',
+      backgroundColor: Theme.of(context).primaryColor,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 2),
+    );
+
+    // Navigate to GC list with highlighting
+    Get.toNamed('/gc_list', arguments: {'highlightGcId': gcId});
   }
 }
 

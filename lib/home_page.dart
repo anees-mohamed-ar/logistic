@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:async';
@@ -23,6 +25,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   bool _showAllActions = false;
+  bool _showAllRecentActivity = false;
   bool _isCheckingGcAccess = false; // Prevents overlapping GC access checks
 
   // State for summary data
@@ -1211,7 +1214,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     Expanded(
                       child: _buildStatItem(
                         'GCs',
-                        dashboardController.totalGCs.value.toString(),
+                        dashboardController.totalGCs.value,
                         Icons.description,
                         const Color(0xFF3B82F6),
                       ),
@@ -1220,7 +1223,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     Expanded(
                       child: _buildStatItem(
                         'Drivers',
-                        dashboardController.totalDrivers.value.toString(),
+                        dashboardController.totalDrivers.value,
                         Icons.person,
                         const Color(0xFF10B981),
                       ),
@@ -1229,7 +1232,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     Expanded(
                       child: _buildStatItem(
                         'Trucks',
-                        dashboardController.totalTrucks.value.toString(),
+                        dashboardController.totalTrucks.value,
                         Icons.local_shipping,
                         const Color(0xFFF59E0B),
                       ),
@@ -1244,32 +1247,32 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     });
   }
 
-  Widget _buildStatItem(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _buildStatItem(String title, int value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(10),
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(height: 12),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: OdometerNumber(value: value, color: color),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
             title,
             style: TextStyle(
@@ -1285,6 +1288,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Widget _buildRecentActivitySection() {
     return Obx(() {
+      final recentGCs = dashboardController.recentGCs;
+      final displayItems = _showAllRecentActivity
+          ? recentGCs
+          : recentGCs.take(3).toList();
+
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -1296,13 +1304,44 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Recent Activity',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1A1A1A),
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Recent Activity',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  if (recentGCs.length > 3)
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _showAllRecentActivity = !_showAllRecentActivity;
+                        });
+                      },
+                      icon: Icon(
+                        _showAllRecentActivity
+                            ? Icons.expand_less
+                            : Icons.expand_more,
+                        size: 16,
+                      ),
+                      label: Text(
+                        _showAllRecentActivity ? 'Show Less' : 'Show More',
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Theme.of(context).primaryColor,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 16),
               if (dashboardController.isLoading.value)
@@ -1312,7 +1351,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     child: CircularProgressIndicator(),
                   ),
                 )
-              else if (dashboardController.recentGCs.isEmpty)
+              else if (recentGCs.isEmpty)
                 Container(
                   padding: const EdgeInsets.all(32),
                   child: Center(
@@ -1337,8 +1376,26 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ),
                 )
               else
-                ...dashboardController.recentGCs.map(
-                  (gc) => _buildRecentGCItem(gc),
+                Column(
+                  children: [
+                    ...displayItems.map((gc) => _buildRecentGCItem(gc)),
+                    if (!_showAllRecentActivity && recentGCs.length > 3)
+                      Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        child: TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _showAllRecentActivity = true;
+                            });
+                          },
+                          icon: const Icon(Icons.expand_more, size: 16),
+                          label: Text('Show ${recentGCs.length - 3} more'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Theme.of(context).primaryColor,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
             ],
           ),
@@ -1363,13 +1420,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       gc['ConsigneeName']?.toString() ?? 'Unknown',
     );
 
+    // Determine if this GC was recently updated vs created
+    final createdAt = gc['created_at']?.toString();
+    final updatedAt = gc['updated_at']?.toString();
+    final isUpdated =
+        createdAt != null && updatedAt != null && updatedAt != createdAt;
+    final displayDate = (isUpdated ? updatedAt : date) ?? date;
+
     String formattedDate = 'Unknown date';
-    if (date.isNotEmpty) {
+    if (displayDate.isNotEmpty) {
       try {
-        final dateTime = DateTime.parse(date);
+        final dateTime = DateTime.parse(displayDate);
         formattedDate = '${dateTime.day}/${dateTime.month}/${dateTime.year}';
       } catch (e) {
-        formattedDate = date;
+        formattedDate = displayDate;
       }
     }
 
@@ -1396,13 +1460,58 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  gcNumber,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: Color(0xFF1A1A1A),
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      gcNumber,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (isUpdated)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFF59E0B)),
+                        ),
+                        child: const Text(
+                          'Updated',
+                          style: TextStyle(
+                            color: Color(0xFF92400E),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD1FAE5),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFF10B981)),
+                        ),
+                        child: const Text(
+                          'Created',
+                          style: TextStyle(
+                            color: Color(0xFF065F46),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -1517,6 +1626,312 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// Simple odometer-style rolling number made of individual digit wheels.
+// Each digit animates when it changes, similar to a kilometer counter.
+class OdometerNumber extends StatefulWidget {
+  final int value;
+  final Color color;
+
+  const OdometerNumber({super.key, required this.value, required this.color});
+
+  @override
+  State<OdometerNumber> createState() => _OdometerNumberState();
+}
+
+class _OdometerNumberState extends State<OdometerNumber> {
+  late List<int> _previousDigits;
+  late List<int> _currentDigits;
+  late int _displayValue;
+  Timer? _stepTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayValue = widget.value;
+    _currentDigits = _getDigits(_displayValue);
+    _previousDigits = List.from(_currentDigits);
+  }
+
+  List<int> _getDigits(int value) {
+    return value
+        .clamp(0, 999999)
+        .toString()
+        .padLeft(4, '0')
+        .split('')
+        .map((d) => int.parse(d))
+        .toList();
+  }
+
+  @override
+  void didUpdateWidget(OdometerNumber oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      _startStepping(widget.value);
+    }
+  }
+
+  void _startStepping(int targetValue) {
+    _stepTimer?.cancel();
+
+    if (targetValue == _displayValue) return;
+
+    final int direction = targetValue > _displayValue ? 1 : -1;
+    final int distance = (targetValue - _displayValue).abs();
+
+    // Faster steps for large jumps, slower for small changes
+    final int stepMs = distance <= 10
+        ? 500
+        : distance <= 50
+        ? 100
+        : distance <= 100
+        ? 40
+        : 10;
+
+    _stepTimer = Timer.periodic(Duration(milliseconds: stepMs), (timer) {
+      if (_displayValue == targetValue) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        _previousDigits = _getDigits(_displayValue);
+        _displayValue += direction;
+        _currentDigits = _getDigits(_displayValue);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _stepTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: widget.color.withOpacity(0.35), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(_currentDigits.length, (index) {
+          return _OdometerDigit(
+            currentDigit: _currentDigits[index],
+            previousDigit: _previousDigits[index],
+            color: widget.color,
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _OdometerDigit extends StatefulWidget {
+  final int currentDigit;
+  final int previousDigit;
+  final Color color;
+
+  const _OdometerDigit({
+    required this.currentDigit,
+    required this.previousDigit,
+    required this.color,
+  });
+
+  @override
+  State<_OdometerDigit> createState() => _OdometerDigitState();
+}
+
+class _OdometerDigitState extends State<_OdometerDigit>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  late int _displayDigit;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayDigit = widget.currentDigit;
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 320),
+      vsync: this,
+    );
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOutCubic,
+    );
+  }
+
+  @override
+  void didUpdateWidget(_OdometerDigit oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentDigit != widget.currentDigit) {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 48,
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.black.withOpacity(0.15), width: 1),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Stack(
+          children: [
+            // Top half highlight (optional)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 24,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.04),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 23.5,
+              left: 0,
+              right: 0,
+              height: 1,
+              child: Container(color: Colors.black.withOpacity(0.3)),
+            ),
+            // Animated digits with true drum roll
+            AnimatedBuilder(
+              animation: _animation,
+              builder: (context, child) {
+                final progress = _animation.value;
+                final offset = (1 - progress) * 48; // slide up
+
+                return Stack(
+                  children: [
+                    // Previous digit sliding out
+                    Positioned(
+                      top: offset - 48,
+                      left: 0,
+                      right: 0,
+                      height: 48,
+                      child: Center(
+                        child: Text(
+                          widget.previousDigit.toString(),
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black,
+                            height: 1.0,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Current digit sliding in
+                    Positioned(
+                      top: offset,
+                      left: 0,
+                      right: 0,
+                      height: 48,
+                      child: Center(
+                        child: Text(
+                          widget.currentDigit.toString(),
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black,
+                            height: 1.0,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MechanicalRoller extends StatelessWidget {
+  final int previousDigit;
+  final int currentDigit;
+  final double progress;
+  final Color color;
+
+  const _MechanicalRoller({
+    required this.previousDigit,
+    required this.currentDigit,
+    required this.progress,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Calculate rotation for smooth rolling effect
+    int diff = currentDigit - previousDigit;
+    if (diff < 0) diff += 10;
+
+    final rotations = diff * progress;
+
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()
+        ..setEntry(3, 2, 0.002) // Perspective
+        ..rotateX(rotations * math.pi * 0.2), // Rotate on X-axis
+      child: Center(
+        child: _buildDigitText(((previousDigit + rotations) % 10).floor()),
+      ),
+    );
+  }
+
+  Widget _buildDigitText(int digit) {
+    return Text(
+      digit.toString(),
+      style: TextStyle(
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        color: Colors.white,
+        height: 1.0,
+        shadows: [Shadow(color: color.withOpacity(0.5), blurRadius: 4)],
+        fontFeatures: const [FontFeature.tabularFigures()],
       ),
     );
   }

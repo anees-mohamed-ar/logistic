@@ -13,6 +13,7 @@ import 'package:logistic/login_screen.dart';
 import 'package:logistic/gc_form_screen.dart';
 import 'package:logistic/gc_report_page.dart';
 import 'package:logistic/gc_list_page.dart';
+import 'package:logistic/gc_attachments_page.dart';
 import 'package:logistic/views/gst/gst_form_page.dart';
 import 'package:logistic/views/km/km_form_page.dart';
 import 'package:logistic/views/km/km_list_page.dart';
@@ -77,6 +78,7 @@ class AppRoutes {
   static const String gcAssignment = '/gc_assignment';
   static const String temporaryGcList = '/temporary-gc-list';
   static const String gcHistory = '/gc_history';
+  static const String gcAttachments = '/gc_attachments';
 
   static final routes = [
     GetPage(name: splash, page: () => const SplashScreen()),
@@ -282,6 +284,18 @@ class AppRoutes {
     GetPage(
       name: gcHistory,
       page: () => GCHistoryPage(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: gcAttachments,
+      page: () {
+        final args = Get.arguments as Map<String, dynamic>? ?? {};
+        return GCAttachmentsPage(
+          gcNumber: args['gcNumber']?.toString() ?? '',
+          companyId: args['companyId']?.toString() ?? '',
+          branchId: args['branchId']?.toString() ?? '',
+        );
+      },
       transition: Transition.rightToLeft,
     ),
   ];
